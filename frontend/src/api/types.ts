@@ -152,6 +152,86 @@ export interface SharedList {
   items: ListItem[]
 }
 
+export interface ChoreCompletion {
+  id: number
+  chore_id: number
+  user_id: number
+  on: string
+  status: 'pending' | 'done'
+  points_awarded: number
+}
+
+export interface ChoreDef {
+  id: number
+  title: string
+  notes: string | null
+  points: number
+  schedule: 'daily' | 'weekly' | 'once'
+  weekdays: number[]
+  due_on: string | null
+  requires_approval: boolean
+  icon: string | null
+  assignee_ids: number[]
+}
+
+export interface BoardChore {
+  chore_id: number
+  title: string
+  notes: string | null
+  icon: string | null
+  points: number
+  requires_approval: boolean
+  schedule: string
+  completion: ChoreCompletion | null
+}
+
+export interface PersonBoard {
+  user_id: number
+  name: string
+  color: string
+  avatar_emoji: string | null
+  stars: number
+  chores: BoardChore[]
+}
+
+export interface Reward {
+  id: number
+  title: string
+  description: string | null
+  points_cost: number
+  icon: string | null
+}
+
+export interface Redemption {
+  id: number
+  reward_id: number
+  reward_title: string
+  user_id: number
+  user_name: string
+  color: string
+  points_spent: number
+  status: string
+}
+
+export interface PendingApproval {
+  completion_id: number
+  chore_id: number
+  title: string
+  user_id: number
+  user_name: string
+  color: string
+  points: number
+  on: string
+}
+
+export interface ChoreBoard {
+  on: string
+  people: PersonBoard[]
+  rewards: Reward[]
+  pending_redemptions: Redemption[]
+  pending_approvals: PendingApproval[]
+}
+
 export interface AppSettings {
   first_day_of_week: number
   time_format_24h: boolean
