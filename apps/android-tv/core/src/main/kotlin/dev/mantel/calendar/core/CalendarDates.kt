@@ -91,10 +91,26 @@ fun timedRange(day: LocalDate, startMinutes: Int, endMinutes: Int, zone: ZoneId)
 }
 
 /** All-day events are UTC midnights with an exclusive end. One day is start..start+1. */
-fun allDayRange(day: LocalDate): Pair<String, String> {
-    val start = day.toString()
-    val end = day.plusDays(1).toString()
-    return "${start}T00:00:00Z" to "${end}T00:00:00Z"
+fun allDayRange(day: LocalDate): Pair<String, String> = allDaySpan(day, day)
+
+/** `endDay` is inclusive on the wall. The wire format's end is the morning after it. */
+fun allDaySpan(startDay: LocalDate, endDay: LocalDate): Pair<String, String> {
+    val end = if (endDay.isBefore(startDay)) startDay else endDay
+    return "${startDay}T00:00:00Z" to "${end.plusDays(1)}T00:00:00Z"
+}
+
+fun eventDay(event: CalEvent, home: ZoneId): LocalDate {
+    if (event.allDay) return utcDate(event.startAt)
+    return parseInstant(event.startAt).atZone(eventZone(event, home)).toLocalDate()
+}
+
+/** Start and end minutes from midnight in the event's zone. Null for an all-day event. */
+fun eventMinutes(event: CalEvent, home: ZoneId): Pair<Int, Int>? {
+    if (event.allDay) return null
+    val zone = eventZone(event, home)
+    val start = parseInstant(event.startAt).atZone(zone)
+    val end = parseInstant(event.endAt).atZone(zone)
+    return (start.hour * 60 + start.minute) to (end.hour * 60 + end.minute)
 }
 
 private val DAY_LABEL = DateTimeFormatter.ofPattern("EEE, MMM d")

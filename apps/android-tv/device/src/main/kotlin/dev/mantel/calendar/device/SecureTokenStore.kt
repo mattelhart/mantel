@@ -1,42 +1,60 @@
-package dev.mantel.calendar.tv.store
+package dev.mantel.calendar.device
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.preferencesDataStoreFile
 import kotlinx.coroutines.flow.first
 import java.security.KeyStore
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-private val Context.store by preferencesDataStore("mantel_tv")
-
 data class SavedConnection(val origin: String?, val token: String?)
 
 /**
  * The server address is not a secret. The device token is: an AES key that
- * never leaves the Android Keystore encrypts it before it is written to DataStore.
+ * never leaves the Android Keystore encrypts it before it is written.
+ *
+ * The TV already stores under "mantel_tv". A phone passes its own file name.
+ * The keystore alias stays per app, because each app has its own keystore.
  */
-class SecureTokenStore(private val context: Context) {
+class SecureTokenStore(
+    context: Context,
+    private val preferencesName: String = "mantel_tv",
+    private val keyAlias: String = "mantel_device_token",
+) {
+    private val app = context.applicationContext
+    private val store = dataStore(app, preferencesName)
+    private val originKey = stringPreferencesKey("origin")
+    private val tokenKey = stringPreferencesKey("token")
+
     suspend fun read(): SavedConnection {
-        val prefs = context.store.data.first()
-        val token = prefs[TOKEN]?.let { runCatching { decrypt(it) }.getOrNull() }
-        return SavedConnection(prefs[ORIGIN], token)
+        val prefs = store.data.first()
+        val token = prefs[tokenKey]?.let { runCatching { decrypt(it) }.getOrNull() }
+        return SavedConnection(prefs[originKey], token)
     }
 
     suspend fun saveOrigin(origin: String) {
-        context.store.edit { it[ORIGIN] = origin }
+        store.edit { it[originKey] = origin }
     }
 
     suspend fun saveToken(token: String?) {
-        context.store.edit { prefs ->
-            if (token.isNullOrBlank()) prefs.remove(TOKEN) else prefs[TOKEN] = encrypt(token)
+        store.edit { prefs ->
+            if (token.isNullOrBlank()) prefs.remove(tokenKey) else prefs[tokenKey] = encrypt(token)
         }
+    }
+
+    suspend fun clear() {
+        store.edit { it.clear() }
     }
 
     private fun encrypt(plain: String): String {
@@ -60,10 +78,10 @@ class SecureTokenStore(private val context: Context) {
 
     private fun key(): SecretKey {
         val keystore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keystore.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (keystore.getKey(keyAlias, null) as? SecretKey)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
-            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            KeyGenParameterSpec.Builder(keyAlias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
@@ -73,10 +91,15 @@ class SecureTokenStore(private val context: Context) {
     }
 
     private companion object {
-        const val ALIAS = "mantel_device_token"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val TRANSFORM = "AES/GCM/NoPadding"
-        val ORIGIN = stringPreferencesKey("origin")
-        val TOKEN = stringPreferencesKey("token")
+        val stores = ConcurrentHashMap<String, DataStore<Preferences>>()
+
+        fun dataStore(context: Context, name: String): DataStore<Preferences> =
+            stores.getOrPut(name) {
+                PreferenceDataStoreFactory.create(
+                    produceFile = { context.preferencesDataStoreFile(name) },
+                )
+            }
     }
 }

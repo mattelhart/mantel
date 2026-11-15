@@ -1,8 +1,10 @@
 # Mantel for Google TV
 
 A remote-only calendar for the living room. D-pad, select, and Back. The
-`core` module is plain Kotlin — HTTP, dates, and the chore rules — so a future
-phone app can depend on it without taking the TV screens.
+`core` module is plain Kotlin — HTTP, dates, and the chore rules. The phone
+app (`:phone`, see [docs/android-phone.md](../../docs/android-phone.md)) depends
+on it and does not take these screens. Token storage lives in `:device`, shared
+by both apps.
 
 The look is a bright board: warm paper, big type, and a thick dark ring on
 whatever has focus.
@@ -17,10 +19,11 @@ export ANDROID_HOME="$ANDROID_SDK_ROOT"   # or wherever the SDK lives
 ./gradlew assembleDebug test
 ```
 
-The debug APK is
+`assembleDebug` builds the TV app and the phone app. The debug APKs are
 
 ```text
 apps/android-tv/app/build/outputs/apk/debug/app-debug.apk
+apps/android-tv/phone/build/outputs/apk/debug/phone-debug.apk
 ```
 
 ## Sideload onto a Google TV
@@ -92,4 +95,3 @@ Gaps:
   whole series when the event has a recurrence rule.
 - Weekly and one-off chores are created on the wall. The TV checks today's list
   and redeems rewards.
-- There is no push channel. The app polls, the same way the wall does.

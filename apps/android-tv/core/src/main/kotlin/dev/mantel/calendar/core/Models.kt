@@ -158,6 +158,7 @@ data class PendingApproval(
     val title: String,
     val userId: Int,
     val userName: String,
+    val color: String = "#3b82f6",
     val points: Int,
     val on: String,
 )

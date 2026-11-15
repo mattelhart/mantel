@@ -174,11 +174,20 @@ fun applyListCheck(lists: List<SharedList>, listId: Int, itemId: Int, checked: B
 }
 
 fun offlineLabel(savedAtIso: String?, zone: ZoneId = ZoneId.systemDefault(), now: Instant = Instant.now()): String {
-    if (savedAtIso.isNullOrBlank()) return "Offline, last synced earlier"
-    val then = runCatching { Instant.parse(savedAtIso) }.getOrNull() ?: return "Offline, last synced earlier"
+    val whenText = syncedWhen(savedAtIso, zone, now) ?: return "Offline, last synced earlier"
+    return "Offline, last synced $whenText"
+}
+
+fun syncedLabel(savedAtIso: String?, zone: ZoneId = ZoneId.systemDefault(), now: Instant = Instant.now()): String {
+    val whenText = syncedWhen(savedAtIso, zone, now) ?: return "Not synced yet"
+    return "Synced $whenText"
+}
+
+private fun syncedWhen(savedAtIso: String?, zone: ZoneId, now: Instant): String? {
+    if (savedAtIso.isNullOrBlank()) return null
+    val then = runCatching { Instant.parse(savedAtIso) }.getOrNull() ?: return null
     val zoned = then.atZone(zone)
     val time = DateTimeFormatter.ofPattern("h:mm a").format(zoned)
-    val whenText = if (zoned.toLocalDate() == now.atZone(zone).toLocalDate()) time
+    return if (zoned.toLocalDate() == now.atZone(zone).toLocalDate()) time
     else "${zoned.monthValue}/${zoned.dayOfMonth} $time"
-    return "Offline, last synced $whenText"
 }

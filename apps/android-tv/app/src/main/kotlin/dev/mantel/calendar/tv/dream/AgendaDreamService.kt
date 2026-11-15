@@ -11,7 +11,7 @@ import dev.mantel.calendar.core.eventsOn
 import dev.mantel.calendar.core.formatWhen
 import dev.mantel.calendar.core.todayIn
 import dev.mantel.calendar.core.zoneOrUtc
-import dev.mantel.calendar.tv.store.SecureTokenStore
+import dev.mantel.calendar.device.SecureTokenStore
 import io.ktor.client.engine.cio.CIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

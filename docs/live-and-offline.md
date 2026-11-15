@@ -62,8 +62,9 @@ family data is not polled. While it is down, one timer refetches about every
 60 seconds — the old cadence, as a fallback. A gap (`resync`) waits a
 fraction of a second before refetching, for the same reason.
 
-The TV app uses the client in `apps/android-tv/core`. A future phone app can
-call `MantelClient.listen` the same way.
+The TV app and the Android phone app use the client in `apps/android-tv/core`.
+Both call `MantelClient.listen` the same way. The phone install notes are in
+[android-phone.md](android-phone.md).
 
 ## Offline
 

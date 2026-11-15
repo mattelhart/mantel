@@ -87,6 +87,13 @@ class MantelClient(
     suspend fun addList(name: String): SharedList =
         post("/lists", buildJsonObject { put("name", name) })
 
+    suspend fun deleteItem(listId: Int, itemId: Int) {
+        send<Unit>(HttpMethod.Delete, "/lists/$listId/items/$itemId", null)
+    }
+
+    suspend fun clearChecked(listId: Int): SharedList =
+        post("/lists/$listId/clear-checked", buildJsonObject {})
+
     suspend fun choreBoard(on: String? = null): ChoreBoard =
         get("/chores/board", if (on == null) emptyMap() else mapOf("on" to on))
 

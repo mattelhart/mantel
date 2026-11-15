@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The server is HTTP on the LAN. Android cannot express "private IPs and
+  100.64.0.0/10" as domains, so cleartext is permitted here and
+  cleartextPermitted() refuses a public IP before any request is sent.
+  Hostnames such as familycal.local and Tailscale MagicDNS stay allowed.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
