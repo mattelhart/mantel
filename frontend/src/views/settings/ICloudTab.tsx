@@ -24,7 +24,6 @@ export function ICloudTab() {
   const { data: status, refetch: refetchStatus } = useQuery({
     queryKey: ['sync-status'],
     queryFn: () => api.get<SyncStatus>('/sync/status'),
-    refetchInterval: 30_000,
   })
 
   const [connecting, setConnecting] = useState<number | null>(null)

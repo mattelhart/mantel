@@ -204,7 +204,9 @@
   bottom: calc(var(--nav-size) + 12px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 150;
+  /* Above the screensaver. A wall that has gone idle is the one that
+     needs to say the schedule is stale. */
+  z-index: 260;
   background: var(--bg-elev-2);
   border: 1px solid var(--border);
   border-radius: 999px;

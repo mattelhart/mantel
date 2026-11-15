@@ -403,6 +403,25 @@ def test_replaying_a_request_id_does_not_award_or_spend_twice(client, db):
     assert db.query(StarEntry).count() == 2, "the replay must not write a second spend"
 
 
+def test_replaying_an_uncheck_does_not_take_the_stars_twice(client, db):
+    """The offline queue sends the same request_id again when the link returns.
+    That retry must not write a second reversal."""
+    sam = user(client, "Sam")
+    row = chore(client, [sam["id"]], points=4).json()
+    client.post(
+        f"/api/chores/{row['id']}/complete",
+        json={"user_id": sam["id"], "on": "2026-11-15", "done": True, "request_id": "on"},
+    )
+    undo = {"user_id": sam["id"], "on": "2026-11-15", "done": False, "request_id": "off"}
+    first = client.post(f"/api/chores/{row['id']}/complete", json=undo)
+    replay = client.post(f"/api/chores/{row['id']}/complete", json=undo)
+    assert first.status_code == 200, first.text
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["completion"] is None
+    assert client.get("/api/chores/board?on=2026-11-15").json()["people"][0]["stars"] == 0
+    assert db.query(StarEntry).count() == 2
+
+
 def test_a_child_needs_no_account(client):
     """A family member is a name and a color. Chores do not require a login
     or a linked Google or iCloud account."""

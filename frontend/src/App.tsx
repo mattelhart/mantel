@@ -9,6 +9,9 @@ import { VersionBadge } from './components/VersionBadge'
 import { useBurnInShift } from './hooks/useIdle'
 import { useOnline } from './hooks/useOnline'
 import { useViewportFit } from './hooks/useViewportFit'
+import { useLiveUpdates, useOfflineReplay } from './live/useLive'
+import { lastSyncedLabel } from './offline/board'
+import { useLastSynced } from './offline/useLastSynced'
 import { applyTheme, isThemeId } from './theme'
 
 /** The four calendar views, each its own destination. A phone shows one entry for
@@ -36,9 +39,12 @@ export function App() {
   // Keeps the app the height of the space actually available, so a phone keyboard
   // never covers the nav or a modal's Save button.
   useViewportFit()
+  useLiveUpdates()
+  useOfflineReplay()
 
   const shift = useBurnInShift(settings?.burn_in_shift ?? false)
   const online = useOnline()
+  const syncedAt = useLastSynced()
 
   // Optional shortcut to somewhere else in the house. No bookmark, no bar --
   // the grid row collapses, so nobody pays vertical space for a feature they
@@ -106,7 +112,11 @@ export function App() {
         ))}
         <VersionBadge />
       </nav>
-      {!online && <div className="offline">Offline — showing the last known schedule</div>}
+      {!online && (
+        <div className="offline" role="status">
+          Offline, last synced {lastSyncedLabel(syncedAt)}
+        </div>
+      )}
       <Screensaver />
     </div>
   )

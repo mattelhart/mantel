@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import { useEntityMutation, useUsers } from '../../api/hooks'
+import { checkListItem } from '../../offline/actions'
 import type { SharedList } from '../../api/types'
 
 const LIST_KEYS = ['lists']
@@ -10,7 +11,6 @@ export function ListsPage() {
   const { data: lists = [] } = useQuery({
     queryKey: LIST_KEYS,
     queryFn: () => api.get<SharedList[]>('/lists'),
-    refetchInterval: 30_000,
   })
   const [newName, setNewName] = useState('')
 
@@ -72,11 +72,7 @@ function ListCard({ list }: { list: SharedList }) {
       api.post(`/lists/${list.id}/items`, body),
     LIST_KEYS,
   )
-  const patchItem = useEntityMutation(
-    ({ id, ...patch }: { id: number; checked?: boolean }) =>
-      api.patch(`/lists/${list.id}/items/${id}`, patch),
-    LIST_KEYS,
-  )
+  const qc = useQueryClient()
   const removeItem = useEntityMutation(
     (id: number) => api.del(`/lists/${list.id}/items/${id}`),
     LIST_KEYS,
@@ -124,7 +120,12 @@ function ListCard({ list }: { list: SharedList }) {
               className="listitem__check"
               aria-label={item.checked ? `Uncheck ${item.text}` : `Check off ${item.text}`}
               style={item.color && !item.checked ? { borderColor: item.color } : undefined}
-              onClick={() => patchItem.mutate({ id: item.id, checked: !item.checked })}
+              onClick={() =>
+                void checkListItem(
+                  { listId: list.id, itemId: item.id, checked: !item.checked },
+                  qc,
+                ).catch(() => undefined)
+              }
             >
               {item.checked ? '✓' : ''}
             </button>

@@ -15,9 +15,6 @@ accident; it's an inconsistency rather than a trap.
 series, on both Google and iCloud. Cancelling a single iCloud occurrence does work. The
 transport supports more than the UI exposes.
 
-**Changes made offline aren't queued.** The wall keeps showing the last known schedule, but an
-edit made while the network is down is lost.
-
 **Drag to move an event** between times or days.
 
 **Serving CalDAV.** Mantel is now a CalDAV *client* (that is how iCloud sync works), but it does
@@ -27,6 +24,18 @@ they cannot write back.
 **Chores and rewards**, and **meal planning** -- both frequently asked for, neither started.
 
 ## Unreleased
+
+**Screens hear about a change within a second.** `GET /api/live` is a
+Server-Sent Events stream. A commit — including a Google or iCloud pull —
+names what changed, and open browsers and the TV app refetch that. Polling
+stays as the fallback when the stream is down. See
+[docs/live-and-offline.md](docs/live-and-offline.md).
+
+**The wall keeps working through a network drop.** The last calendar, chores
+and rewards stay on screen, with `Offline, last synced <time>`. Chore
+check-offs, reward redeems and list ticks queue and replay with the same
+`request_id`, so a retry does not award or spend stars twice. Event edits are
+not queued: the server's copy wins.
 
 **The API asks who you are, except on the wall.** Requests from the home network
 (and from the Pi kiosk, which Docker presents as a private address) still need

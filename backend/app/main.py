@@ -21,6 +21,7 @@ from .routers import (
     events,
     feeds,
     lists,
+    live,
     meta,
     photos,
     sync,
@@ -31,8 +32,13 @@ from .routers import (
     settings as settings_router,
 )
 from .schema_sync import sync as sync_schema
+from .services import live as live_notices
 from .services import scheduler
 from .services.device_auth import DeviceAuthMiddleware, is_public
+
+# Registers the commit listener. Importing the router is not enough if a test
+# reaches the hub without loading this module's routes.
+live_notices.install()
 
 settings = get_settings()
 
@@ -108,6 +114,7 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(photos.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(lists.router, prefix="/api")
+app.include_router(live.router, prefix="/api")
 app.include_router(chores.router, prefix="/api")
 app.include_router(chores.rewards_router, prefix="/api")
 app.include_router(chores.redemptions_router, prefix="/api")

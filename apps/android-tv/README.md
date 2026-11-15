@@ -69,8 +69,11 @@ a code while `AUTH_MODE=lan`.
 - Chores for each person, with their color and stars. Select checks today's
   occurrence only. Approve or send back a chore that is waiting. Rewards spend
   stars; **Given** or **Send back** finishes the request.
-- Refreshes about every 60 seconds and when the app resumes. If the server is
-  down, the last data stays up and a line says it can't be reached.
+- Follows `GET /api/live` (the same stream as the wall) and refetches only what
+  changed. If the stream drops, it polls about every 60 seconds. Offline, the
+  last calendar, lists and chores stay up with `Offline, last synced <time>`.
+  A chore check or list tick made then is replayed, with the same `request_id`,
+  when the TV can reach the Pi again.
 - Optional screensaver: in the TV's screensaver settings, pick **Mantel today**.
   It shows today's agenda.
 

@@ -2,18 +2,24 @@ package dev.mantel.calendar.core
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.content.TextContent
+import io.ktor.utils.io.readUTF8Line
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -27,7 +33,14 @@ class MantelClient(
     private val origin: () -> String,
     private val token: () -> String?,
 ) {
-    private val http = HttpClient(engine) { expectSuccess = false }
+    private val http = HttpClient(engine) {
+        expectSuccess = false
+        install(HttpTimeout) {
+            connectTimeoutMillis = 10_000
+            requestTimeoutMillis = 30_000
+            socketTimeoutMillis = 30_000
+        }
+    }
 
     suspend fun reachable(base: String): Boolean = try {
         val response = http.get("$base/api/health")
@@ -114,6 +127,70 @@ class MantelClient(
 
     suspend fun deny(redemptionId: Int): RedemptionInfo =
         post("/redemptions/$redemptionId/deny", buildJsonObject {})
+
+    /**
+     * Blocks until the stream ends. Callers reconnect with [reconnectDelayMs]
+     * and pass the last id they saw so a short drop does not refetch everything.
+     */
+    suspend fun listen(lastId: Long?, onLine: (String) -> Unit) {
+        try {
+            http.prepareGet(url("/live")) {
+                auth()
+                header(HttpHeaders.Accept, "text/event-stream")
+                if (lastId != null) header("Last-Event-ID", lastId.toString())
+                timeout {
+                    // The client default would close a quiet stream at 30s.
+                    // Keepalives arrive every 15s; this only bounds a dead socket.
+                    requestTimeoutMillis = Long.MAX_VALUE
+                    socketTimeoutMillis = 45_000
+                }
+            }.execute { response ->
+                if (response.status.value !in 200..299) {
+                    val text = response.bodyAsText()
+                    val envelope = runCatching { mantelJson.decodeFromString<ErrorEnvelope>(text) }.getOrNull()
+                    throw MantelException(
+                        envelope?.error?.code ?: "error",
+                        envelope?.error?.message ?: "The calendar could not do that",
+                        response.status.value,
+                    )
+                }
+                val channel = response.bodyAsChannel()
+                while (!channel.isClosedForRead) {
+                    val line = channel.readUTF8Line() ?: break
+                    onLine(line)
+                }
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw unreachable(e)
+        }
+    }
+
+    /** Replays one queued tap. 2xx is done, a refusal is dropped, a dead network is retried. */
+    suspend fun replayWrite(method: String, path: String, body: String?): ReplayOutcome {
+        val httpMethod = when (method) {
+            "PATCH" -> HttpMethod.Patch
+            "DELETE" -> HttpMethod.Delete
+            else -> HttpMethod.Post
+        }
+        val response = try {
+            http.request(url(path)) {
+                this.method = httpMethod
+                auth()
+                if (body != null) setBody(TextContent(body, ContentType.Application.Json))
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            return ReplayOutcome.Retry
+        }
+        val status = response.status.value
+        runCatching { response.bodyAsText() }
+        return when {
+            status in 200..299 -> ReplayOutcome.Done
+            status == 401 || status == 408 || status == 429 || status >= 500 -> ReplayOutcome.Retry
+            else -> ReplayOutcome.Drop
+        }
+    }
 
     fun close() = http.close()
 

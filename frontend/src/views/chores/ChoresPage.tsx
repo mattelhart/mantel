@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiError, api } from '../../api/client'
 import { useEntityMutation, useUsers } from '../../api/hooks'
+import { checkChore, redeemReward, reviewChore } from '../../offline/actions'
 import type { ChoreBoard, ChoreDef, PersonBoard } from '../../api/types'
 import { formatBoardDay, shiftDay, weekdayLabel } from './dates'
 
@@ -13,7 +14,7 @@ export function ChoresPage() {
   const { data, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['chores', 'board', on ?? 'today'],
     queryFn: () => api.get<ChoreBoard>(path),
-    refetchInterval: 30_000,
+    // The live stream refreshes this. The 60s poll is the fallback when it drops.
   })
   const { data: chores = [] } = useQuery({
     queryKey: ['chores', 'defs'],
@@ -53,7 +54,7 @@ export function ChoresPage() {
       </header>
 
       <div className="chores__body">
-        {isError && (
+        {isError && !data && (
           <p className="hint">
             {error instanceof ApiError ? error.message : 'The calendar is unreachable.'}{' '}
             <button className="iconbtn" onClick={() => void refetch()}>
@@ -109,24 +110,19 @@ export function ChoresPage() {
 }
 
 function ApprovalRow({ item }: { item: ChoreBoard['pending_approvals'][number] }) {
-  const approve = useEntityMutation(
-    () => api.post(`/chores/completions/${item.completion_id}/approve`),
-    KEYS,
-  )
-  const reject = useEntityMutation(
-    () => api.post(`/chores/completions/${item.completion_id}/reject`),
-    KEYS,
-  )
+  const qc = useQueryClient()
+  const approve = () => void reviewChore(item.completion_id, true, qc).catch(() => undefined)
+  const reject = () => void reviewChore(item.completion_id, false, qc).catch(() => undefined)
   return (
     <div className="chores__approval">
       <span className="chores__swatch" style={{ background: item.color }} />
       <span>
         {item.user_name} · {item.title} · {item.points}★ · {item.on}
       </span>
-      <button className="btn btn--primary" onClick={() => approve.mutate(undefined as never)}>
+      <button className="btn btn--primary" onClick={approve}>
         Approve
       </button>
-      <button className="btn" onClick={() => reject.mutate(undefined as never)}>
+      <button className="btn" onClick={reject}>
         Not yet
       </button>
     </div>
@@ -134,16 +130,9 @@ function ApprovalRow({ item }: { item: ChoreBoard['pending_approvals'][number] }
 }
 
 function PersonColumn({ person, day }: { person: PersonBoard; day: string }) {
-  const toggle = useEntityMutation(
-    (body: { chore_id: number; done: boolean; request_id: string }) =>
-      api.post(`/chores/${body.chore_id}/complete`, {
-        user_id: person.user_id,
-        on: day,
-        done: body.done,
-        request_id: body.request_id,
-      }),
-    KEYS,
-  )
+  const qc = useQueryClient()
+  const toggle = (choreId: number, done: boolean) =>
+    void checkChore({ choreId, userId: person.user_id, on: day, done }, qc).catch(() => undefined)
 
   return (
     <section className="chores__person">
@@ -166,13 +155,7 @@ function PersonColumn({ person, day }: { person: PersonBoard; day: string }) {
                 className="listitem__check"
                 aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
                 style={!checked ? { borderColor: person.color } : undefined}
-                onClick={() =>
-                  toggle.mutate({
-                    chore_id: chore.chore_id,
-                    done: !checked,
-                    request_id: crypto.randomUUID(),
-                  })
-                }
+                onClick={() => toggle(chore.chore_id, !checked)}
               >
                 {status === 'done' ? '✓' : status === 'pending' ? '…' : ''}
               </button>
@@ -209,14 +192,11 @@ function Rewards({
     (body: { title: string; points_cost: number }) => api.post('/rewards', body),
     KEYS,
   )
-  const redeem = useEntityMutation(
-    (body: { reward_id: number; user_id: number; request_id: string }) =>
-      api.post(`/rewards/${body.reward_id}/redeem`, {
-        user_id: body.user_id,
-        request_id: body.request_id,
-      }),
-    KEYS,
-  )
+  const qc = useQueryClient()
+  const redeem = (rewardId: number, userId: number) =>
+    void redeemReward({ rewardId, userId }, qc).catch((err: unknown) => {
+      setMessage(err instanceof Error ? err.message : 'Could not redeem that.')
+    })
   const fulfill = useEntityMutation(
     (id: number) => api.post(`/redemptions/${id}/fulfill`),
     KEYS,
@@ -264,14 +244,8 @@ function Rewards({
               className="btn btn--primary"
               onClick={() => {
                 if (spender == null) return
-                redeem.mutate(
-                  { reward_id: row.id, user_id: spender, request_id: crypto.randomUUID() },
-                  {
-                    onSuccess: () => setMessage(''),
-                    onError: (err) =>
-                      setMessage(err instanceof ApiError ? err.message : 'Could not redeem'),
-                  },
-                )
+                setMessage('')
+                void redeem(row.id, spender)
               }}
             >
               Redeem

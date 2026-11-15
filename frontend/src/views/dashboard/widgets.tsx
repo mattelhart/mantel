@@ -1,8 +1,9 @@
 import { addDays, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns'
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useEntityMutation, useEvents, useUsers, useWeather } from '../../api/hooks'
+import { checkChore, checkListItem } from '../../offline/actions'
 import type { SharedList } from '../../api/types'
 import type { CalendarEvent, ChoreBoard } from '../../api/types'
 import { pickList } from './pickList'
@@ -212,7 +213,6 @@ function ListWidget({ config, onConfigChange }: WidgetProps) {
   const { data: lists = [] } = useQuery({
     queryKey: ['lists'],
     queryFn: () => api.get<SharedList[]>('/lists'),
-    refetchInterval: 30_000,
   })
 
   // An id that doesn't match is a removed list, not "show the first one". Falling
@@ -224,11 +224,7 @@ function ListWidget({ config, onConfigChange }: WidgetProps) {
     (body: { text: string }) => api.post(`/lists/${list?.id}/items`, body),
     ['lists'],
   )
-  const toggle = useEntityMutation(
-    ({ id, checked }: { id: number; checked: boolean }) =>
-      api.patch(`/lists/${list?.id}/items/${id}`, { checked }),
-    ['lists'],
-  )
+  const qc = useQueryClient()
 
   const choose = (id: number) => onConfigChange({ ...config, list_id: id })
 
@@ -293,7 +289,13 @@ function ListWidget({ config, onConfigChange }: WidgetProps) {
               className="listitem__check"
               aria-label={item.checked ? `Uncheck ${item.text}` : `Check off ${item.text}`}
               style={item.color && !item.checked ? { borderColor: item.color } : undefined}
-              onClick={() => toggle.mutate({ id: item.id, checked: !item.checked })}
+              onClick={() =>
+                list &&
+                void checkListItem(
+                  { listId: list.id, itemId: item.id, checked: !item.checked },
+                  qc,
+                ).catch(() => undefined)
+              }
             >
               {item.checked ? '✓' : ''}
             </button>
@@ -492,18 +494,8 @@ function ChoresWidget({ config }: WidgetProps) {
   const { data } = useQuery({
     queryKey: ['chores', 'board', 'today'],
     queryFn: () => api.get<ChoreBoard>('/chores/board'),
-    refetchInterval: 30_000,
   })
-  const toggle = useEntityMutation(
-    (body: { choreId: number; userId: number; done: boolean; on: string; requestId: string }) =>
-      api.post(`/chores/${body.choreId}/complete`, {
-        user_id: body.userId,
-        on: body.on,
-        done: body.done,
-        request_id: body.requestId,
-      }),
-    ['chores'],
-  )
+  const qc = useQueryClient()
   const only = people(config)
   const shown = (data?.people ?? []).filter((p) => only.length === 0 || only.includes(p.user_id))
 
@@ -532,13 +524,15 @@ function ChoresWidget({ config }: WidgetProps) {
                     aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
                     onClick={() =>
                       data &&
-                      toggle.mutate({
-                        choreId: chore.chore_id,
-                        userId: person.user_id,
-                        done: !checked,
-                        on: data.on,
-                        requestId: crypto.randomUUID(),
-                      })
+                      void checkChore(
+                        {
+                          choreId: chore.chore_id,
+                          userId: person.user_id,
+                          done: !checked,
+                          on: data.on,
+                        },
+                        qc,
+                      ).catch(() => undefined)
                     }
                   >
                     {chore.completion?.status === 'done' ? '✓' : chore.completion?.status === 'pending' ? '…' : ''}

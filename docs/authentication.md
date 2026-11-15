@@ -20,6 +20,9 @@ except:
 | `GET /api/feeds/*.ics?token=` | Subscriptions already carry their own token. `GET /api/feeds/token`, which reveals it, is protected |
 | `GET /api/openapi.json`, `/api/docs`, `/api/redoc`, `/api/ai-guide` | The contract itself |
 
+`GET /api/live` (the change stream) is not in that list. A device token or a
+trusted address can open it. Anyone else gets the same `401` as `GET /api/users`.
+
 The HTML, CSS and JavaScript of the wall UI are not under `/api`. They are
 public. The data they request is not.
 
