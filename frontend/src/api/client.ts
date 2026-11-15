@@ -8,10 +8,48 @@ export class ApiError extends Error {
   }
 }
 
+/** Set once a browser has paired. The wall display on the home network never has one. */
+const TOKEN_KEY = 'mantel.deviceToken'
+
+export function deviceToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function storeDeviceToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearDeviceToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+/** Header for fetches that don't go through `api` (photo upload, the guide). */
+export function authHeaders(): Record<string, string> {
+  const token = deviceToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+/** `<img src>` cannot send a header. A paired browser appends the token; the wall
+ *  does not have one and is let in by its address. */
+export function authedUrl(url: string): string {
+  const token = deviceToken()
+  if (!token || url.includes('access_token=')) return url
+  const join = url.includes('?') ? '&' : '?'
+  return `${url}${join}access_token=${encodeURIComponent(token)}`
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...(init?.headers ?? {}),
+    },
   })
   if (!res.ok) {
     let code = 'error'

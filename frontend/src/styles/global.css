@@ -122,6 +122,9 @@ body,
 }
 
 body {
+  /* The screensaver hides the pointer, because nobody is there. The app itself
+     does not: a TV with a mouse has to be able to see it. */
+  cursor: auto;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -158,6 +161,49 @@ button {
   cursor: pointer;
   min-height: var(--touch);
   min-width: var(--touch);
+}
+
+/* A mouse on a TV gets no :active until the click lands, so hover is how a
+   control shows it can be used. Touch screens report hover unreliably; the
+   media query keeps this off them. Keyboard focus stays visible everywhere. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.is-dragging,
+.is-dragging button {
+  cursor: grabbing;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .navbtn:hover,
+  .iconbtn:hover,
+  .settings__tab:hover,
+  .btn:hover,
+  .minimonth__day:hover,
+  .agenda__main:hover,
+  .picker:hover,
+  .timegrid__slot:hover,
+  .topbar__link:hover {
+    background: var(--bg-elev-2);
+  }
+
+  .iconbtn--primary:hover,
+  .btn--primary:hover {
+    background: var(--accent);
+    filter: brightness(1.12);
+  }
+
+  .chip:hover,
+  .event-block:hover,
+  .personchip:hover {
+    filter: brightness(1.12);
+  }
 }
 
 /* ---- App shell: bottom nav in portrait, side rail in landscape ---- */

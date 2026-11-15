@@ -272,6 +272,60 @@ def test_making_an_event_recurring_afterwards(client, local_calendar):
     assert len(listed) == 3
 
 
+def test_weekly_event_keeps_wall_clock_across_dst():
+    """A 4pm event created in daylight time must still be 4pm after standard time.
+
+    Expanding the stored UTC instant by a fixed week is what shifts it an hour:
+    20:00 UTC is 4pm in New York during EDT and 3pm during EST. US DST ends on
+    2026-11-01, so the Monday after that is an hour later in UTC.
+    """
+    event = make_event("FREQ=WEEKLY", start=datetime(2026, 10, 26, 20, 0))
+    event.timezone = "America/New_York"
+    found = recurrence.occurrences(event, datetime(2026, 10, 26), datetime(2026, 11, 10))
+    assert [o.isoformat() for o in found] == [
+        "2026-10-26T20:00:00",
+        "2026-11-02T21:00:00",
+        "2026-11-09T21:00:00",
+    ]
+
+
+def test_dst_shift_uses_the_household_zone_when_the_event_has_none():
+    event = make_event("FREQ=WEEKLY", start=datetime(2026, 10, 26, 20, 0))
+    found = recurrence.occurrences(
+        event, datetime(2026, 10, 26), datetime(2026, 11, 10), zone="America/New_York"
+    )
+    assert found[1] == datetime(2026, 11, 2, 21, 0)
+
+
+def test_an_exclusion_matches_the_dst_corrected_instant():
+    """Exclusions are stored as the real UTC of that occurrence. Matching them
+    against the pre-correction instant would draw a cancelled week twice."""
+    event = make_event("FREQ=WEEKLY", start=datetime(2026, 10, 26, 20, 0))
+    event.timezone = "America/New_York"
+    event.exdates = "2026-11-02T21:00:00"
+    found = recurrence.occurrences(event, datetime(2026, 10, 26), datetime(2026, 11, 10))
+    assert datetime(2026, 11, 2, 21, 0) not in found
+    assert datetime(2026, 11, 9, 21, 0) in found
+
+
+def test_all_day_series_is_not_moved_by_a_zone():
+    event = make_event("FREQ=DAILY;COUNT=2", start=datetime(2026, 11, 1))
+    event.end_at = datetime(2026, 11, 2)
+    event.all_day = True
+    event.timezone = "America/New_York"
+    found = recurrence.occurrences(event, datetime(2026, 11, 1), datetime(2026, 11, 4))
+    assert found == [datetime(2026, 11, 1), datetime(2026, 11, 2)]
+
+
+def test_a_series_landing_in_the_skipped_hour_does_not_raise():
+    # 2026-03-08 is the US spring-forward. 02:30 that morning does not exist.
+    event = make_event("FREQ=WEEKLY", start=datetime(2026, 3, 2, 7, 30))
+    event.timezone = "America/New_York"
+    found = recurrence.occurrences(event, datetime(2026, 3, 1), datetime(2026, 3, 16))
+    assert found[0] == datetime(2026, 3, 2, 7, 30)
+    assert len(found) == 2
+
+
 def test_single_events_still_behave(client, local_calendar):
     """The recurrence branch must not disturb the ordinary path."""
     client.post(

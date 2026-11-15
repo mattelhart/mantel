@@ -2,7 +2,7 @@
 
 import threading
 import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fake_google import FakeGoogle, gevent
@@ -53,17 +53,24 @@ def gcal(client, db, fake):
 def test_feed_excludes_a_series_google_now_owns(client, db, gcal, fake):
     """Once pushed, Google's expanded instances are the record. Exporting the
     master's RRULE as well made every subscriber render the series twice."""
+    # The feed only ships the last 90 days, so a fixed August date ages out of it.
+    first = (datetime.now(UTC) + timedelta(days=7)).replace(minute=0, second=0, microsecond=0)
+    second = first + timedelta(days=7)
+
+    def stamp(moment: datetime) -> str:
+        return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def end(moment: datetime) -> str:
+        return stamp(moment + timedelta(minutes=30))
     client.post("/api/events", json={
         "calendar_id": gcal.id, "title": "Weekly sync",
-        "start_at": "2026-08-03T13:00:00Z", "end_at": "2026-08-03T13:30:00Z",
+        "start_at": stamp(first), "end_at": end(first),
         "recurrence_rule": "FREQ=WEEKLY;COUNT=4"})
     google_sync.push_pending(db)
 
     fake.pages = [([
-        gevent("g1_1", "Weekly sync", "2026-08-03T13:00:00Z", "2026-08-03T13:30:00Z",
-               recurringEventId="g1"),
-        gevent("g1_2", "Weekly sync", "2026-08-10T13:00:00Z", "2026-08-10T13:30:00Z",
-               recurringEventId="g1"),
+        gevent("g1_1", "Weekly sync", stamp(first), end(first), recurringEventId="g1"),
+        gevent("g1_2", "Weekly sync", stamp(second), end(second), recurringEventId="g1"),
     ], "t1")]
     google_sync.pull_calendar(db, gcal)
 

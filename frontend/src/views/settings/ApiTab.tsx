@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { authHeaders } from '../../api/client'
 import { Markdown } from '../../components/Markdown'
 
 /** Renders the same markdown that /api/ai-guide serves, so what a person reads here and
@@ -7,7 +8,7 @@ export function ApiTab() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['ai-guide'],
     queryFn: async () => {
-      const res = await fetch('/api/ai-guide')
+      const res = await fetch('/api/ai-guide', { headers: authHeaders() })
       if (!res.ok) throw new Error(`ai-guide ${res.status}`)
       return res.text()
     },
@@ -20,9 +21,9 @@ export function ApiTab() {
     <section className="panel">
       <h2>API</h2>
       <p className="hint">
-        Everything this app can do is available over HTTP, with no authentication — it is meant
-        for a trusted home network. Point another tool, a script, or an AI agent at the guide
-        below.
+        Everything this app can do is available over HTTP. The wall display and the rest of
+        the home network need no token. A phone away from home pairs under Devices and then
+        sends <code>Authorization: Bearer</code>. The guide below is what to hand an agent.
       </p>
 
       <div className="row">

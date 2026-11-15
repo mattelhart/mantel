@@ -27,7 +27,7 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
     values = {**DEFAULT_SETTINGS, **stored}
     # Secrets are write-only over the API. Reporting whether one is set is enough
     # for the settings screen to render, and means a stored client secret and a
-    # Home Assistant token can never be read back out of a no-auth LAN endpoint.
+    # Home Assistant token can never be read back out.
     values[google_config.CLIENT_SECRET_KEY] = ""
     values["ha_token"] = ""
 

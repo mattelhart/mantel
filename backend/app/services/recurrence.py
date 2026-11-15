@@ -19,7 +19,8 @@ separate component and this app stores as its own row. Both arrive here as
 cancelled and, in the second case, shows it twice.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil import rrule as rrule_lib
 from sqlalchemy.orm.attributes import set_committed_value
@@ -88,7 +89,52 @@ def validate(rule: str) -> str:
     return text
 
 
-def series_end(rule: str | None, dtstart: datetime, duration: timedelta) -> datetime | None:
+def zoneinfo(name: str | None) -> ZoneInfo | None:
+    if not name:
+        return None
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def _utc_to_local(moment: datetime, zone: ZoneInfo) -> datetime:
+    return moment.replace(tzinfo=UTC).astimezone(zone).replace(tzinfo=None)
+
+
+def _local_to_utc(moment: datetime, zone: ZoneInfo) -> datetime:
+    """Wall-clock time in `zone` back to naive UTC.
+
+    The hour a spring-forward skips does not exist. Attaching the zone and
+    converting shifts that instant forward instead of raising, so a series that
+    lands in the gap still has a start. The hour a fall-back repeats is taken
+    as the first one (still on daylight time).
+    """
+    return moment.replace(tzinfo=zone).astimezone(UTC).replace(tzinfo=None)
+
+
+def _rule_for_zone(rule: str, zone: ZoneInfo) -> str:
+    """UNTIL is stored as naive UTC. dateutil compares it to DTSTART as-is, so a
+    DTSTART expressed as a wall-clock time needs UNTIL on that same clock."""
+    parts = []
+    for piece in _naive_until(rule).split(";"):
+        if piece.startswith("UNTIL=") and "T" in piece:
+            raw = piece.split("=", 1)[1]
+            try:
+                until = datetime.strptime(raw[:15], "%Y%m%dT%H%M%S")
+            except ValueError:
+                parts.append(piece)
+                continue
+            local = _utc_to_local(until, zone)
+            parts.append("UNTIL=" + local.strftime("%Y%m%dT%H%M%S"))
+            continue
+        parts.append(piece)
+    return ";".join(parts)
+
+
+def series_end(
+    rule: str | None, dtstart: datetime, duration: timedelta, zone: str | None = None
+) -> datetime | None:
     """When a finite series stops, or None if it never does.
 
     Stored on the row so `list_events` can skip finished series in SQL. Without
@@ -97,8 +143,14 @@ def series_end(rule: str | None, dtstart: datetime, duration: timedelta) -> date
     """
     if not rule:
         return None
+    zi = zoneinfo(zone)
     try:
-        parsed = rrule_lib.rrulestr(_naive_until(rule), dtstart=dtstart)
+        if zi is None:
+            parsed = rrule_lib.rrulestr(_naive_until(rule), dtstart=dtstart)
+        else:
+            parsed = rrule_lib.rrulestr(
+                _rule_for_zone(rule, zi), dtstart=_utc_to_local(dtstart, zi)
+            )
     except (ValueError, TypeError):
         return None
 
@@ -112,10 +164,19 @@ def series_end(rule: str | None, dtstart: datetime, duration: timedelta) -> date
         last = occurrence
         if count >= MAX_OCCURRENCES:
             return None  # pathologically long; treat as unbounded
-    return None if last is None else last + duration
+    if last is None:
+        return None
+    # `last` is a wall-clock time when a zone was applied, and already UTC otherwise.
+    end_start = _local_to_utc(last, zi) if zi is not None else last
+    return end_start + duration
 
 
-def occurrences(event: Event, window_start: datetime, window_end: datetime) -> list[datetime]:
+def occurrences(
+    event: Event,
+    window_start: datetime,
+    window_end: datetime,
+    zone: str | None = None,
+) -> list[datetime]:
     """Start times for `event` that fall inside the window.
 
     The window is widened backwards by the event's duration so a long occurrence
@@ -128,20 +189,33 @@ def occurrences(event: Event, window_start: datetime, window_end: datetime) -> l
     duration = event.end_at - event.start_at
     search_from = window_start - duration
     excluded = excluded_starts(event)
+    # All-day series are dates with an exclusive end, not instants. Running them
+    # through a zone would move the day. A timed series is expanded on the wall
+    # clock of its zone (or the household zone, passed in) and converted back to
+    # UTC per occurrence. Adding a fixed UTC offset instead is what makes a 4pm
+    # weekly event read as 3pm after daylight saving ends.
+    zi = None if event.all_day else zoneinfo(event.timezone or zone)
 
     try:
         # Defensive: rules stored before normalisation existed, or written straight
         # into the database, may still carry a Z-suffixed UNTIL.
-        rule = rrule_lib.rrulestr(_naive_until(event.recurrence_rule), dtstart=event.start_at)
+        if zi is None:
+            rule = rrule_lib.rrulestr(_naive_until(event.recurrence_rule), dtstart=event.start_at)
+        else:
+            rule = rrule_lib.rrulestr(
+                _rule_for_zone(event.recurrence_rule, zi),
+                dtstart=_utc_to_local(event.start_at, zi),
+            )
     except (ValueError, TypeError):
         return []
 
     found: list[datetime] = []
     for occurrence in rule:
-        if occurrence >= window_end:
+        utc = _local_to_utc(occurrence, zi) if zi is not None else occurrence
+        if utc >= window_end:
             break
-        if occurrence > search_from and occurrence not in excluded:
-            found.append(occurrence)
+        if utc > search_from and utc not in excluded:
+            found.append(utc)
             if len(found) >= MAX_OCCURRENCES:
                 break
     return found
@@ -171,7 +245,9 @@ def excluded_starts(event: Event) -> set[datetime]:
     return out
 
 
-def materialise(event: Event, window_start: datetime, window_end: datetime) -> list[Event]:
+def materialise(
+    event: Event, window_start: datetime, window_end: datetime, zone: str | None = None
+) -> list[Event]:
     """Detached copies of `event`, one per occurrence in the window.
 
     These are never added to the session -- they exist only to be serialised. The
@@ -188,7 +264,7 @@ def materialise(event: Event, window_start: datetime, window_end: datetime) -> l
     duration = event.end_at - event.start_at
     out: list[Event] = []
 
-    for start in occurrences(event, window_start, window_end):
+    for start in occurrences(event, window_start, window_end, zone=zone):
         instance = Event(
             id=event.id,
             calendar_id=event.calendar_id,
@@ -250,7 +326,9 @@ def describe(rule: str | None) -> str | None:
     return text
 
 
-def next_occurrence_after(event: Event, moment: datetime) -> datetime | None:
+def next_occurrence_after(
+    event: Event, moment: datetime, zone: str | None = None
+) -> datetime | None:
     """First start time at or after `moment`, for countdowns and reminders."""
-    found = occurrences(event, moment, moment + timedelta(days=365 * 3))
+    found = occurrences(event, moment, moment + timedelta(days=365 * 3), zone=zone)
     return found[0] if found else None

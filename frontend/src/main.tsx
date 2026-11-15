@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
+import { ApiError } from './api/client'
 import { App } from './App'
 import './styles/global.css'
 import './styles/calendar.css'
@@ -15,7 +16,16 @@ import { SettingsPage } from './views/settings/SettingsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { refetchInterval: 60_000, refetchOnWindowFocus: true, staleTime: 15_000, retry: 1 },
+    queries: {
+      refetchInterval: 60_000,
+      refetchOnWindowFocus: true,
+      staleTime: 15_000,
+      // A 401 will not succeed on a retry, and the pairing screen should appear at once.
+      retry: (count, err) => {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return false
+        return count < 1
+      },
+    },
   },
 })
 

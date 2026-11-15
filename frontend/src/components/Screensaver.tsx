@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { addDays, format } from 'date-fns'
 import { useEffect, useState } from 'react'
-import { api } from '../api/client'
+import { api, authedUrl } from '../api/client'
 import { useEvents, useSettings } from '../api/hooks'
 import type { Photo } from '../api/types'
 import { useIdle, useSleepWindow } from '../hooks/useIdle'
@@ -102,9 +102,9 @@ function PhotoSlideshow({
       {/* The next image is mounted hidden so it is already decoded when its turn
           comes -- otherwise every transition flashes a blank frame. */}
       {next && next.id !== current?.id && (
-        <img className="saver__preload" src={next.url} alt="" aria-hidden />
+        <img className="saver__preload" src={authedUrl(next.url)} alt="" aria-hidden />
       )}
-      {current && <img key={current.id} className="saver__photo" src={current.url} alt="" />}
+      {current && <img key={current.id} className="saver__photo" src={authedUrl(current.url)} alt="" />}
       <div className="saver__overlay">
         <ClockOverlay />
       </div>

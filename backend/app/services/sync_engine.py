@@ -24,7 +24,7 @@ from .providers.base import (
     RemoteEvent,
     SyncTokenExpired,
 )
-from .providers.registry import for_account
+from .providers.registry import for_account, home_timezone
 
 log = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ def _apply_remote_event(db: Session, cal: Calendar, item: RemoteEvent) -> int:
             sync_state="synced",
             remote_updated_at=item.updated,
         )
-        _apply_recurrence(event, item)
+        _apply_recurrence(event, item, home_timezone(db))
         db.add(event)
         return 1
 
@@ -202,11 +202,11 @@ def _apply_remote_event(db: Session, cal: Calendar, item: RemoteEvent) -> int:
     existing.remote_etag = item.etag
     existing.recurring_event_id = item.recurring_event_id
     existing.remote_updated_at = item.updated
-    _apply_recurrence(existing, item)
+    _apply_recurrence(existing, item, home_timezone(db))
     return 1
 
 
-def _apply_recurrence(event: Event, item: RemoteEvent) -> None:
+def _apply_recurrence(event: Event, item: RemoteEvent, household_zone: str) -> None:
     """Carries a series' rule, its exclusions, and when it stops.
 
     Only providers that hand back masters set any of this -- Google expands its own
@@ -218,8 +218,9 @@ def _apply_recurrence(event: Event, item: RemoteEvent) -> None:
     """
     event.recurrence_rule = item.recurrence_rule
     event.exdates = _pack_exdates(item.exdates)
+    zone = None if event.all_day else (event.timezone or household_zone)
     event.recurrence_end = recurrence.series_end(
-        item.recurrence_rule, event.start_at, event.end_at - event.start_at
+        item.recurrence_rule, event.start_at, event.end_at - event.start_at, zone=zone
     )
 
 

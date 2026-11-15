@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { api } from '../../api/client'
+import { api, authHeaders, authedUrl } from '../../api/client'
 import { useEntityMutation, useSettings } from '../../api/hooks'
 import type { AppSettings, Photo } from '../../api/types'
 
@@ -162,7 +162,7 @@ function PhotoLibrary() {
       body.append('file', file)
       // Not the shared api client: this is multipart, and setting a JSON
       // Content-Type here would strip the multipart boundary.
-      const res = await fetch('/api/photos', { method: 'POST', body })
+      const res = await fetch('/api/photos', { method: 'POST', body, headers: authHeaders() })
       if (!res.ok) {
         const detail = await res.json().catch(() => null)
         failures.push(`${file.name}: ${detail?.error?.message ?? res.statusText}`)
@@ -212,7 +212,7 @@ function PhotoLibrary() {
         <div className="photogrid">
           {photos.map((p) => (
             <figure key={p.id} className="photogrid__item">
-              <img src={p.url} alt={p.original_name ?? ''} loading="lazy" />
+              <img src={authedUrl(p.url)} alt={p.original_name ?? ''} loading="lazy" />
               <button
                 className="photogrid__remove"
                 aria-label={`Delete ${p.original_name ?? 'photo'}`}

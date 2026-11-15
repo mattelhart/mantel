@@ -4,6 +4,8 @@ A malformed feed is rejected outright by strict parsers -- Home Assistant's is
 one -- so the format details here are load-bearing, not cosmetic.
 """
 
+from datetime import UTC, datetime, timedelta
+
 from app.services.crypto import feed_token
 
 
@@ -11,15 +13,33 @@ def token() -> str:
     return feed_token()
 
 
+def _soon(days: int = 7) -> datetime:
+    """Inside the feed's rolling window (the last 90 days and the next year).
+    A fixed August date falls out of that window as the clock moves on."""
+    return (datetime.now(UTC) + timedelta(days=days)).replace(minute=0, second=0, microsecond=0)
+
+
 def make_event(client, calendar_id, **extra):
+    start = _soon()
     payload = {
         "calendar_id": calendar_id,
         "title": "Soccer practice",
-        "start_at": "2026-08-03T17:00:00Z",
-        "end_at": "2026-08-03T18:30:00Z",
+        "start_at": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "end_at": (start + timedelta(hours=1, minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **extra,
     }
     return client.post("/api/events", json=payload)
+
+
+def all_day_span(days: int = 7) -> tuple[str, str, str, str]:
+    start = _soon(days).date()
+    end = start + timedelta(days=2)
+    return (
+        f"{start.isoformat()}T00:00:00Z",
+        f"{end.isoformat()}T00:00:00Z",
+        start.strftime("%Y%m%d"),
+        end.strftime("%Y%m%d"),
+    )
 
 
 def fetch_feed(client, path="all", **params):
@@ -57,11 +77,13 @@ def test_event_fields_are_present(client, local_calendar):
     )
     body = fetch_feed(client).text
 
+    start = _soon()
+    end = start + timedelta(hours=1, minutes=30)
     assert "SUMMARY:Soccer practice" in body
     assert "DESCRIPTION:Bring shin guards" in body
     assert "LOCATION:Riverside Park" in body
-    assert "DTSTART:20260803T170000Z" in body
-    assert "DTEND:20260803T183000Z" in body
+    assert f"DTSTART:{start.strftime('%Y%m%dT%H%M%SZ')}" in body
+    assert f"DTEND:{end.strftime('%Y%m%dT%H%M%SZ')}" in body
     assert "UID:famcal-" in body
 
 
@@ -74,17 +96,18 @@ def test_uid_is_stable_between_fetches(client, local_calendar):
 
 
 def test_all_day_events_use_date_values(client, local_calendar):
+    start, end, start_stamp, end_stamp = all_day_span()
     make_event(
         client,
         local_calendar["id"],
         title="Beach trip",
         all_day=True,
-        start_at="2026-08-01T00:00:00Z",
-        end_at="2026-08-03T00:00:00Z",
+        start_at=start,
+        end_at=end,
     )
     body = fetch_feed(client).text
-    assert "DTSTART;VALUE=DATE:20260801" in body
-    assert "DTEND;VALUE=DATE:20260803" in body
+    assert f"DTSTART;VALUE=DATE:{start_stamp}" in body
+    assert f"DTEND;VALUE=DATE:{end_stamp}" in body
 
 
 def test_recurring_events_export_the_rule_not_every_instance(client, local_calendar):
@@ -134,13 +157,14 @@ def test_feed_parses_with_a_real_icalendar_parser(client, local_calendar):
         location="Riverside Park, Field 3",
         recurrence_rule="FREQ=WEEKLY;BYDAY=MO",
     )
+    start, end, start_stamp, _end_stamp = all_day_span()
     make_event(
         client,
         local_calendar["id"],
         title="Beach trip",
         all_day=True,
-        start_at="2026-08-01T00:00:00Z",
-        end_at="2026-08-03T00:00:00Z",
+        start_at=start,
+        end_at=end,
     )
 
     parsed = Calendar.from_ical(fetch_feed(client).text.encode("utf-8"))
@@ -155,7 +179,8 @@ def test_feed_parses_with_a_real_icalendar_parser(client, local_calendar):
     assert str(recurring.get("LOCATION")) == "Riverside Park, Field 3"
 
     all_day = next(e for e in events if str(e.get("SUMMARY")) == "Beach trip")
-    assert all_day.decoded("DTSTART").isoformat() == "2026-08-01"
+    expected = datetime.strptime(start_stamp, "%Y%m%d").date().isoformat()
+    assert all_day.decoded("DTSTART").isoformat() == expected
 
 
 # ------------------------------- filtering -----------------------------------

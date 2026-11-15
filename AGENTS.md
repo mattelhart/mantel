@@ -9,8 +9,9 @@ cost you a debugging session if you don't know it.
 ## What this is
 
 A self-hosted family calendar for a wall-mounted touchscreen. FastAPI + SQLAlchemy 2.0 behind a
-React 19 SPA, shipped as one Docker image. SQLite in WAL mode. No authentication, deliberately —
-it runs on a home LAN.
+React 19 SPA, shipped as one Docker image. SQLite in WAL mode. The API trusts the home LAN
+(`AUTH_MODE=lan` by default, which is also how the Pi kiosk looks from inside Docker) and
+requires a revocable device token from anywhere else. See [docs/authentication.md](docs/authentication.md).
 
 The thing that makes it unusual is **two-way sync**, with both Google Calendar and iCloud. Most
 self-hosted calendars only display. Breaking the round trip is the worst regression available.
