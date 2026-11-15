@@ -11,7 +11,7 @@ whatever has focus.
 
 ## Build
 
-You need JDK 17 and the Android SDK (compile SDK 35, build-tools 35).
+You need JDK 17 and the Android SDK (compile SDK 35, build-tools 35). The checkout has to be a full git history, not a shallow clone: the version code is the number of commits, and a shallow clone would number the APK too low for Android to install it over the last one.
 
 ```bash
 cd apps/android-tv
@@ -19,12 +19,18 @@ export ANDROID_HOME="$ANDROID_SDK_ROOT"   # or wherever the SDK lives
 ./gradlew assembleDebug test
 ```
 
-`assembleDebug` builds the TV app and the phone app. The debug APKs are
+`assembleDebug` builds the TV app and the phone app. Both are signed with the keystore in `signing/` (see [signing/README.md](signing/README.md)), so a build from CI and a build from a laptop install over each other. The debug APKs are
 
 ```text
 apps/android-tv/app/build/outputs/apk/debug/app-debug.apk
 apps/android-tv/phone/build/outputs/apk/debug/phone-debug.apk
 ```
+
+`versionName` is the number in the repo's `VERSION` file plus that commit count, for example `0.5.12 (140)`. `versionCode` is the commit count alone. Rebuilding the same commit keeps the same code, which Android will replace. The next commit is a higher code.
+
+GitHub Actions (`.github/workflows/android.yml`) runs the same build on a pull request that touches this directory and uploads one artifact, `mantel-android-debug`, containing `mantel-tv-debug.apk` and `mantel-phone-debug.apk`.
+
+Install over the previous copy with `adb install -r`. The app's saved server address and pairing token stay. The one exception is an install that was signed with an older machine-local debug key: Android rejects that update (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), and that app has to be uninstalled once. Everything signed with `signing/mantel-debug.keystore` after that replaces in place. `assembleRelease` uses the same key, for the same reason.
 
 ## Sideload onto a Google TV
 

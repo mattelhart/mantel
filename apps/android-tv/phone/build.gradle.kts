@@ -5,6 +5,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+apply(from = rootProject.file("gradle/mantel-version.gradle.kts"))
+
 android {
     namespace = "dev.mantel.calendar.phone"
     compileSdk = 35
@@ -13,13 +15,27 @@ android {
         applicationId = "dev.mantel.calendar.phone"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = extra["mantelVersionCode"] as Int
+        versionName = extra["mantelVersionName"] as String
+    }
+
+    // The committed debug key, not ~/.android/debug.keystore. Same block in :app.
+    signingConfigs {
+        create("mantel") {
+            storeFile = rootProject.file("signing/mantel-debug.keystore")
+            storePassword = "mantel-debug"
+            keyAlias = "manteldebug"
+            keyPassword = "mantel-debug"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("mantel")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("mantel")
         }
     }
 
