@@ -160,3 +160,14 @@ to anyone who finds it.
 Rotating `SECRET_KEY` still forces Google and iCloud accounts to reconnect and
 changes the feed links. It does not revoke device tokens. It does invalidate
 pairing codes that are still on screen, which expire in ten minutes anyway.
+
+## Phones away from home
+
+Keep the server on a machine that stays on: the Pi, or a PC that does not sleep
+while anyone might look at the wall. The database stays on that machine's disk.
+Do not put `family.db` in a live sync folder.
+
+A phone on WireGuard is already on a private address (`10.x`, `192.168.x`, or
+`172.16`–`172.31`), so `AUTH_MODE=lan` treats it like a phone on the home Wi-Fi.
+Connect the tunnel and open `http://<that-machine>:8080`. No `AUTH_TRUSTED_CIDRS`
+entry, and no port forward. Pairing is only for when the tunnel is down.

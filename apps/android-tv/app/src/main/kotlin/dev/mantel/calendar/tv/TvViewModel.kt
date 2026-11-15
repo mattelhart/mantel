@@ -18,7 +18,7 @@ import dev.mantel.calendar.core.fetchInstants
 import dev.mantel.calendar.core.normalizeServer
 import dev.mantel.calendar.core.timedRange
 import dev.mantel.calendar.core.zoneOrUtc
-import dev.mantel.calendar.tv.data.SecureTokenStore
+import dev.mantel.calendar.tv.store.SecureTokenStore
 import io.ktor.client.engine.cio.CIO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
