@@ -26,6 +26,10 @@ apps/android-tv/**/build/
 apps/android-tv/local.properties
 apps/android-tv/.idea/
 
+# Windows desktop shell. The installer is built on Windows; keep the Rust output out.
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
 # OneDrive conflicted copies. This repo lives in a synced folder, and OneDrive
 # writes "<name>-<device> Probably.<ext>" beside a file edited on two machines.
 # They are duplicates, never source.

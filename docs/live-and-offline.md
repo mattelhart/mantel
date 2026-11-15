@@ -64,7 +64,9 @@ fraction of a second before refetching, for the same reason.
 
 The TV app and the Android phone app use the client in `apps/android-tv/core`.
 Both call `MantelClient.listen` the same way. The phone install notes are in
-[android-phone.md](android-phone.md).
+[android-phone.md](android-phone.md). Mantel Calendar for Windows is a window
+around this web app, so it uses the same stream and the same offline cache.
+Install notes are in [windows.md](windows.md).
 
 ## Offline
 

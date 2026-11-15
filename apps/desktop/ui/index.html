@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mantel Calendar</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <main>
+      <img src="icon.png" alt="" width="72" height="72" />
+      <h1>Mantel Calendar</h1>
+      <p>
+        This window shows the calendar from your Mantel server. It starts at
+        this PC. Point it at a Raspberry Pi later by changing the address.
+      </p>
+      <label for="server">Server</label>
+      <input id="server" type="url" spellcheck="false" value="http://localhost:8080" />
+      <div class="row">
+        <button id="test" type="button">Test connection</button>
+        <button id="open" type="button" class="primary">Open calendar</button>
+      </div>
+      <p id="status" role="status"></p>
+      <p class="note">
+        On this PC that is <code>http://localhost:8080</code>. A bare address
+        such as <code>10.0.15.178</code> is tried on port 8080. If the server
+        is not on a trusted network, the calendar asks for the pairing code
+        from the wall: Settings → Devices → Pair a phone.
+      </p>
+    </main>
+    <script src="setup.js"></script>
+  </body>
+</html>

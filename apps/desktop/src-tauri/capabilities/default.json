@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The setup page. The calendar itself is the server's web app and is not given these commands.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-show",
+    "core:window:allow-set-title",
+    "allow-test-server",
+    "allow-open-server",
+    "allow-current-server",
+    "window-state:default",
+    "global-shortcut:allow-register"
+  ]
+}

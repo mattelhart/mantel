@@ -1,0 +1,26 @@
+[package]
+name = "mantel-calendar"
+version = "0.1.0"
+description = "Mantel Calendar for Windows"
+authors = ["Mantel"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+# custom-protocol embeds the setup page. Without it the window looks for a dev server.
+tauri = { version = "2", features = ["custom-protocol"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-window-state = "2"
+url = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
