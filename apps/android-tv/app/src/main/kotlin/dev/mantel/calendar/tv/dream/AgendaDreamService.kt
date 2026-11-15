@@ -1,5 +1,6 @@
 package dev.mantel.calendar.tv.dream
 
+import android.content.res.Configuration
 import android.graphics.Color
 import android.service.dreams.DreamService
 import android.widget.LinearLayout
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 /** Today's agenda on the TV's screensaver. Turn it on in the device's screensaver settings. */
 class AgendaDreamService : DreamService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var ink: Int = Color.parseColor("#1C2430")
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -30,7 +32,10 @@ class AgendaDreamService : DreamService() {
         isScreenBright = false
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#FFF6E4"))
+            val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
+            setBackgroundColor(if (night) Color.parseColor("#1A1613") else Color.parseColor("#FFF6E4"))
+            ink = if (night) Color.parseColor("#F6EFE6") else Color.parseColor("#1C2430")
             setPadding(80, 64, 80, 64)
         }
         val title = text("Today", 42f)
@@ -71,7 +76,7 @@ class AgendaDreamService : DreamService() {
     private fun text(value: String, size: Float) = TextView(this).apply {
         text = value
         textSize = size
-        setTextColor(Color.parseColor("#1C2430"))
+        setTextColor(ink)
         setPadding(0, 12, 0, 12)
     }
 }

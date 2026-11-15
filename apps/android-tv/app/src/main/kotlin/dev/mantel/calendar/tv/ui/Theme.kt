@@ -10,6 +10,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import kotlin.math.pow
@@ -42,6 +43,33 @@ val Danger = Color(0xFF9B1C1C)
 val Dim = Color(0xFF3D4A5C)
 val Line = Color(0xFF4E5968)
 
+/** Night colours. Bright fills (coral, sun, sky) stay the same; text on them stays dark. */
+val NightInk = Color(0xFFF6EFE6)
+val NightPaper = Color(0xFF1A1613)
+val NightCard = Color(0xFF2C2621)
+val NightEmber = Color(0xFFFFC09A)
+val NightDanger = Color(0xFFFFB4AB)
+val NightDim = Color(0xFFD9CBB8)
+val NightLine = Color(0xFFCDBBA6)
+
+data class TvPalette(
+    val ink: Color,
+    val paper: Color,
+    val card: Color,
+    val ember: Color,
+    val danger: Color,
+    val dim: Color,
+    val line: Color,
+)
+
+val TvDay = TvPalette(Ink, Paper, Card, Ember, Danger, Dim, Line)
+val TvNight = TvPalette(NightInk, NightPaper, NightCard, NightEmber, NightDanger, NightDim, NightLine)
+
+val LocalTvPalette = staticCompositionLocalOf { TvDay }
+
+@Composable
+fun tvPalette(): TvPalette = LocalTvPalette.current
+
 /** Ink when it clears AA on [background], otherwise white. Person colours are chosen by the family. */
 fun readableOn(background: Color): Color =
     if (wcagContrast(Ink, background) >= 4.5) Ink else Color.White
@@ -65,22 +93,25 @@ private val Round = RoundedCornerShape(20.dp)
 fun SunnyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    container: Color = Card,
+    container: Color = Color.Unspecified,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val fill = if (container == Color.Unspecified) tvPalette().card else container
+    val label = readableOn(fill)
+    val focusedLabel = readableOn(Sun)
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = ClickableSurfaceDefaults.shape(shape = Round, focusedShape = Round, pressedShape = Round),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = container,
+            containerColor = fill,
             focusedContainerColor = Sun,
-            contentColor = Ink,
-            focusedContentColor = Ink,
+            contentColor = label,
+            focusedContentColor = focusedLabel,
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         border = ClickableSurfaceDefaults.border(
-            border = Border(border = BorderStroke(2.dp, Color(0xFFFFD78A)), shape = Round),
+            border = Border(border = BorderStroke(2.dp, tvPalette().line), shape = Round),
             focusedBorder = Border(border = BorderStroke(5.dp, Ink), shape = Round),
         ),
         content = content,
@@ -95,30 +126,37 @@ fun SunnyField(
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
     onSubmit: (() -> Unit)? = null,
+    placeholder: String? = null,
 ) {
     val focus = LocalFocusManager.current
+    val palette = tvPalette()
     OutlinedTextField(
         value = value,
         onValueChange = onValue,
         label = { Text(label, fontSize = 18.sp) },
+        placeholder = placeholder?.let { hint -> { Text(hint, fontSize = 20.sp) } },
         singleLine = true,
-        textStyle = TextStyle(fontSize = 24.sp, color = Ink, fontWeight = FontWeight.SemiBold),
+        textStyle = TextStyle(fontSize = 24.sp, color = palette.ink, fontWeight = FontWeight.SemiBold),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Ink,
-            unfocusedTextColor = Ink,
-            disabledTextColor = Ink,
-            errorTextColor = Ink,
-            focusedLabelColor = Ember,
-            unfocusedLabelColor = Dim,
-            disabledLabelColor = Dim,
-            errorLabelColor = Danger,
-            focusedPlaceholderColor = Dim,
-            unfocusedPlaceholderColor = Dim,
-            cursorColor = Ember,
-            errorCursorColor = Danger,
-            focusedBorderColor = Ember,
-            unfocusedBorderColor = Line,
-            errorBorderColor = Danger,
+            focusedTextColor = palette.ink,
+            unfocusedTextColor = palette.ink,
+            disabledTextColor = palette.ink,
+            errorTextColor = palette.ink,
+            focusedContainerColor = palette.card,
+            unfocusedContainerColor = palette.card,
+            disabledContainerColor = palette.card,
+            errorContainerColor = palette.card,
+            focusedLabelColor = palette.ember,
+            unfocusedLabelColor = palette.dim,
+            disabledLabelColor = palette.dim,
+            errorLabelColor = palette.danger,
+            focusedPlaceholderColor = palette.dim,
+            unfocusedPlaceholderColor = palette.dim,
+            cursorColor = palette.ember,
+            errorCursorColor = palette.danger,
+            focusedBorderColor = palette.ember,
+            unfocusedBorderColor = palette.line,
+            errorBorderColor = palette.danger,
         ),
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboardType,
@@ -144,7 +182,7 @@ fun SunnyField(
 
 @Composable
 fun BigTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier.padding(bottom = 8.dp), color = Ink, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Text(text, modifier = modifier.padding(bottom = 8.dp), color = tvPalette().ink, fontSize = 40.sp, fontWeight = FontWeight.Bold)
 }
 
 fun parseColor(hex: String): Color {

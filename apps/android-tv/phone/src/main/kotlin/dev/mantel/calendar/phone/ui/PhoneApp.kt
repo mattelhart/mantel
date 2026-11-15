@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import android.app.Activity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,12 +43,15 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -150,7 +155,17 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
     BackHandler(enabled = scanning || stack.isNotEmpty()) {
         if (scanning) scanning = false else stack = stack.dropLast(1)
     }
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            val bars = WindowCompat.getInsetsController(window, view)
+            bars.isAppearanceLightStatusBars = !dark
+            bars.isAppearanceLightNavigationBars = !dark
+        }
+    }
     MaterialTheme(colorScheme = if (dark) mantelDark() else mantelLight()) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         if (scanning) {
             QrScanner(onResult = {
                 scanning = false
@@ -237,6 +252,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                 }
             }
         }
+        }
     }
 }
 
@@ -281,13 +297,12 @@ private fun AddressScreen(state: PhoneState, vm: PhoneViewModel, onScan: () -> U
     val submit = { vm.connect(address) }
     SetupColumn(state.message) {
         Text("Connect to your calendar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Same Wi-Fi as the calendar, or Tailscale or WireGuard. No port forward.")
-        Text("The computer running Mantel, for example 192.168.1.20. A bare address uses port 8080.")
+        Text("The calendar server's address. Reachable at home, or over a VPN such as WireGuard.")
         OutlinedTextField(
             value = address,
             onValueChange = { address = it },
             modifier = Modifier.fillMaxWidth().touchTarget(),
-            placeholder = { Text("192.168.1.20") },
+            placeholder = { Text("http://192.168.1.10:8080") },
             singleLine = true,
             label = { Text("Calendar server") },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
@@ -358,6 +373,10 @@ fun SettingsScreen(state: PhoneState, vm: PhoneViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Appearance", fontWeight = FontWeight.Bold)
+        Text(
+            "System follows this phone. Light and Dark stay put.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ThemeChoice.entries.forEach { choice ->
                 FilterChip(

@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+**The phone and the TV follow the device's light or dark theme.** The connect screen, the rest of each app, and the phone's home-screen widget switch with the system. The calendar pages inside the Windows window stay on the theme chosen for the household.
+
 **The phone and TV connect screens can be read across the room.** Field text is near-black, placeholders and labels clear WCAG AA on the warm paper, errors are a dark red, and outlined buttons are no longer pale orange. Filled buttons stay the warm orange, with dark text.
 
 **TV and phone updates install over the last copy.** Debug and release APKs are signed with one keystore in the repo, so a build from another machine no longer forces an uninstall. The version code is the number of git commits, and the version name is `VERSION` plus that count.

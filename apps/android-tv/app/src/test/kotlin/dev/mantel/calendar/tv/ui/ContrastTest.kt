@@ -26,6 +26,18 @@ class ContrastTest {
     }
 
     @Test
+    fun nightTextClearsAa() {
+        assertAtLeast(4.5, NightInk, NightPaper, "body text")
+        assertAtLeast(4.5, NightInk, NightCard, "text on a card")
+        assertAtLeast(4.5, NightDim, NightPaper, "field label and placeholder")
+        assertAtLeast(4.5, NightDim, NightCard, "placeholder on the field")
+        assertAtLeast(4.5, NightEmber, NightPaper, "accent text")
+        assertAtLeast(4.5, NightDanger, NightPaper, "error")
+        assertAtLeast(4.5, NightLine, NightPaper, "border used as text")
+        assertAtLeast(4.5, Ink, Coral, "label on an orange button at night")
+    }
+
+    @Test
     fun aDarkPersonColourGetsWhiteText() {
         assertEquals(Color.White, readableOn(Color(0xFF1D4ED8)))
         assertEquals(Ink, readableOn(Paper))
