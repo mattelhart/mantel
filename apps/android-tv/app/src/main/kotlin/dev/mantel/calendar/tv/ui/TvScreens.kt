@@ -76,7 +76,20 @@ fun MantelTvApp(vm: TvViewModel) {
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
-    MaterialTheme(colorScheme = lightColorScheme(primary = Coral, background = Paper, surface = Card, onSurface = Ink)) {
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            primary = Ember,
+            onPrimary = Card,
+            background = Paper,
+            onBackground = Ink,
+            surface = Card,
+            onSurface = Ink,
+            onSurfaceVariant = Dim,
+            outline = Line,
+            error = Danger,
+            onError = Card,
+        ),
+    ) {
         Box(Modifier.fillMaxSize().background(Paper).padding(36.dp)) {
             when (state.phase) {
                 Phase.Loading -> BigTitle(state.message ?: "Looking for the calendar…")
@@ -106,7 +119,7 @@ private fun AddressScreen(message: String?, prefill: String?, onConnect: (String
             color = Ink,
             fontSize = 20.sp,
         )
-        if (message != null) Text(message, color = Coral, fontSize = 20.sp)
+        if (message != null) Text(message, color = Danger, fontSize = 20.sp)
         SunnyField(
             address,
             { address = it },
@@ -145,7 +158,7 @@ private fun PairScreen(message: String?, onPair: (String) -> Unit) {
             color = Ink,
             fontSize = 22.sp,
         )
-        if (message != null) Text(message, color = Coral, fontSize = 20.sp)
+        if (message != null) Text(message, color = Danger, fontSize = 20.sp)
         SunnyField(code, { code = it }, "Pairing code", Modifier.fillMaxWidth())
         SunnyButton(onClick = { onPair(code) }) {
             Text("Pair", modifier = Modifier.padding(18.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold)
@@ -164,7 +177,7 @@ private fun Home(state: TvState, vm: TvViewModel) {
         if (state.offline) {
             Text(
                 state.offlineDetail.ifBlank { "Offline, last synced earlier" },
-                color = Coral,
+                color = Ember,
                 fontSize = 20.sp,
             )
         }
@@ -216,7 +229,7 @@ private fun Agenda(state: TvState, vm: TvViewModel, day: LocalDate, push: (Overl
             Text(dayLabel(day), color = Ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             StepButton("Next day") { vm.setAnchor(step(ViewKind.AGENDA, day, 1)) }
             SunnyButton(onClick = { push(Overlay.Edit(null, day)) }, container = Coral) {
-                Text("Add", modifier = Modifier.padding(16.dp), color = Card, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Add", modifier = Modifier.padding(16.dp), color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
         if (events.isEmpty()) Text("Nothing on this day.", color = Ink, fontSize = 24.sp)
@@ -275,7 +288,7 @@ private fun Month(state: TvState, vm: TvViewModel, push: (Overlay) -> Unit) {
                     SunnyButton(onClick = { push(Overlay.Day(day)) }, modifier = Modifier.weight(1f).height(72.dp), container = if (inMonth) Card else Sun) {
                         Column(Modifier.padding(6.dp)) {
                             Text(day.dayOfMonth.toString(), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            if (count > 0) Text("$count", color = Coral, fontSize = 14.sp)
+                            if (count > 0) Text("$count", color = Ember, fontSize = 14.sp)
                         }
                     }
                 }
@@ -310,8 +323,8 @@ private fun EventDetail(event: CalEvent, state: TvState, vm: TvViewModel, onEdit
         if (!event.location.isNullOrBlank()) Text(event.location!!, color = Ink, fontSize = 22.sp)
         if (!event.description.isNullOrBlank()) Text(event.description!!, color = Ink, fontSize = 20.sp)
         if (event.recurrenceText != null) Text(event.recurrenceText!!, color = Ink, fontSize = 20.sp)
-        if (event.recurrenceRule != null) Text("Saving changes the whole series.", color = Coral, fontSize = 20.sp)
-        error?.let { Text(it, color = Coral, fontSize = 20.sp) }
+        if (event.recurrenceRule != null) Text("Saving changes the whole series.", color = Ember, fontSize = 20.sp)
+        error?.let { Text(it, color = Danger, fontSize = 20.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (event.editable) {
                 SunnyButton(onClick = onEdit) { Text("Edit", modifier = Modifier.padding(16.dp), fontSize = 20.sp) }
@@ -346,7 +359,7 @@ private fun EditEvent(existing: CalEvent?, day0: LocalDate, state: TvState, vm: 
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         BigTitle(if (existing == null) "New event" else "Edit event")
-        if (existing?.recurrenceRule != null) Text("This changes the whole series.", color = Coral, fontSize = 20.sp)
+        if (existing?.recurrenceRule != null) Text("This changes the whole series.", color = Ember, fontSize = 20.sp)
         SunnyField(title, { title = it }, "Title", Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SunnyButton(onClick = { allDay = true }, container = if (allDay) Sun else Card) { Text("All day", modifier = Modifier.padding(12.dp)) }
@@ -378,7 +391,7 @@ private fun EditEvent(existing: CalEvent?, day0: LocalDate, state: TvState, vm: 
                 }
             }
         }
-        error?.let { Text(it, color = Coral) }
+        error?.let { Text(it, color = Danger) }
         val chosen = calendarId
         SunnyButton(onClick = {
             if (chosen == null) {
@@ -389,7 +402,7 @@ private fun EditEvent(existing: CalEvent?, day0: LocalDate, state: TvState, vm: 
                 vm.saveEvent(existing, title, day, allDay, start, end, chosen, onDone = { onDone() }, onError = { error = it })
             }
         }, container = Coral) {
-            Text("Save", modifier = Modifier.padding(16.dp), color = Card, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Save", modifier = Modifier.padding(16.dp), color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -426,9 +439,9 @@ private fun ListsHome(state: TvState, vm: TvViewModel, push: (Overlay) -> Unit) 
             }
         }
         SunnyField(name, { name = it }, "New list", Modifier.fillMaxWidth())
-        error?.let { Text(it, color = Coral) }
+        error?.let { Text(it, color = Danger) }
         SunnyButton(onClick = { vm.addList(name) { error = it }; name = "" }, container = Coral) {
-            Text("Add list", modifier = Modifier.padding(14.dp), color = Card, fontWeight = FontWeight.Bold)
+            Text("Add list", modifier = Modifier.padding(14.dp), color = Ink, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -450,9 +463,9 @@ private fun ListDetail(id: Int, state: TvState, vm: TvViewModel) {
             }
         }
         SunnyField(text, { text = it }, "Add an item", Modifier.fillMaxWidth())
-        error?.let { Text(it, color = Coral) }
+        error?.let { Text(it, color = Danger) }
         SunnyButton(onClick = { vm.addItem(list.id, text) { error = it }; text = "" }, container = Coral) {
-            Text("Add", modifier = Modifier.padding(14.dp), color = Card, fontWeight = FontWeight.Bold)
+            Text("Add", modifier = Modifier.padding(14.dp), color = Ink, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -472,8 +485,9 @@ private fun ChoresHome(state: TvState, vm: TvViewModel, onRewards: () -> Unit) {
         Text(state.board?.on ?: "", color = Ink, fontSize = 20.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             people.forEach { member ->
-                SunnyButton(onClick = { selected = member.userId }, container = if (person?.userId == member.userId) parseColor(member.color) else Card) {
-                    Text("${member.name}  ${member.stars}★", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                val chip = if (person?.userId == member.userId) parseColor(member.color) else Card
+                SunnyButton(onClick = { selected = member.userId }, container = chip) {
+                    Text("${member.name}  ${member.stars}★", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = readableOn(chip))
                 }
             }
         }
@@ -483,7 +497,7 @@ private fun ChoresHome(state: TvState, vm: TvViewModel, onRewards: () -> Unit) {
             if (completion != null && completion.status == "pending") {
                 Text("${chore.icon ?: "⭐"} ${chore.title} is waiting", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SunnyButton(onClick = { vm.approve(completion.id) }, container = Coral) { Text("Approve", modifier = Modifier.padding(12.dp), color = Card) }
+                    SunnyButton(onClick = { vm.approve(completion.id) }, container = Coral) { Text("Approve", modifier = Modifier.padding(12.dp), color = Ink) }
                     SunnyButton(onClick = { vm.reject(completion.id) }) { Text("Not yet", modifier = Modifier.padding(12.dp)) }
                 }
             } else {
@@ -515,12 +529,13 @@ private fun Rewards(state: TvState, vm: TvViewModel) {
         BigTitle("Rewards")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             people.forEach { member ->
-                SunnyButton(onClick = { selected = member.userId }, container = if (person?.userId == member.userId) parseColor(member.color) else Card) {
-                    Text("${member.name}  ${member.stars}★", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+                val chip = if (person?.userId == member.userId) parseColor(member.color) else Card
+                SunnyButton(onClick = { selected = member.userId }, container = chip) {
+                    Text("${member.name}  ${member.stars}★", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, color = readableOn(chip))
                 }
             }
         }
-        error?.let { Text(it, color = Coral, fontSize = 20.sp) }
+        error?.let { Text(it, color = Danger, fontSize = 20.sp) }
         state.board?.rewards?.forEach { reward ->
             SunnyButton(onClick = {
                 val who = person ?: return@SunnyButton
@@ -532,7 +547,7 @@ private fun Rewards(state: TvState, vm: TvViewModel) {
         state.board?.pendingRedemptions?.forEach { row ->
             Text("${row.userName} wants ${row.rewardTitle}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SunnyButton(onClick = { vm.fulfill(row.id) }, container = Coral) { Text("Given", modifier = Modifier.padding(12.dp), color = Card) }
+                SunnyButton(onClick = { vm.fulfill(row.id) }, container = Coral) { Text("Given", modifier = Modifier.padding(12.dp), color = Ink) }
                 SunnyButton(onClick = { vm.deny(row.id) }) { Text("Send back", modifier = Modifier.padding(12.dp)) }
             }
         }

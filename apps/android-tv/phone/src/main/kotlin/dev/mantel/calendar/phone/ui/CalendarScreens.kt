@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -102,6 +101,8 @@ fun TodayScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
         FloatingActionButton(
             onClick = { open(Page.Edit(null, day)) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            containerColor = warmContainer(),
+            contentColor = warmOnContainer(),
         ) {
             Icon(Icons.Filled.Add, contentDescription = "Add event")
         }
@@ -178,7 +179,7 @@ fun MonthScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
             val dayEvents = eventsOn(shown, state.anchor, zone)
             if (dayEvents.isEmpty()) Text("Nothing on this day.")
             dayEvents.forEach { event -> EventRow(event, state, vm) { open(Page.Event(event)) } }
-            Button(onClick = { open(Page.Edit(null, state.anchor)) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
+            WarmButton(onClick = { open(Page.Edit(null, state.anchor)) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
                 Text("Add on this day")
             }
         }
@@ -295,7 +296,7 @@ fun EventDetail(event: CalEvent, state: PhoneState, vm: PhoneViewModel, onEdit: 
         editNote(kind)?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (kind != dev.mantel.calendar.core.EventEditKind.ReadOnly) {
-            Button(onClick = onEdit, modifier = Modifier.fillMaxWidth().touchTarget()) { Text("Edit") }
+            WarmButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().touchTarget()) { Text("Edit") }
             TextButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth().touchTarget()) { Text("Delete") }
         }
     }
@@ -356,9 +357,9 @@ fun EditEvent(existing: CalEvent?, day0: LocalDate, state: PhoneState, vm: Phone
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         editNote(kind)?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-        OutlinedTextField(title, { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(location, { location = it }, label = { Text("Place") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(description, { description = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(title, { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = mantelFieldColors(), textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface))
+        OutlinedTextField(location, { location = it }, label = { Text("Place") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = mantelFieldColors(), textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface))
+        OutlinedTextField(description, { description = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), colors = mantelFieldColors(), textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Text("All day", style = MaterialTheme.typography.titleMedium)
             Switch(checked = allDay, onCheckedChange = { allDay = it })
@@ -448,7 +449,7 @@ fun EditEvent(existing: CalEvent?, day0: LocalDate, state: PhoneState, vm: Phone
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         val chosen = calendarId
-        Button(
+        WarmButton(
             onClick = {
                 if (chosen == null) {
                     error = "Pick a calendar"

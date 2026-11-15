@@ -100,7 +100,7 @@ fun savedAddressPrefill(saved: String?): String = saved?.let(::normalizeServer).
 
 fun discoveryMissMessage(saved: String?): String =
     if (savedAddressPrefill(saved).isEmpty()) {
-        "Couldn't find familycal.local. Enter the calendar server's address."
+        "Enter the calendar server's address, such as 192.168.1.20."
     } else {
         "Couldn't reach the saved calendar server. The last address is filled in below."
     }

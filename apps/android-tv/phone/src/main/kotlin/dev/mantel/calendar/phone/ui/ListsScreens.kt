@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -69,9 +68,11 @@ fun ListsScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                 label = { Text("New list") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                colors = mantelFieldColors(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             )
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Button(
+            WarmButton(
                 onClick = {
                     vm.addList(name) { error = it }
                     name = ""
@@ -116,9 +117,11 @@ fun ListDetail(id: Int, state: PhoneState, vm: PhoneViewModel) {
             label = { Text("Add an item") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            colors = mantelFieldColors(),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
         )
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button(
+        WarmButton(
             onClick = {
                 vm.addItem(list.id, text) { error = it }
                 text = ""

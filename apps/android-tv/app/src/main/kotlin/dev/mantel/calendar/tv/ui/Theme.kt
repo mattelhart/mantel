@@ -7,10 +7,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import kotlin.math.pow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -33,6 +35,29 @@ val Sun = Color(0xFFFFE38A)
 val Coral = Color(0xFFFF7A45)
 val Sky = Color(0xFFD7F0FF)
 val Card = Color.White
+
+/** Text on paper. Coral itself is about 2.4:1 on this paper, so it stays a button fill. */
+val Ember = Color(0xFF8C3A16)
+val Danger = Color(0xFF9B1C1C)
+val Dim = Color(0xFF3D4A5C)
+val Line = Color(0xFF4E5968)
+
+/** Ink when it clears AA on [background], otherwise white. Person colours are chosen by the family. */
+fun readableOn(background: Color): Color =
+    if (wcagContrast(Ink, background) >= 4.5) Ink else Color.White
+
+fun wcagContrast(foreground: Color, background: Color): Double {
+    fun lum(color: Color): Double {
+        fun channel(c: Float): Double {
+            val x = c.toDouble()
+            return if (x <= 0.04045) x / 12.92 else ((x + 0.055) / 1.055).pow(2.4)
+        }
+        return 0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue)
+    }
+    val hi = maxOf(lum(foreground), lum(background))
+    val lo = minOf(lum(foreground), lum(background))
+    return (hi + 0.05) / (lo + 0.05)
+}
 
 private val Round = RoundedCornerShape(20.dp)
 
@@ -78,6 +103,23 @@ fun SunnyField(
         label = { Text(label, fontSize = 18.sp) },
         singleLine = true,
         textStyle = TextStyle(fontSize = 24.sp, color = Ink, fontWeight = FontWeight.SemiBold),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = Ink,
+            unfocusedTextColor = Ink,
+            disabledTextColor = Ink,
+            errorTextColor = Ink,
+            focusedLabelColor = Ember,
+            unfocusedLabelColor = Dim,
+            disabledLabelColor = Dim,
+            errorLabelColor = Danger,
+            focusedPlaceholderColor = Dim,
+            unfocusedPlaceholderColor = Dim,
+            cursorColor = Ember,
+            errorCursorColor = Danger,
+            focusedBorderColor = Ember,
+            unfocusedBorderColor = Line,
+            errorBorderColor = Danger,
+        ),
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboardType,
             imeAction = if (onSubmit == null) ImeAction.Default else ImeAction.Done,
