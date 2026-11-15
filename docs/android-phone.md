@@ -14,9 +14,11 @@ cd apps/android-tv
 adb install -r phone/build/outputs/apk/debug/phone-debug.apk
 ```
 
-Without a computer: copy `phone-debug.apk` onto the phone and open it. Android will ask you to allow installs from that app.
+The APK is signed with the keystore committed in `apps/android-tv/signing/`. A newer build from any machine installs over this one and keeps the server address and the pairing token. An app that was installed from an older build, signed with a machine-local debug key, has to be uninstalled once first.
 
-`./gradlew assembleDebug` in that directory also builds the TV app. `./gradlew test` runs the core and phone unit tests.
+Without a computer: copy `phone-debug.apk` onto the phone and open it. Android will ask you to allow installs from that app. Opening an APK that way also replaces an older install when the signature matches and the version code is not lower.
+
+`./gradlew assembleDebug` in that directory also builds the TV app. `./gradlew test` runs the core and phone unit tests. The version code is the git commit count, so the checkout needs its full history. See [apps/android-tv/README.md](../apps/android-tv/README.md).
 
 ## Pairing
 

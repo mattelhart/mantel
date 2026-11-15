@@ -436,6 +436,8 @@ cd apps/android-tv
 ./gradlew assembleDebug test
 ```
 
+Both APKs are signed with the keystore in `apps/android-tv/signing/`, so a new build installs over the last one and keeps the server address and the pairing token. The version code is the git commit count. Details are in [apps/android-tv/README.md](apps/android-tv/README.md).
+
 **Mantel Calendar** for Windows is a WebView2 window around this web app. Install notes:
 [docs/windows.md](docs/windows.md).
 

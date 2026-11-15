@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+**TV and phone updates install over the last copy.** Debug and release APKs are signed with one keystore in the repo, so a build from another machine no longer forces an uninstall. The version code is the number of git commits, and the version name is `VERSION` plus that count.
+
 **The TV and phone apps ask for the calendar server.** The last address that
 worked is tried first. `familycal.local` gives up quickly, and the address box
 comes back with that address filled in. A TV remote can type an IP from the
