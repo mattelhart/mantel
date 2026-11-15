@@ -1,0 +1,263 @@
+/* Chores is its own bright board. The rest of the wall follows the theme;
+   this page stays sunny so stars and names read from across the room. */
+
+.chores {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  background: linear-gradient(180deg, #ffe38a 0%, #fff7e6 180px, #fffdf8 100%);
+  color: #1c2430;
+}
+
+.chores__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.chores__title {
+  margin: 0;
+  font-size: 1.6rem;
+  flex: 1;
+}
+
+.chores__title small {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #5c4a2a;
+}
+
+.chores__body {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.chores .btn,
+.chores .iconbtn {
+  background: #fff;
+  color: #1c2430;
+  border: 2px solid #f0c36a;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.chores .btn--primary {
+  background: #ff7a45;
+  border-color: #ff7a45;
+  color: #fff;
+}
+
+.chores .iconbtn--danger {
+  background: #fff;
+  color: #c2412d;
+  border-color: #f3b7ae;
+}
+
+.chores input,
+.chores select {
+  background: #fff;
+  color: #1c2430;
+  border: 2px solid #f0c36a;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font: inherit;
+  min-height: var(--touch);
+}
+
+.chores .hint {
+  color: #5c4a2a;
+}
+
+.chores .row {
+  border-bottom: none;
+  padding: 0;
+}
+
+.chores__people {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.chores__person {
+  background: #fff;
+  border-radius: 22px;
+  padding: 14px;
+  box-shadow: 0 8px 0 rgba(28, 36, 48, 0.06);
+}
+
+.chores__person header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 4px solid #ffd56a;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.chores__person h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  flex: 1;
+}
+
+.chores__stars {
+  background: #ffe38a;
+  color: #6a4b00;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 800;
+}
+
+.chores__person ul,
+.chores__manage ul,
+.chores__requests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chores__person li,
+.chores__def,
+.chores__requests li,
+.chores__approval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.chores__person li[data-status='done'] .chores__label {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.chores .listitem__check {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 50%;
+  border: 3px solid #1c2430;
+  background: #fff;
+  color: #1c2430;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.chores__person li[data-status='done'] .listitem__check {
+  background: #7dce6a;
+  border-color: #3d8b32;
+  color: #fff;
+}
+
+.chores__person li[data-status='pending'] .listitem__check {
+  background: #ffe38a;
+}
+
+.chores__label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 1.05rem;
+}
+
+.chores__label small {
+  color: #7a6844;
+}
+
+.chores__swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  flex: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0, 0, 0, 0.15);
+}
+
+.chores__approvals,
+.chores__rewards,
+.chores__manage {
+  background: #fff;
+  border-radius: 22px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 0 rgba(28, 36, 48, 0.06);
+}
+
+.chores__approvals h2,
+.chores__rewards h2,
+.chores__manage h2 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+}
+
+.chores__reward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.chores__reward {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #e7f6ff;
+}
+
+.chores__form {
+  flex-wrap: wrap;
+}
+
+.chores__days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chores__days .iconbtn[aria-pressed='true'] {
+  background: #ff7a45;
+  border-color: #ff7a45;
+  color: #fff;
+}
+
+.chores__checkline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chores__def {
+  justify-content: space-between;
+}
+
+/* Dashboard widget: same sunny chip, so it still reads on a dark wall. */
+.chores-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chores-mini__person {
+  background: #fff7e6;
+  color: #1c2430;
+  border-radius: 14px;
+  padding: 8px 10px;
+}
+
+.chores-mini__person strong {
+  display: flex;
+  justify-content: space-between;
+}

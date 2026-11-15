@@ -35,7 +35,7 @@ export function ListsPage() {
       <div className="lists__body">
         {lists.length === 0 && (
           <p className="hint">
-            No lists yet. Groceries, chores, packing for a trip — whatever the house needs.
+            No lists yet. Groceries, packing for a trip — whatever the house needs to tick off.
           </p>
         )}
 

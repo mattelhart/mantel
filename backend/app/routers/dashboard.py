@@ -46,6 +46,13 @@ WIDGET_TYPES: list[WidgetTypeOut] = [
         config_schema={},
     ),
     WidgetTypeOut(
+        type="chores",
+        name="Chores and stars",
+        description="Today's chores for each person, and the stars they have earned.",
+        default_size="large",
+        config_schema={"user_ids": "Optional list of user ids; defaults to everyone"},
+    ),
+    WidgetTypeOut(
         type="list",
         name="Shared list",
         description="A grocery or to-do list you can tick off from the wall.",

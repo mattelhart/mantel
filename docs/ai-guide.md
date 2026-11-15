@@ -253,6 +253,8 @@ new `position`.
 | Photos    | `GET/POST /api/photos`, `GET /api/photos/{id}/file`, `DELETE /api/photos/{id}` |
 | Weather   | `GET /api/weather`, `GET /api/weather/search?q=`                              |
 | Lists     | `GET/POST /api/lists`, `GET/PATCH/DELETE /api/lists/{id}`, `POST /api/lists/{id}/items`, `PATCH/DELETE /api/lists/{id}/items/{item_id}`, `POST /api/lists/{id}/clear-checked` |
+| Chores    | `GET/POST /api/chores`, `PATCH/DELETE /api/chores/{id}`, `GET /api/chores/board`, `POST /api/chores/{id}/complete`, `POST /api/chores/completions/{id}/approve`, `POST /api/chores/completions/{id}/reject` |
+| Rewards   | `GET/POST /api/rewards`, `PATCH/DELETE /api/rewards/{id}`, `POST /api/rewards/{id}/redeem`, `POST /api/redemptions/{id}/fulfill`, `POST /api/redemptions/{id}/deny` |
 | Feeds     | `GET /api/feeds/token`, `GET /api/feeds/all.ics?token=`, `GET /api/feeds/{calendar_id}.ics?token=` |
 | Sync      | `GET /api/sync/status`, `POST /api/sync/run`, `POST /api/sync/calendars`      |
 | Settings  | `GET/PATCH /api/settings`                                                     |
@@ -273,6 +275,63 @@ POST /api/lists/1/items
 `GET /api/weather` never returns an error status. Check `available`; when it is false, `reason`
 explains why. `stale: true` means the upstream service was unreachable and the data came from
 cache — still worth displaying.
+
+### 8. Chores and rewards
+
+Checking a chore adds stars. Unchecking writes the same number back. The balance is the
+sum of those rows, not a counter that gets edited. Each day is its own completion, so
+Monday does not check off Tuesday. Assignees are family members from `GET /api/users` —
+a child does not need a Google or iCloud account.
+
+Send `request_id` (1–64 letters, numbers, `_` or `-`) on complete and redeem. The same id
+is the same tap: a retry returns the original result and does not move stars again. A
+second redeem of a reward that is still waiting to be given also returns the open request.
+
+```http
+GET /api/chores/board?on=2026-11-15
+```
+
+Omit `on` for today in `home_timezone`. Every family member comes back, with the chores
+due that day, their star total, the reward catalog, open reward requests, and checks that
+are still waiting for approval (those last two are not limited to `on`).
+
+```http
+POST /api/chores
+{
+  "title": "Make bed",
+  "points": 2,
+  "schedule": "weekly",
+  "weekdays": [1, 3, 5],
+  "requires_approval": false,
+  "assignee_ids": [1, 2]
+}
+```
+
+`schedule` is `daily`, `weekly` (needs `weekdays`, 0 = Sunday), or `once` (needs `due_on`).
+Each assignee checks their own copy:
+
+```http
+POST /api/chores/1/complete
+{ "user_id": 1, "on": "2026-11-15", "done": true }
+```
+
+If `requires_approval` is set, the check stays `pending` and stars wait for
+`POST /api/chores/completions/{id}/approve`. `POST .../reject` clears it. `done: false`
+unchecks, and takes the stars back if they were already given. A second check does not
+award them again.
+
+```http
+POST /api/rewards
+{ "title": "Pick the movie", "points_cost": 10 }
+
+POST /api/rewards/1/redeem
+{ "user_id": 1 }
+```
+
+Redeem fails with `400` when the balance is short. Stars are held immediately.
+`POST /api/redemptions/{id}/fulfill` marks it given (no further charge).
+`POST /api/redemptions/{id}/deny` returns the stars. Deleting a chore or a reward
+retires it: stars already earned stay, and an open request is sent back.
 
 The `/api/feeds/*.ics` endpoints take their own `?token=` from `GET /api/feeds/token`, because a
 feed URL is pasted into a calendar app and cannot send a device token. Everything else on the

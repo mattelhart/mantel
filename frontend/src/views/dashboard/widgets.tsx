@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useEntityMutation, useEvents, useUsers, useWeather } from '../../api/hooks'
 import type { SharedList } from '../../api/types'
-import type { CalendarEvent } from '../../api/types'
+import type { CalendarEvent, ChoreBoard } from '../../api/types'
 import { pickList } from './pickList'
 import { overlapsDay } from '../calendar/overlap'
 
@@ -486,6 +486,76 @@ function Countdown({ config, onConfigChange }: WidgetProps) {
   )
 }
 
+// -------------------------------- Chores ------------------------------------
+
+function ChoresWidget({ config }: WidgetProps) {
+  const { data } = useQuery({
+    queryKey: ['chores', 'board', 'today'],
+    queryFn: () => api.get<ChoreBoard>('/chores/board'),
+    refetchInterval: 30_000,
+  })
+  const toggle = useEntityMutation(
+    (body: { choreId: number; userId: number; done: boolean; on: string; requestId: string }) =>
+      api.post(`/chores/${body.choreId}/complete`, {
+        user_id: body.userId,
+        on: body.on,
+        done: body.done,
+        request_id: body.requestId,
+      }),
+    ['chores'],
+  )
+  const only = people(config)
+  const shown = (data?.people ?? []).filter((p) => only.length === 0 || only.includes(p.user_id))
+
+  return (
+    <div className="chores-mini">
+      <div className="widget__head">
+        <h3>Chores</h3>
+      </div>
+      {shown.length === 0 && <p className="widget__empty">No chores today.</p>}
+      {shown.map((person) => (
+        <div key={person.user_id} className="chores-mini__person">
+          <strong>
+            <span>
+              <span className="chores__swatch" style={{ background: person.color }} /> {person.name}
+            </span>
+            <span>{person.stars}★</span>
+          </strong>
+          {person.chores.length === 0 && <p className="widget__empty">Nothing due.</p>}
+          <ul className="listcard__items">
+            {person.chores.map((chore) => {
+              const checked = chore.completion?.status === 'done' || chore.completion?.status === 'pending'
+              return (
+                <li key={chore.chore_id} className="listitem" data-checked={checked}>
+                  <button
+                    className="listitem__check"
+                    aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
+                    onClick={() =>
+                      data &&
+                      toggle.mutate({
+                        choreId: chore.chore_id,
+                        userId: person.user_id,
+                        done: !checked,
+                        on: data.on,
+                        requestId: crypto.randomUUID(),
+                      })
+                    }
+                  >
+                    {chore.completion?.status === 'done' ? '✓' : chore.completion?.status === 'pending' ? '…' : ''}
+                  </button>
+                  <span className="listitem__text">
+                    {chore.icon} {chore.title}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // -------------------------------- registry -----------------------------------
 
 export const WIDGETS: Record<string, WidgetDef> = {
@@ -495,6 +565,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
   mini_month: { component: MiniMonth, label: 'Month at a glance' },
   weather: { component: Weather, label: 'Weather' },
   list: { component: ListWidget, label: 'Shared list' },
+  chores: { component: ChoresWidget, label: 'Chores and stars' },
   countdown: { component: Countdown, label: 'Countdown' },
   note: { component: Note, label: 'Family note' },
 }

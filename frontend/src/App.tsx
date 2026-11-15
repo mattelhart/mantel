@@ -24,6 +24,7 @@ const CALENDAR_VIEWS = [
 const NAV = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/lists', label: 'Lists' },
+  { to: '/chores', label: 'Chores' },
   { to: '/settings', label: 'Settings' },
 ]
 

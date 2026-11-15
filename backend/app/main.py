@@ -16,6 +16,7 @@ from .routers import (
     accounts,
     auth,
     calendars,
+    chores,
     dashboard,
     events,
     feeds,
@@ -107,6 +108,9 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(photos.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(lists.router, prefix="/api")
+app.include_router(chores.router, prefix="/api")
+app.include_router(chores.rewards_router, prefix="/api")
+app.include_router(chores.redemptions_router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
 
 

@@ -1,14 +1,17 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -262,6 +265,181 @@ class ListItem(TimestampMixin, Base):
 
     list: Mapped[ShoppingList] = relationship(back_populates="items")
     assigned_to: Mapped[User | None] = relationship()
+
+
+class Chore(TimestampMixin, Base):
+    """A repeating or one-off job assigned to one or more people.
+
+    Each assignee completes their own copy. Stars are not stored on the chore:
+    a completion writes a row in `star_entries`, and the balance is the sum, so
+    unchecking or sending a reward back is another row rather than an edit of
+    history.
+    """
+
+    __tablename__ = "chores"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    # What the person earns for this occurrence. Zero is a chore with no prize.
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # daily: every day. weekly: the days in `weekdays`. once: `due_on` only.
+    schedule: Mapped[str] = mapped_column(String(16), nullable=False, default="daily")
+    # Comma-separated 0–6, Sunday = 0, matching `first_day_of_week`. Weekly only.
+    weekdays: Mapped[str | None] = mapped_column(String(20))
+    due_on: Mapped[date | None] = mapped_column(Date)
+    # When set, checking the chore waits for someone to approve before stars land.
+    requires_approval: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    icon: Mapped[str | None] = mapped_column(String(16))
+    # Retired chores leave the board but keep their completions, so star history
+    # still points at a real row.
+    archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    assignees: Mapped[list["ChoreAssignee"]] = relationship(
+        back_populates="chore", cascade="all, delete-orphan"
+    )
+    completions: Mapped[list["ChoreCompletion"]] = relationship(
+        back_populates="chore", cascade="all, delete-orphan"
+    )
+
+
+class ChoreAssignee(Base):
+    """One person the chore is for. A shared chore is several of these, and each
+    person checks off their own — finishing yours does not finish theirs."""
+
+    __tablename__ = "chore_assignees"
+    __table_args__ = (UniqueConstraint("chore_id", "user_id", name="uq_chore_assignee"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chore_id: Mapped[int] = mapped_column(ForeignKey("chores.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+
+    chore: Mapped[Chore] = relationship(back_populates="assignees")
+    user: Mapped[User] = relationship()
+
+
+class ChoreCompletion(Base):
+    """One person's answer for one occurrence of a chore.
+
+    `on_date` is a calendar day in the household timezone, not an instant: the
+    chore is "Tuesday's dishes", and Tuesday does not move when the clocks do.
+    """
+
+    __tablename__ = "chore_completions"
+    __table_args__ = (
+        UniqueConstraint("chore_id", "user_id", "on_date", name="uq_chore_occurrence"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chore_id: Mapped[int] = mapped_column(ForeignKey("chores.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    on_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # pending: checked, waiting for approval. done: stars have been awarded
+    # (or the chore was worth zero).
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    points_awarded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    chore: Mapped[Chore] = relationship(back_populates="completions")
+    user: Mapped[User] = relationship()
+
+
+class StarEntry(Base):
+    """One movement of a person's star balance. The balance is the sum of these.
+
+    Reversals are new rows. Editing a past delta would make "why does Sam have
+    12 stars" impossible to answer after a chore was unchecked.
+    """
+
+    __tablename__ = "star_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    # chore, reward, or reversal. The linked id says which row it came from.
+    reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Kept after the completion or redemption row is gone, so a reversal still
+    # says what it undid.
+    note: Mapped[str | None] = mapped_column(String(200))
+    chore_completion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("chore_completions.id", ondelete="SET NULL")
+    )
+    redemption_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reward_redemptions.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Reward(TimestampMixin, Base):
+    """Something stars can be spent on. Redeeming creates a request a person at
+    the wall can mark as given, or send back so the stars return."""
+
+    __tablename__ = "rewards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    points_cost: Mapped[int] = mapped_column(Integer, nullable=False)
+    icon: Mapped[str | None] = mapped_column(String(16))
+    archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    redemptions: Mapped[list["RewardRedemption"]] = relationship(back_populates="reward")
+
+
+class RewardRedemption(Base):
+    __tablename__ = "reward_redemptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reward_id: Mapped[int] = mapped_column(ForeignKey("rewards.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    points_spent: Mapped[int] = mapped_column(Integer, nullable=False)
+    # pending: asked for, stars already held. fulfilled: it was given.
+    # denied: sent back, stars returned.
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    reward: Mapped[Reward] = relationship(back_populates="redemptions")
+    user: Mapped[User] = relationship()
+
+    __table_args__ = (
+        # One open request per person per reward. A second tap, or a retry that
+        # minted a new id, finds this row instead of spending the stars again.
+        # Fulfilled and denied rows drop out of the index, so the reward can be
+        # bought again later.
+        Index(
+            "uq_open_redemption",
+            "user_id",
+            "reward_id",
+            unique=True,
+            sqlite_where=text("status = 'pending'"),
+        ),
+    )
+
+
+class PointRequest(Base):
+    """The id a screen chose for one tap.
+
+    Posting the same `request_id` again is the same tap: the handler returns
+    what already happened and does not write another star entry. The balance
+    stays the sum of `star_entries`.
+    """
+
+    __tablename__ = "point_requests"
+    __table_args__ = (UniqueConstraint("request_id", name="uq_point_request"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # complete, undo, or redeem.
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    completion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("chore_completions.id", ondelete="SET NULL")
+    )
+    redemption_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reward_redemptions.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class WeatherCache(Base):

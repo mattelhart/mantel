@@ -9,7 +9,9 @@ import './styles/calendar.css'
 import './styles/settings.css'
 import './styles/dashboard.css'
 import './styles/screensaver.css'
+import './styles/chores.css'
 import { CalendarPage } from './views/calendar/CalendarPage'
+import { ChoresPage } from './views/chores/ChoresPage'
 import { DashboardPage } from './views/dashboard/DashboardPage'
 import { ListsPage } from './views/lists/ListsPage'
 import { SettingsPage } from './views/settings/SettingsPage'
@@ -40,6 +42,7 @@ const router = createBrowserRouter([
       { path: 'calendar/:view', element: <CalendarPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'lists', element: <ListsPage /> },
+      { path: 'chores', element: <ChoresPage /> },
       { path: 'settings', element: <SettingsPage /> },
       // The API guide used to be its own page. Keep old bookmarks and kiosk
       // shortcuts working by sending them to the tab that replaced it.
