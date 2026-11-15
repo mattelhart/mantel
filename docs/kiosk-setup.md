@@ -8,6 +8,11 @@ browser cannot do for you.
 Before you start, decide which route the display should sit on. `/dashboard` and
 `/calendar/week` are the usual choices.
 
+The kiosk does not log in. With the default `AUTH_MODE=lan`, a browser on the
+same machine — including Chromium on the Pi talking to the published Docker
+port — is trusted by its address. Phones that leave the house pair from
+Settings → Devices. See [authentication.md](authentication.md).
+
 > **The app updates itself.** Every screen polls for new versions and hard-reloads on its own,
 > so you never need to touch a mounted tablet after a deploy. That's the whole reason the
 > version number is in the corner.

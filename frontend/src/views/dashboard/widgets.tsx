@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import { useEntityMutation, useEvents, useUsers, useWeather } from '../../api/hooks'
 import type { SharedList } from '../../api/types'
 import type { CalendarEvent } from '../../api/types'
+import { pickList } from './pickList'
 import { overlapsDay } from '../calendar/overlap'
 
 export interface WidgetProps {
@@ -21,7 +22,10 @@ interface WidgetDef {
 
 function num(config: Record<string, unknown>, key: string, fallback: number): number {
   const v = config[key]
-  return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  // Config written by hand, or by a client that JSON-encoded the id as a string.
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v)
+  return fallback
 }
 
 function str(config: Record<string, unknown>, key: string, fallback = ''): string {
@@ -200,7 +204,7 @@ function Note({ config, onConfigChange }: WidgetProps) {
 
 // --------------------------------- List --------------------------------------
 
-function ListWidget({ config }: WidgetProps) {
+function ListWidget({ config, onConfigChange }: WidgetProps) {
   const listId = num(config, 'list_id', 0)
   const hideChecked = config.hide_checked === true
   const [text, setText] = useState('')
@@ -211,7 +215,10 @@ function ListWidget({ config }: WidgetProps) {
     refetchInterval: 30_000,
   })
 
-  const list = lists.find((l) => l.id === listId) ?? lists[0]
+  // An id that doesn't match is a removed list, not "show the first one". Falling
+  // back is what made every list widget display the same list.
+  const list = pickList(lists, listId)
+  const missing = listId > 0 && list === null
 
   const addItem = useEntityMutation(
     (body: { text: string }) => api.post(`/lists/${list?.id}/items`, body),
@@ -223,13 +230,38 @@ function ListWidget({ config }: WidgetProps) {
     ['lists'],
   )
 
+  const choose = (id: number) => onConfigChange({ ...config, list_id: id })
+
+  const picker =
+    lists.length > 1 || missing ? (
+      <select
+        className="listcard__pick"
+        aria-label="Which list to show"
+        value={list ? String(list.id) : ''}
+        onChange={(e) => choose(Number(e.target.value))}
+      >
+        {missing && <option value="">Choose a list</option>}
+        {lists.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.icon ? `${l.icon} ` : ''}
+            {l.name}
+          </option>
+        ))}
+      </select>
+    ) : null
+
   if (!list) {
     return (
       <>
         <div className="widget__head">
           <h3>List</h3>
+          {picker}
         </div>
-        <p className="widget__empty">Create a list on the Lists page first.</p>
+        <p className="widget__empty">
+          {lists.length === 0
+            ? 'Create a list on the Lists page first.'
+            : 'That list was removed. Pick another.'}
+        </p>
       </>
     )
   }
@@ -246,9 +278,11 @@ function ListWidget({ config }: WidgetProps) {
   return (
     <>
       <div className="widget__head">
-        <h3>
-          {list.icon} {list.name}
-        </h3>
+        {picker ?? (
+          <h3>
+            {list.icon} {list.name}
+          </h3>
+        )}
         <span className="listcard__count">{list.item_count}</span>
       </div>
 

@@ -45,6 +45,23 @@ class Settings(BaseSettings):
 
     cors_origins: str = "*"
 
+    # Who may call /api without a device token.
+    #   lan   (default) — loopback, link-local, and private addresses. That is the
+    #           Pi kiosk (including Docker's bridge), plus anything else on the
+    #           home LAN. The public internet needs a paired device.
+    #   local — loopback only. Docker port publishing does NOT look like loopback
+    #           from inside the container; use this only with host networking.
+    #   token — no address is trusted. Every caller, including the wall, needs a
+    #           device token. The kiosk will show a pairing screen.
+    #   off   — the historical open API.
+    auth_mode: str = "lan"
+    # Extra networks to trust, comma-separated CIDRs. Tailscale is 100.64.0.0/10,
+    # which is not a private range, so it is not covered by `lan` on its own.
+    auth_trusted_cidrs: str = ""
+    # Use the first X-Forwarded-For address as the client. Turn on only behind a
+    # proxy that overwrites that header; otherwise a caller picks their own address.
+    auth_trust_proxy: bool = False
+
     @property
     def version(self) -> str:
         return self.app_version or _read_version_file()

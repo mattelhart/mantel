@@ -23,11 +23,11 @@ def for_account(db: Session, account: LinkedAccount) -> CalendarProvider:
 
         client = icloud_auth.client_for(account)
         home = icloud_auth.calendar_home_for(db, account, client)
-        return ICloudProvider(client, home, _home_timezone(db))
+        return ICloudProvider(client, home, home_timezone(db))
     return GoogleProvider(access_token_for(db, account))
 
 
-def _home_timezone(db: Session) -> str:
+def home_timezone(db: Session) -> str:
     """Where the family lives, for reading iCalendar times that carry no zone.
 
     A floating time means "whatever the clock says here". Assuming UTC would move

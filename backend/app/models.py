@@ -283,3 +283,39 @@ class AppSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+
+class Device(TimestampMixin, Base):
+    """A phone or browser that has been paired with this install.
+
+    The token itself is never stored. `token_hash` is SHA-256 of the secret the
+    device sends as a bearer; `token_prefix` is the only fragment the settings
+    screen can show, so a revoke button can be matched to a phone without
+    keeping the credential.
+    """
+
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    token_prefix: Mapped[str] = mapped_column(String(20), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PairingCode(Base):
+    """A short-lived code shown on the wall and typed (or scanned) by a phone.
+
+    Hashed, like a device token: the database should not contain a live code
+    in a form that can be replayed. Single use. The wall creates these; the
+    exchange endpoint that consumes them is unauthenticated, because the phone
+    has no token yet — the code is the credential.
+    """
+
+    __tablename__ = "pairing_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

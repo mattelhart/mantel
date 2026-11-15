@@ -19,6 +19,8 @@ dependencies = [
     "itsdangerous>=2.2",
     "pillow>=11.0",
     "python-multipart>=0.0.20",
+    # Pairing QR codes, drawn on the wall. Pure Python, no system libraries.
+    "segno>=1.6",
 ]
 
 [project.optional-dependencies]

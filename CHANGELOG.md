@@ -26,6 +26,28 @@ they cannot write back.
 
 **Chores and rewards**, and **meal planning** -- both frequently asked for, neither started.
 
+## Unreleased
+
+**The API asks who you are, except on the wall.** Requests from the home network
+(and from the Pi kiosk, which Docker presents as a private address) still need
+no login. A phone off that network pairs with a short code shown in Settings →
+Devices and then sends `Authorization: Bearer`. Tokens are stored as a hash and
+can be revoked from the same screen. `GET /api/health` and the Google OAuth
+callback stay public. `AUTH_MODE=off` is the old open API. See
+[docs/authentication.md](docs/authentication.md).
+
+**A mouse can do what a finger could.** Dragging across the calendar scrolls it,
+or turns the page when the drag is sideways, and the buttons for those gestures
+were already there. Hover and keyboard focus are visible. The pointer stays
+visible in the app; the screensaver still hides it.
+
+**A weekly event keeps its clock time across daylight saving.** A 4pm series no
+longer reads as 3pm after the clocks go back. All-day events are unchanged.
+
+**A dashboard list widget can show a list that isn't the first one.** The widget
+has a picker. A deleted list stays missing instead of silently becoming the
+other list.
+
 ## 0.5.12
 
 **Week and 3 Day find their way home.** Scroll away and come back toward today, and the

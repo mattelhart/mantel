@@ -10,10 +10,18 @@ from ..schemas import EventCreate, EventOut, EventUpdate
 from ..serializers import event_out
 from ..services import recurrence
 from ..services.notify import calendar_changed
+from ..services.providers.registry import home_timezone
 from ..services.pushqueue import mark_pending, request_push
 from ..timeutil import to_utc
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+def _wall_zone(db: Session, ev: Event) -> str | None:
+    """Zone a timed series repeats in. All-day events are dates, not instants."""
+    if ev.all_day:
+        return None
+    return ev.timezone or home_timezone(db)
 
 
 def _load(db: Session, event_id: int) -> Event:
@@ -147,11 +155,13 @@ def list_events(
         stmt = stmt.where(Event.title.ilike(f"%{q}%"))
 
     rows = list(db.scalars(stmt))
+    household = home_timezone(db)
 
     expanded: list[Event] = []
     for row in rows:
         if row.recurrence_rule:
-            expanded.extend(recurrence.materialise(row, window_start, window_end))
+            zone = None if row.all_day else (row.timezone or household)
+            expanded.extend(recurrence.materialise(row, window_start, window_end, zone=zone))
         else:
             expanded.append(row)
 
@@ -184,7 +194,7 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db)) -> EventOu
             raise HTTPException(400, str(exc)) from exc
     ev = Event(**data, origin="local")
     ev.recurrence_end = recurrence.series_end(
-        ev.recurrence_rule, ev.start_at, ev.end_at - ev.start_at
+        ev.recurrence_rule, ev.start_at, ev.end_at - ev.start_at, zone=_wall_zone(db, ev)
     )
     mark_pending(ev, cal, "pending_create")
     db.add(ev)
@@ -262,7 +272,10 @@ def _move_event(db: Session, ev: Event, target: Calendar, changes: dict) -> Even
 
     moved = Event(calendar_id=target.id, origin="local", **values)
     moved.recurrence_end = recurrence.series_end(
-        moved.recurrence_rule, moved.start_at, moved.end_at - moved.start_at
+        moved.recurrence_rule,
+        moved.start_at,
+        moved.end_at - moved.start_at,
+        zone=_wall_zone(db, moved),
     )
     mark_pending(moved, target, "pending_create")
     db.add(moved)
@@ -319,7 +332,7 @@ def update_event(event_id: int, payload: EventUpdate, db: Session = Depends(get_
     if ev.end_at <= ev.start_at:
         raise HTTPException(400, "`end_at` must be after `start_at`")
     ev.recurrence_end = recurrence.series_end(
-        ev.recurrence_rule, ev.start_at, ev.end_at - ev.start_at
+        ev.recurrence_rule, ev.start_at, ev.end_at - ev.start_at, zone=_wall_zone(db, ev)
     )
 
     mark_pending(ev, ev.calendar, "pending_update")

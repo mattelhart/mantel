@@ -349,17 +349,27 @@ newsletter to the calendar" is a thing an agent can actually do.
 
 ## Security
 
-There is **no authentication**, deliberately. A wall calendar that asks a ten-year-old to log in
-before adding football practice doesn't get used, and this is designed to live behind your front
-door.
+The wall display does not ask anyone to log in. A calendar that wants a password before a
+ten-year-old can add football practice doesn't get used. By default (`AUTH_MODE=lan`) any
+request from the home network — including the Pi's own browser, which Docker presents as a
+private address — is allowed straight through.
 
-That means: **don't expose it directly to the internet.** If you need access from outside the
-house, put it behind a VPN — Tailscale and WireGuard both work well. The one exception is the
-`/api/feeds/*.ics` links, which carry a token, because a feed URL is the thing most likely to be
-pasted into a service outside the house.
+A phone that is not on that network pairs instead. Settings → Devices shows a short code
+(and a QR). The app exchanges it for a token, stored only as a hash, and sends
+`Authorization: Bearer`. Revoke the phone from the same screen. The scheme the iOS and
+Android clients should implement is [docs/authentication.md](docs/authentication.md).
+
+`GET /api/health` is always public. Google's OAuth redirect is too, because Google cannot
+attach a token. The `/api/feeds/*.ics` links keep their own `?token=`, because a feed URL is
+the thing most likely to be pasted into a calendar app.
+
+You can still keep the server off the public internet. Tailscale and WireGuard both work; add
+the Tailscale range with `AUTH_TRUSTED_CIDRS=100.64.0.0/10` if those addresses should not need
+a token. `AUTH_MODE=off` restores the old open API.
 
 Secrets you give it (the Google client secret, Home Assistant token) are encrypted at rest with
-your `SECRET_KEY` and are never readable back out through the API.
+your `SECRET_KEY` and are never readable back out through the API. Device tokens are hashed,
+not encrypted, so rotating `SECRET_KEY` does not sign the phones out.
 
 ## Data and backups
 

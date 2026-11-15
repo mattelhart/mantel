@@ -116,6 +116,38 @@ DATABASE_URL=postgresql+psycopg://user:password@dbhost:5432/familycalendar
 
 (You'll need to add the `psycopg` package to the image.)
 
+### `AUTH_MODE`
+
+Default `lan`. Who may call the API without a device token.
+
+| Value | Meaning |
+| --- | --- |
+| `lan` | Loopback, link-local, and private addresses. The Pi kiosk and the rest of the house. This is the right default: from inside Docker the kiosk does not look like `127.0.0.1`. |
+| `local` | Loopback only. The kiosk works with host networking, not with a published port. |
+| `token` | Every caller needs a paired device, including the wall. |
+| `off` | No auth. The previous behaviour. |
+
+Phones that are not on a trusted address pair from Settings → Devices. The
+scheme is [authentication.md](authentication.md).
+
+### `AUTH_TRUSTED_CIDRS`
+
+Default empty. Extra networks that are trusted on top of `AUTH_MODE`,
+comma-separated. Tailscale is `100.64.0.0/10`.
+
+### `AUTH_TRUST_PROXY`
+
+Default `false`. When `true`, the client address is the first
+`X-Forwarded-For` value. Turn it on only behind a proxy that sets that header
+itself.
+
+### `FORWARDED_ALLOW_IPS`
+
+Set to empty in the Docker image. Uvicorn would otherwise trust
+`X-Forwarded-For` from 127.0.0.1. Point it at a reverse proxy's address if that
+proxy should supply the real client IP. See
+[authentication.md](authentication.md).
+
 ### `CORS_ORIGINS`
 
 Default `*`. Which origins may call the API from a browser. `*` is reasonable on a home

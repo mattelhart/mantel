@@ -139,6 +139,21 @@ def test_creates_a_table_an_older_release_did_not_have(fresh_schema):
     assert "photos" in inspect(engine).get_table_names()
 
 
+def test_new_tables_appear_on_a_database_that_predates_them(fresh_schema):
+    """Device pairing is a new table, not a new column. create_all is what
+    brings it in; an install from before this release has neither table."""
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE devices"))
+        conn.execute(text("DROP TABLE pairing_codes"))
+    names = set(inspect(engine).get_table_names())
+    assert "devices" not in names and "pairing_codes" not in names
+
+    sync(engine)
+
+    names = set(inspect(engine).get_table_names())
+    assert "devices" in names and "pairing_codes" in names
+
+
 def test_is_idempotent(fresh_schema):
     assert sync(engine) == []
     assert sync(engine) == [], "a second run on an up-to-date schema changes nothing"

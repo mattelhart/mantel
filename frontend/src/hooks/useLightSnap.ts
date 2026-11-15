@@ -1,5 +1,105 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 
+interface MouseDragOptions {
+  /** 'both' scrolls x and y. A single axis leaves the other one alone. */
+  axis: 'x' | 'y' | 'both'
+  /** A cross-axis drag is someone swiping to another day, not scrolling this scroller. */
+  yieldCrossAxis: boolean
+  onGesture?: (phase: 'start' | 'end', dominant: 'x' | 'y') => void
+}
+
+/** Mouse-drag scrolling. Touch already scrolls natively; a mouse on a TV does not,
+ *  so a drag has to move the scroller itself. Yields a clearly cross-axis drag so
+ *  the page swipe can still turn the day. A drag that moves suppresses the click
+ *  that would otherwise open whatever is under the cursor. */
+export function bindMouseDrag(el: HTMLElement, options: MouseDragOptions): () => void {
+  let drag: {
+    id: number
+    x: number
+    y: number
+    left: number
+    top: number
+    taken: boolean
+    horizontal: boolean
+  } | null = null
+
+  const onDown = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    const target = e.target instanceof Element ? e.target : null
+    if (target?.closest('input, textarea, select, a')) return
+    drag = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      left: el.scrollLeft,
+      top: el.scrollTop,
+      taken: false,
+      horizontal: false,
+    }
+  }
+  const onMove = (e: PointerEvent) => {
+    if (!drag || e.pointerId !== drag.id) return
+    const dx = e.clientX - drag.x
+    const dy = e.clientY - drag.y
+    if (!drag.taken) {
+      if (Math.hypot(dx, dy) < 8) return
+      drag.horizontal = Math.abs(dx) > Math.abs(dy)
+      const cross =
+        (options.axis === 'y' && drag.horizontal) || (options.axis === 'x' && !drag.horizontal)
+      if (options.yieldCrossAxis && cross) {
+        drag = null
+        return
+      }
+      drag.taken = true
+      options.onGesture?.('start', drag.horizontal ? 'x' : 'y')
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {
+        // The pointer can already have been released.
+      }
+      el.classList.add('is-dragging')
+    }
+    if (options.axis !== 'y') el.scrollLeft = drag.left - dx
+    if (options.axis !== 'x') el.scrollTop = drag.top - dy
+  }
+  const finish = (e: PointerEvent) => {
+    if (!drag || e.pointerId !== drag.id) return
+    const taken = drag.taken
+    const horizontal = drag.horizontal
+    drag = null
+    el.classList.remove('is-dragging')
+    if (!taken) return
+    options.onGesture?.('end', horizontal ? 'x' : 'y')
+    const swallow = (ev: Event) => {
+      ev.preventDefault()
+      ev.stopPropagation()
+    }
+    el.addEventListener('click', swallow, { capture: true, once: true })
+  }
+
+  el.addEventListener('pointerdown', onDown)
+  el.addEventListener('pointermove', onMove)
+  el.addEventListener('pointerup', finish)
+  el.addEventListener('pointercancel', finish)
+  return () => {
+    el.removeEventListener('pointerdown', onDown)
+    el.removeEventListener('pointermove', onMove)
+    el.removeEventListener('pointerup', finish)
+    el.removeEventListener('pointercancel', finish)
+    el.classList.remove('is-dragging')
+  }
+}
+
+/** Vertical mouse-drag for the day view, which scrolls natively but does not snap.
+ *  A horizontal drag is left for the page swipe. */
+export function useMouseDragScroll(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    return bindMouseDrag(el, { axis: 'y', yieldCrossAxis: true })
+  }, [ref])
+}
+
 /** "Near the boundary of a unit" for the light snap: within 12% of a unit's size, in either
  *  direction. Wide enough that a slightly-off stop tidies itself up, narrow enough that
  *  stopping mid-way (to read the middle of a month) stays put. */
@@ -171,7 +271,24 @@ export function useLightSnap(ref: RefObject<HTMLElement | null>, { axis, measure
     el.addEventListener('touchend', onUp, { passive: true })
     el.addEventListener('touchcancel', onUp, { passive: true })
     el.addEventListener('wheel', onWheel, { passive: true })
+    // Week scrolls on both axes; month only vertically, and a sideways drag there
+    // is the page swipe, so it is given back.
+    const unbindDrag = bindMouseDrag(el, {
+      axis: axis === 'x' ? 'both' : 'y',
+      yieldCrossAxis: axis === 'y',
+      onGesture: (phase, dominant) => {
+        if (phase === 'start') {
+          inflight.current = null
+          touching = true
+          byTouch = dominant === axis
+          return
+        }
+        touching = false
+        settleSoon()
+      },
+    })
     return () => {
+      unbindDrag()
       el.removeEventListener('scroll', onScroll)
       el.removeEventListener('scrollend', settle)
       el.removeEventListener('touchstart', onDown)

@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { ApiError } from './api/client'
 import { useSettings } from './api/hooks'
+import { AuthGate } from './components/AuthGate'
 import { bookmarkLabel, safeBookmarkUrl } from './components/bookmark'
 import { Screensaver } from './components/Screensaver'
 import { VersionBadge } from './components/VersionBadge'
@@ -26,7 +28,8 @@ const NAV = [
 ]
 
 export function App() {
-  const { data: settings } = useSettings()
+  const settingsQuery = useSettings()
+  const settings = settingsQuery.data
   const onCalendar = useLocation().pathname.startsWith('/calendar')
 
   // Keeps the app the height of the space actually available, so a phone keyboard
@@ -50,6 +53,12 @@ export function App() {
     // already showing rather than blanking every token.
     if (isThemeId(settings?.theme)) applyTheme(settings.theme)
   }, [settings?.theme])
+
+  // Hooks above always run. This is the one place a browser that is not on the
+  // trusted network lands; the kiosk on the Pi never gets a 401.
+  if (settingsQuery.error instanceof ApiError && settingsQuery.error.status === 401) {
+    return <AuthGate />
+  }
 
   return (
     <div

@@ -1,11 +1,15 @@
 # Mantel — API guide for AI agents
 
 You are talking to a self-hosted family calendar that runs on a home network.
-**There is no authentication.** Every action the touchscreen UI can perform is available here.
+The wall display and anything else on that network call the API with no login.
+A caller from anywhere else sends `Authorization: Bearer <token>`, where the token
+comes from pairing — see [authentication.md](authentication.md). `GET /api/health`
+never needs a token.
 
 - Base URL: the host serving the UI, plus `/api` — e.g. `http://localhost:8080/api`
 - Full machine-readable schema: `GET /api/openapi.json`
 - Interactive docs: `/api/docs`
+- Auth scheme, for a phone app: [authentication.md](authentication.md)
 
 ## The model in one paragraph
 
@@ -239,6 +243,7 @@ new `position`.
 
 | Group     | Endpoints                                                                     |
 | --------- | ----------------------------------------------------------------------------- |
+| Auth      | `GET /api/auth/status`, `POST /api/auth/pairing-codes`, `POST /api/auth/pair`, `GET /api/auth/devices`, `DELETE /api/auth/devices/{id}` |
 | Meta      | `GET /api/version`, `/api/health`, `/api/ai-guide`                            |
 | Users     | `GET/POST /api/users`, `GET/PATCH/DELETE /api/users/{id}`                     |
 | Accounts  | `GET /api/accounts`, `GET /api/accounts/google/auth-url?user_id=`, `POST /api/accounts/icloud`, `DELETE /api/accounts/{id}` |
@@ -269,9 +274,11 @@ POST /api/lists/1/items
 explains why. `stale: true` means the upstream service was unreachable and the data came from
 cache — still worth displaying.
 
-The `/api/feeds/*.ics` endpoints are the only ones that require a credential — the token from
-`GET /api/feeds/token` — because a feed URL is the one thing likely to be pasted into a service
-outside the house. Everything else is open on the LAN.
+The `/api/feeds/*.ics` endpoints take their own `?token=` from `GET /api/feeds/token`, because a
+feed URL is pasted into a calendar app and cannot send a device token. Everything else on the
+home network is open. Off the network, send `Authorization: Bearer` with a token from
+`POST /api/auth/pair`. The full scheme — including how the wall stays login-free — is in
+[authentication.md](authentication.md).
 
 `GET/PATCH /api/settings` is where Google, weather, screensaver and Home Assistant
 configuration lives — there is no config file to edit. Secrets (`google_client_secret`,

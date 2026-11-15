@@ -574,3 +574,54 @@ code {
 .themeswatch[aria-pressed='true'] .themeswatch__name::after {
   content: ' \2713';
 }
+
+/* Pairing a phone. The code is meant to be read from the couch. */
+.pair {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 8px 0 16px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.pair__code {
+  font-size: calc(2.5rem * var(--scale));
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pair__qr {
+  width: 180px;
+  height: 180px;
+  background: #fff;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.pair__meta {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  text-align: center;
+}
+
+.authgate {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.authgate__card {
+  width: min(440px, 100%);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

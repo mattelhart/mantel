@@ -1,6 +1,7 @@
 import { format, isToday } from 'date-fns'
 import { useEffect, useMemo, useRef } from 'react'
 import type { CalendarEvent } from '../../api/types'
+import { useMouseDragScroll } from '../../hooks/useLightSnap'
 import { overlapsDay, startOfLocalDay } from './overlap'
 
 interface Props {
@@ -32,6 +33,8 @@ export function TimeGridView({
   onSelectSlot,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Touch scrolls this natively. A mouse on a TV does not, so a vertical drag does.
+  useMouseDragScroll(scrollRef)
   const hours = Array.from({ length: dayEndHour - dayStartHour }, (_, i) => dayStartHour + i)
 
   useEffect(() => {

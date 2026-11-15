@@ -12,6 +12,9 @@ os.environ["APP_VERSION"] = "test"
 os.environ["SYNC_ENABLED"] = "false"
 # Never let a test run reach out to GitHub from the startup update check.
 os.environ["UPDATE_CHECK_ENABLED"] = "false"
+# The default AUTH_MODE trusts private addresses and rejects everything else.
+# The test client is neither, so the suite would 401. Auth cases opt back in.
+os.environ["AUTH_MODE"] = "off"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

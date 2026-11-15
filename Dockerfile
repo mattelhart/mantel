@@ -20,11 +20,15 @@ FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd
 ARG APP_VERSION=dev
 ARG BUILD_TIME=""
 
+# FORWARDED_ALLOW_IPS is empty so Uvicorn does not trust X-Forwarded-For from
+# loopback. A client that can reach 127.0.0.1 must not be able to claim a LAN
+# address. Set it to a reverse proxy's address if one sits in front.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     APP_VERSION=$APP_VERSION \
     BUILD_TIME=$BUILD_TIME \
-    DATABASE_URL=sqlite:////data/family.db
+    DATABASE_URL=sqlite:////data/family.db \
+    FORWARDED_ALLOW_IPS=
 
 WORKDIR /app
 
