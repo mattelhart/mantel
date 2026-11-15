@@ -6,10 +6,12 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -400,6 +402,44 @@ class RewardRedemption(Base):
 
     reward: Mapped[Reward] = relationship(back_populates="redemptions")
     user: Mapped[User] = relationship()
+
+    __table_args__ = (
+        # One open request per person per reward. A second tap, or a retry that
+        # minted a new id, finds this row instead of spending the stars again.
+        # Fulfilled and denied rows drop out of the index, so the reward can be
+        # bought again later.
+        Index(
+            "uq_open_redemption",
+            "user_id",
+            "reward_id",
+            unique=True,
+            sqlite_where=text("status = 'pending'"),
+        ),
+    )
+
+
+class PointRequest(Base):
+    """The id a screen chose for one tap.
+
+    Posting the same `request_id` again is the same tap: the handler returns
+    what already happened and does not write another star entry. The balance
+    stays the sum of `star_entries`.
+    """
+
+    __tablename__ = "point_requests"
+    __table_args__ = (UniqueConstraint("request_id", name="uq_point_request"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # complete, undo, or redeem.
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    completion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("chore_completions.id", ondelete="SET NULL")
+    )
+    redemption_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reward_redemptions.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class WeatherCache(Base):

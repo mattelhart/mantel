@@ -212,7 +212,10 @@ def test_approval_holds_stars_until_someone_says_yes(client):
     assert board["pending_approvals"] == []
 
     again = client.post(f"/api/chores/completions/{checked['id']}/approve")
-    assert again.status_code == 400
+    assert again.status_code == 200
+    assert again.json()["points_awarded"] == 3
+    board = client.get("/api/chores/board?on=2026-11-15").json()
+    assert board["people"][0]["stars"] == 3
 
 
 def test_rejecting_a_pending_check_awards_nothing(client):
@@ -295,9 +298,15 @@ def test_redeem_holds_stars_until_it_is_given_or_sent_back(client):
     assert board["people"][0]["stars"] == 3
     assert board["pending_redemptions"][0]["id"] == redeemed["id"]
 
-    # A second request for the same reward cannot spend stars that are already held.
-    again = client.post(f"/api/rewards/{movie['id']}/redeem", json={"user_id": sam["id"]})
-    assert again.status_code == 400
+    # A second tap while this request is still open does not spend the stars again.
+    again = client.post(
+        f"/api/rewards/{movie['id']}/redeem",
+        json={"user_id": sam["id"], "request_id": "tap-2"},
+    )
+    assert again.status_code == 201
+    assert again.json()["id"] == redeemed["id"]
+    board = client.get("/api/chores/board?on=2026-11-15").json()
+    assert board["people"][0]["stars"] == 3
 
     fulfilled = client.post(f"/api/redemptions/{redeemed['id']}/fulfill").json()
     assert fulfilled["status"] == "fulfilled"
@@ -353,10 +362,68 @@ def test_zero_point_chore_writes_no_ledger_row(client, db):
     assert db.query(StarEntry).count() == 0
 
 
+def test_monday_does_not_complete_tuesday(client):
+    sam = user(client, "Sam")
+    row = chore(client, [sam["id"]], points=2).json()
+    client.post(
+        f"/api/chores/{row['id']}/complete",
+        json={"user_id": sam["id"], "on": "2026-11-15", "request_id": "mon"},
+    )
+    tuesday = client.get("/api/chores/board?on=2026-11-16").json()
+    assert tuesday["people"][0]["chores"][0]["completion"] is None
+    assert tuesday["people"][0]["stars"] == 2
+
+    client.post(
+        f"/api/chores/{row['id']}/complete",
+        json={"user_id": sam["id"], "on": "2026-11-16", "request_id": "tue"},
+    )
+    board = client.get("/api/chores/board?on=2026-11-16").json()
+    assert board["people"][0]["chores"][0]["completion"]["status"] == "done"
+    assert board["people"][0]["stars"] == 4
+    monday = client.get("/api/chores/board?on=2026-11-15").json()
+    assert monday["people"][0]["chores"][0]["completion"]["status"] == "done"
+
+
+def test_replaying_a_request_id_does_not_award_or_spend_twice(client, db):
+    sam = user(client, "Sam")
+    row = chore(client, [sam["id"]], points=4).json()
+    body = {"user_id": sam["id"], "on": "2026-11-15", "done": True, "request_id": "check-1"}
+    first = client.post(f"/api/chores/{row['id']}/complete", json=body).json()
+    second = client.post(f"/api/chores/{row['id']}/complete", json=body).json()
+    assert second["completion"]["id"] == first["completion"]["id"]
+    assert client.get("/api/chores/board?on=2026-11-15").json()["people"][0]["stars"] == 4
+    assert db.query(StarEntry).count() == 1
+
+    movie = reward(client, points_cost=3).json()
+    redeem_body = {"user_id": sam["id"], "request_id": "redeem-1"}
+    bought = client.post(f"/api/rewards/{movie['id']}/redeem", json=redeem_body).json()
+    replay = client.post(f"/api/rewards/{movie['id']}/redeem", json=redeem_body).json()
+    assert replay["id"] == bought["id"]
+    assert client.get("/api/chores/board?on=2026-11-15").json()["people"][0]["stars"] == 1
+    assert db.query(StarEntry).count() == 2, "the replay must not write a second spend"
+
+
+def test_a_child_needs_no_account(client):
+    """A family member is a name and a color. Chores do not require a login
+    or a linked Google or iCloud account."""
+    kid = user(client, "Sam", color="#22c55e", avatar_emoji="🦊")
+    assert kid["color"] == "#22c55e"
+    row = chore(client, [kid["id"]], points=1, title="Feed the cat").json()
+    done = client.post(
+        f"/api/chores/{row['id']}/complete",
+        json={"user_id": kid["id"], "on": "2026-11-15"},
+    ).json()
+    assert done["completion"]["status"] == "done"
+    board = client.get("/api/chores/board?on=2026-11-15").json()
+    assert board["people"][0]["stars"] == 1
+    assert board["people"][0]["avatar_emoji"] == "🦊"
+
+
 def test_older_database_gains_the_chore_tables(client):
     """New tables, not new columns. An install from before this release boots
     and create_all adds them; nothing on users, events, or lists changes."""
     with engine.begin() as conn:
+        conn.execute(text("DROP TABLE point_requests"))
         conn.execute(text("DROP TABLE star_entries"))
         conn.execute(text("DROP TABLE reward_redemptions"))
         conn.execute(text("DROP TABLE rewards"))
@@ -374,6 +441,7 @@ def test_older_database_gains_the_chore_tables(client):
         "chore_assignees",
         "chore_completions",
         "star_entries",
+        "point_requests",
         "rewards",
         "reward_redemptions",
     } <= names

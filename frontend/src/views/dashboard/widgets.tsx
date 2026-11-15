@@ -495,11 +495,12 @@ function ChoresWidget({ config }: WidgetProps) {
     refetchInterval: 30_000,
   })
   const toggle = useEntityMutation(
-    (body: { choreId: number; userId: number; done: boolean; on: string }) =>
+    (body: { choreId: number; userId: number; done: boolean; on: string; requestId: string }) =>
       api.post(`/chores/${body.choreId}/complete`, {
         user_id: body.userId,
         on: body.on,
         done: body.done,
+        request_id: body.requestId,
       }),
     ['chores'],
   )
@@ -536,6 +537,7 @@ function ChoresWidget({ config }: WidgetProps) {
                         userId: person.user_id,
                         done: !checked,
                         on: data.on,
+                        requestId: crypto.randomUUID(),
                       })
                     }
                   >

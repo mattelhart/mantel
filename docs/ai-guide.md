@@ -278,9 +278,14 @@ cache — still worth displaying.
 
 ### 8. Chores and rewards
 
-Chores are household jobs with a star value. Rewards are what those stars buy. The balance
-is a ledger: checking a chore adds stars, unchecking writes the same number back, redeeming
-a reward holds the cost until someone gives it or sends it back.
+Checking a chore adds stars. Unchecking writes the same number back. The balance is the
+sum of those rows, not a counter that gets edited. Each day is its own completion, so
+Monday does not check off Tuesday. Assignees are family members from `GET /api/users` —
+a child does not need a Google or iCloud account.
+
+Send `request_id` (1–64 letters, numbers, `_` or `-`) on complete and redeem. The same id
+is the same tap: a retry returns the original result and does not move stars again. A
+second redeem of a reward that is still waiting to be given also returns the open request.
 
 ```http
 GET /api/chores/board?on=2026-11-15

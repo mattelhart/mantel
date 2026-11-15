@@ -1,17 +1,15 @@
 """Chores the household does, and rewards those stars can buy.
 
-A chore is stored once. The board asks, for one calendar day in the home
-timezone, which chores fall on it and whether each assignee has done theirs.
-Checking off yours does not check off anyone else's.
+A chore is stored once. Each day it falls on is its own completion, so Monday
+does not check off Tuesday. Assignees are family members — a child has a name
+and a color, not a login.
 
-Stars are a ledger (`star_entries`). The balance is the sum. Unchecking a
-chore or sending a reward back writes another row, so the history still adds
-up after the fact.
-
-Approving is optional per chore. Without it, stars land when the chore is
-checked. With it, the check waits until someone approves.
+Stars are a ledger (`star_entries`). The balance is the sum. A `request_id`
+from the screen makes a retry of the same tap return the original result
+instead of writing another row.
 """
 
+import re
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,6 +23,7 @@ from ..models import (
     Chore,
     ChoreAssignee,
     ChoreCompletion,
+    PointRequest,
     Reward,
     RewardRedemption,
     StarEntry,
@@ -98,6 +97,13 @@ class CompleteIn(BaseModel):
         default=None, description="Which day. Defaults to today in the home timezone."
     )
     done: bool = True
+    request_id: str | None = Field(
+        default=None,
+        description=(
+            "Chosen by the screen for this tap. Send the same value on a retry. "
+            "A repeat does not award or remove stars again."
+        ),
+    )
 
 
 class CompleteResult(BaseModel):
@@ -148,6 +154,10 @@ class RewardOut(BaseModel):
 
 class RedeemIn(BaseModel):
     user_id: int
+    request_id: str | None = Field(
+        default=None,
+        description="The same value spends the stars at most once.",
+    )
 
 
 class RedemptionOut(BaseModel):
@@ -448,11 +458,11 @@ def board(
     response_model=CompleteResult,
     summary="Check or uncheck one person's occurrence",
     description=(
-        "Each assignee has their own check. `done: true` marks it done, or `pending` when "
-        "the chore requires approval — stars wait for `POST /chores/completions/{id}/approve`. "
-        "`done: false` removes the check. If stars were already awarded, the same number "
-        "is written back as a reversal. Checking something that is already checked does "
-        "not award stars twice."
+        "Each assignee has their own check for that day — Monday does not complete "
+        "Tuesday. `done: true` marks it done, or `pending` when the chore requires "
+        "approval. Stars wait for `POST /chores/completions/{id}/approve`. "
+        "`done: false` removes the check and, if stars were awarded, writes that "
+        "number back. Send `request_id` to make a retry of this tap a no-op."
     ),
 )
 def complete_chore(
@@ -467,15 +477,22 @@ def complete_chore(
     if not occurs_on(chore.schedule, chore.weekdays, chore.due_on, day):
         raise HTTPException(400, "This chore is not scheduled that day")
 
-    existing = db.scalar(
-        select(ChoreCompletion).where(
-            ChoreCompletion.chore_id == chore.id,
-            ChoreCompletion.user_id == payload.user_id,
-            ChoreCompletion.on_date == day,
-        )
-    )
+    request_id = _request_id(payload.request_id)
+    if request_id is not None:
+        prior = _prior_request(db, request_id)
+        if prior is not None:
+            if prior.action not in ("complete", "undo"):
+                raise HTTPException(409, "request_id was already used")
+            current = _occurrence(db, chore.id, payload.user_id, day)
+            return CompleteResult(completion=_completion_out_or_none(current))
+
+    existing = _occurrence(db, chore.id, payload.user_id, day)
     if payload.done:
         if existing is not None and existing.status in ("pending", "done"):
+            if not _claim(db, request_id, "complete", existing.id, None):
+                current = _occurrence(db, chore.id, payload.user_id, day)
+                return CompleteResult(completion=_completion_out_or_none(current))
+            db.commit()
             return CompleteResult(completion=_completion_out(existing))
         if existing is not None:
             db.delete(existing)
@@ -496,23 +513,26 @@ def complete_chore(
             db.flush()
         except IntegrityError:
             db.rollback()
-            again = db.scalar(
-                select(ChoreCompletion).where(
-                    ChoreCompletion.chore_id == chore.id,
-                    ChoreCompletion.user_id == payload.user_id,
-                    ChoreCompletion.on_date == day,
-                )
-            )
+            again = _occurrence(db, chore.id, payload.user_id, day)
             if again is None:
                 raise
             return CompleteResult(completion=_completion_out(again))
         if awarded:
             _award(db, payload.user_id, awarded, "chore", chore.title, completion_id=row.id)
+        if not _claim(db, request_id, "complete", row.id, None):
+            return CompleteResult(
+                completion=_completion_out_or_none(_occurrence(db, chore.id, payload.user_id, day))
+            )
         db.commit()
         db.refresh(row)
         return CompleteResult(completion=_completion_out(row))
 
     if existing is None:
+        if not _claim(db, request_id, "undo", None, None):
+            return CompleteResult(
+                completion=_completion_out_or_none(_occurrence(db, chore.id, payload.user_id, day))
+            )
+        db.commit()
         return CompleteResult(completion=None)
     if existing.points_awarded:
         _award(
@@ -524,6 +544,10 @@ def complete_chore(
             completion_id=existing.id,
         )
     db.delete(existing)
+    if not _claim(db, request_id, "undo", None, None):
+        return CompleteResult(
+            completion=_completion_out_or_none(_occurrence(db, chore.id, payload.user_id, day))
+        )
     db.commit()
     return CompleteResult(completion=None)
 
@@ -534,7 +558,18 @@ def complete_chore(
     summary="Approve a check and award its stars",
 )
 def approve_completion(completion_id: int, db: Session = Depends(get_db)) -> CompletionOut:
-    row = _pending(db, completion_id)
+    row = db.scalar(
+        select(ChoreCompletion)
+        .where(ChoreCompletion.id == completion_id)
+        .options(selectinload(ChoreCompletion.chore))
+    )
+    if row is None or row.chore is None:
+        raise HTTPException(404, "Completion not found")
+    # A retry of an approval that already landed must not grant the stars again.
+    if row.status == "done":
+        return _completion_out(row)
+    if row.status != "pending":
+        raise HTTPException(400, "That chore is not waiting for approval")
     row.status = "done"
     row.points_awarded = row.chore.points
     row.reviewed_at = utcnow()
@@ -611,6 +646,77 @@ def delete_chore(chore_id: int, db: Session = Depends(get_db)) -> None:
         db.delete(row)
     chore.archived = True
     db.commit()
+
+
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _request_id(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = raw.strip()
+    if not value:
+        return None
+    if _REQUEST_ID.fullmatch(value) is None:
+        raise HTTPException(400, "request_id must be 1–64 letters, numbers, _ or -")
+    return value
+
+
+def _prior_request(db: Session, request_id: str) -> PointRequest | None:
+    return db.scalar(select(PointRequest).where(PointRequest.request_id == request_id))
+
+
+def _occurrence(db: Session, chore_id: int, user_id: int, day: date) -> ChoreCompletion | None:
+    return db.scalar(
+        select(ChoreCompletion).where(
+            ChoreCompletion.chore_id == chore_id,
+            ChoreCompletion.user_id == user_id,
+            ChoreCompletion.on_date == day,
+        )
+    )
+
+
+def _completion_out_or_none(row: ChoreCompletion | None) -> CompletionOut | None:
+    return _completion_out(row) if row is not None else None
+
+
+def _claim(
+    db: Session,
+    request_id: str | None,
+    action: str,
+    completion_id: int | None,
+    redemption_id: int | None,
+) -> bool:
+    """Reserve `request_id`. False means it was already used, and this
+    transaction has been rolled back so a retry can read the first result."""
+    if request_id is None:
+        return True
+    db.add(
+        PointRequest(
+            request_id=request_id,
+            action=action,
+            completion_id=completion_id,
+            redemption_id=redemption_id,
+        )
+    )
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        return False
+    return True
+
+
+def _open_redemption_for(db: Session, reward_id: int, user_id: int) -> RewardRedemption | None:
+    return db.scalar(
+        select(RewardRedemption)
+        .where(
+            RewardRedemption.reward_id == reward_id,
+            RewardRedemption.user_id == user_id,
+            RewardRedemption.status == "pending",
+        )
+        .options(selectinload(RewardRedemption.reward), selectinload(RewardRedemption.user))
+    )
 
 
 def _pending(db: Session, completion_id: int) -> ChoreCompletion:
@@ -792,8 +898,9 @@ def delete_reward(reward_id: int, db: Session = Depends(get_db)) -> None:
     status_code=201,
     summary="Spend stars on a reward",
     description=(
-        "Stars are held immediately, so two requests cannot spend the same balance. "
-        "The request stays pending until someone marks it given or sends it back."
+        "Stars are held immediately. The same `request_id`, or a second tap while "
+        "this reward is still waiting to be given, returns the open request and "
+        "does not spend the stars again."
     ),
 )
 def redeem(reward_id: int, payload: RedeemIn, db: Session = Depends(get_db)) -> RedemptionOut:
@@ -801,6 +908,24 @@ def redeem(reward_id: int, payload: RedeemIn, db: Session = Depends(get_db)) -> 
     user = db.get(User, payload.user_id)
     if user is None:
         raise HTTPException(404, "User not found")
+    request_id = _request_id(payload.request_id)
+    if request_id is not None:
+        prior = _prior_request(db, request_id)
+        if prior is not None:
+            if prior.action != "redeem" or prior.redemption_id is None:
+                raise HTTPException(409, "request_id was already used")
+            return _redemption_out(_load_redemption(db, prior.redemption_id))
+
+    open_request = _open_redemption_for(db, reward.id, user.id)
+    if open_request is not None:
+        if not _claim(db, request_id, "redeem", None, open_request.id):
+            prior = _prior_request(db, request_id) if request_id else None
+            if prior is not None and prior.redemption_id is not None:
+                return _redemption_out(_load_redemption(db, prior.redemption_id))
+            return _redemption_out(open_request)
+        db.commit()
+        return _redemption_out(open_request)
+
     balance = _balances(db).get(user.id, 0)
     if balance < reward.points_cost:
         raise HTTPException(
@@ -815,7 +940,22 @@ def redeem(reward_id: int, payload: RedeemIn, db: Session = Depends(get_db)) -> 
         created_at=utcnow(),
     )
     db.add(redemption)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        open_request = _open_redemption_for(db, reward.id, user.id)
+        if open_request is None:
+            raise
+        return _redemption_out(open_request)
+    if not _claim(db, request_id, "redeem", None, redemption.id):
+        prior = _prior_request(db, request_id) if request_id else None
+        if prior is not None and prior.redemption_id is not None:
+            return _redemption_out(_load_redemption(db, prior.redemption_id))
+        again = _open_redemption_for(db, reward.id, user.id)
+        if again is None:
+            raise HTTPException(409, "request_id was already used")
+        return _redemption_out(again)
     _award(
         db,
         user.id,

@@ -135,11 +135,12 @@ function ApprovalRow({ item }: { item: ChoreBoard['pending_approvals'][number] }
 
 function PersonColumn({ person, day }: { person: PersonBoard; day: string }) {
   const toggle = useEntityMutation(
-    (body: { chore_id: number; done: boolean }) =>
+    (body: { chore_id: number; done: boolean; request_id: string }) =>
       api.post(`/chores/${body.chore_id}/complete`, {
         user_id: person.user_id,
         on: day,
         done: body.done,
+        request_id: body.request_id,
       }),
     KEYS,
   )
@@ -165,7 +166,13 @@ function PersonColumn({ person, day }: { person: PersonBoard; day: string }) {
                 className="listitem__check"
                 aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
                 style={!checked ? { borderColor: person.color } : undefined}
-                onClick={() => toggle.mutate({ chore_id: chore.chore_id, done: !checked })}
+                onClick={() =>
+                  toggle.mutate({
+                    chore_id: chore.chore_id,
+                    done: !checked,
+                    request_id: crypto.randomUUID(),
+                  })
+                }
               >
                 {status === 'done' ? '✓' : status === 'pending' ? '…' : ''}
               </button>
@@ -203,8 +210,11 @@ function Rewards({
     KEYS,
   )
   const redeem = useEntityMutation(
-    (body: { reward_id: number; user_id: number }) =>
-      api.post(`/rewards/${body.reward_id}/redeem`, { user_id: body.user_id }),
+    (body: { reward_id: number; user_id: number; request_id: string }) =>
+      api.post(`/rewards/${body.reward_id}/redeem`, {
+        user_id: body.user_id,
+        request_id: body.request_id,
+      }),
     KEYS,
   )
   const fulfill = useEntityMutation(
@@ -255,7 +265,7 @@ function Rewards({
               onClick={() => {
                 if (spender == null) return
                 redeem.mutate(
-                  { reward_id: row.id, user_id: spender },
+                  { reward_id: row.id, user_id: spender, request_id: crypto.randomUUID() },
                   {
                     onSuccess: () => setMessage(''),
                     onError: (err) =>
