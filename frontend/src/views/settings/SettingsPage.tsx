@@ -12,6 +12,7 @@ import { ICloudTab } from './ICloudTab'
 import { ScreenTab } from './ScreenTab'
 import { SharingTab } from './SharingTab'
 import { WeatherTab } from './WeatherTab'
+import { useEventColor } from '../../components/eventColor'
 import { THEMES } from '../../theme'
 import { PALETTE } from './palette'
 import { timeAgo } from './timeAgo'
@@ -81,6 +82,7 @@ export function SettingsPage() {
 
 function PeopleTab() {
   const { data: users = [] } = useUsers()
+  const fill = useEventColor()
   const [name, setName] = useState('')
 
   const createUser = useEntityMutation(
@@ -99,11 +101,14 @@ function PeopleTab() {
   return (
     <section className="panel">
       <h2>Family members</h2>
-      <p className="hint">Each person gets a color. Their calendars use it everywhere.</p>
+      <p className="hint">
+        Each person gets a color. Their calendars use it everywhere. Airy draws those colors as
+        soft pastels.
+      </p>
 
       {users.map((u) => (
         <div key={u.id} className="row">
-          <span className="swatch" style={{ background: u.color }} />
+          <span className="swatch" style={{ background: fill(u.color) }} />
           <input
             className="row__name"
             value={u.name}

@@ -239,7 +239,7 @@ export interface AppSettings {
   default_view: string
   kiosk_default_route: string
   display_scale: 'normal' | 'large' | 'wall'
-  theme: 'midnight' | 'daylight' | 'hearth'
+  theme: 'midnight' | 'daylight' | 'hearth' | 'airy'
   bookmark_label: string
   bookmark_url: string
   day_start_hour: number

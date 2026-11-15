@@ -37,10 +37,28 @@ export function isPersonVisible(hidden: number[], userId: number | null | undefi
  * display in the kitchen and a phone in someone's pocket want different views.
  * It is a way of looking at the calendar, not household configuration.
  */
+/** The top bar and the calendar both read this filter. `storage` events do not
+ *  fire in the tab that wrote them, so subscribers keep the two copies in step. */
+const subscribers = new Set<(hidden: number[]) => void>()
+
+function sameIds(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i])
+}
+
 export function usePersonFilter() {
   const [hiddenUserIds, setHidden] = useState<number[]>(() =>
     parseHidden(safeRead(STORAGE_KEY)),
   )
+
+  useEffect(() => {
+    const sync = (next: number[]) => {
+      setHidden((cur) => (sameIds(cur, next) ? cur : next))
+    }
+    subscribers.add(sync)
+    return () => {
+      subscribers.delete(sync)
+    }
+  }, [])
 
   useEffect(() => {
     try {
@@ -48,6 +66,7 @@ export function usePersonFilter() {
     } catch {
       /* private browsing or a full quota; the choice just won't persist */
     }
+    for (const fn of subscribers) fn(hiddenUserIds)
   }, [hiddenUserIds])
 
   const toggle = useCallback((id: number) => setHidden((cur) => toggleId(cur, id)), [])

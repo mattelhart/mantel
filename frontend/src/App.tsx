@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ApiError } from './api/client'
 import { useSettings } from './api/hooks'
+import { AiryBar, AiryNav } from './components/AiryChrome'
 import { AuthGate } from './components/AuthGate'
 import { bookmarkLabel, safeBookmarkUrl } from './components/bookmark'
+import { EventColorProvider } from './components/eventColor'
 import { Screensaver } from './components/Screensaver'
 import { VersionBadge } from './components/VersionBadge'
 import { useBurnInShift } from './hooks/useIdle'
@@ -50,6 +52,9 @@ export function App() {
   // the grid row collapses, so nobody pays vertical space for a feature they
   // haven't set up. That matters on a wall display.
   const bookmark = safeBookmarkUrl(settings?.bookmark_url)
+  const remembered = typeof document === 'undefined' ? undefined : document.documentElement.dataset.theme
+  const theme = isThemeId(settings?.theme) ? settings.theme : isThemeId(remembered) ? remembered : undefined
+  const airy = theme === 'airy'
 
   useEffect(() => {
     document.documentElement.dataset.scale = settings?.display_scale ?? 'normal'
@@ -68,48 +73,63 @@ export function App() {
   }
 
   return (
+    <EventColorProvider airy={airy}>
     <div
       className="shell"
+      data-airy={airy ? 'true' : undefined}
       style={{ transform: `translate(${shift.x}px, ${shift.y}px)`, transition: 'transform 2s ease-in-out' }}
     >
-      {bookmark && (
-        <div className="topbar">
-          <a className="topbar__link" href={bookmark} rel="noreferrer">
-            <span aria-hidden>🔗</span>
-            {bookmarkLabel(settings?.bookmark_label, bookmark)}
-          </a>
-        </div>
+      {airy ? (
+        <AiryBar
+          bookmark={bookmark}
+          bookmarkText={bookmark ? bookmarkLabel(settings?.bookmark_label, bookmark) : ''}
+        />
+      ) : (
+        bookmark && (
+          <div className="topbar">
+            <a className="topbar__link" href={bookmark} rel="noreferrer">
+              <span aria-hidden>🔗</span>
+              {bookmarkLabel(settings?.bookmark_label, bookmark)}
+            </a>
+          </div>
+        )
       )}
       <main className="shell__main">
         <Outlet />
       </main>
       <nav className="shell__nav">
-        {/* One entry on a phone, four on anything larger. Both are rendered and the
-            stylesheet picks -- a JS breakpoint would disagree with the CSS one that
-            already decides whether this nav is a side rail or a bottom bar. */}
-        <NavLink
-          to="/calendar/today"
-          className="navbtn navbtn--calendar"
-          // Stays lit on every calendar view, not just Today, since it is now the
-          // way back to all four.
-          aria-current={onCalendar ? 'page' : undefined}
-        >
-          <span>Calendar</span>
-        </NavLink>
-
-        <span className="navviews">
-          {CALENDAR_VIEWS.map((item) => (
-            <NavLink key={item.to} to={item.to} className="navbtn">
-              <span>{item.label}</span>
+        {airy ? (
+          <AiryNav onCalendar={onCalendar} />
+        ) : (
+          <>
+            {/* One entry on a phone, four on anything larger. Both are rendered and the
+                stylesheet picks -- a JS breakpoint would disagree with the CSS one that
+                already decides whether this nav is a side rail or a bottom bar. */}
+            <NavLink
+              to="/calendar/today"
+              className="navbtn navbtn--calendar"
+              // Stays lit on every calendar view, not just Today, since it is now the
+              // way back to all four.
+              aria-current={onCalendar ? 'page' : undefined}
+            >
+              <span>Calendar</span>
             </NavLink>
-          ))}
-        </span>
 
-        {NAV.map((item) => (
-          <NavLink key={item.to} to={item.to} className="navbtn">
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+            <span className="navviews">
+              {CALENDAR_VIEWS.map((item) => (
+                <NavLink key={item.to} to={item.to} className="navbtn">
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </span>
+
+            {NAV.map((item) => (
+              <NavLink key={item.to} to={item.to} className="navbtn">
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </>
+        )}
         <VersionBadge />
       </nav>
       {!online && (
@@ -119,5 +139,6 @@ export function App() {
       )}
       <Screensaver />
     </div>
+    </EventColorProvider>
   )
 }

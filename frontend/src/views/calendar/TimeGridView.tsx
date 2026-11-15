@@ -1,6 +1,7 @@
 import { format, isToday } from 'date-fns'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CalendarEvent } from '../../api/types'
+import { useEventColor } from '../../components/eventColor'
 import { useMouseDragScroll } from '../../hooks/useLightSnap'
 import { overlapsDay, startOfLocalDay } from './overlap'
 
@@ -13,6 +14,8 @@ interface Props {
   hourHeight: number
   onSelectEvent: (e: CalendarEvent) => void
   onSelectSlot: (start: Date) => void
+  /** Present on the Airy layout: a vertical drag snaps a single event by 15 minutes. */
+  onReschedule?: (event: CalendarEvent, deltaMinutes: number) => void
 }
 
 /** Below this height an event block cannot show a title and a time on separate lines.
@@ -31,6 +34,7 @@ export function TimeGridView({
   hourHeight,
   onSelectEvent,
   onSelectSlot,
+  onReschedule,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   // Touch scrolls this natively. A mouse on a TV does not, so a vertical drag does.
@@ -81,6 +85,7 @@ export function TimeGridView({
             use24h={use24h}
             onSelectEvent={onSelectEvent}
             onSelectSlot={onSelectSlot}
+            onReschedule={onReschedule}
           />
         ))}
       </div>
@@ -119,6 +124,7 @@ interface ColumnProps {
   placeholder?: boolean
   onSelectEvent: (e: CalendarEvent) => void
   onSelectSlot: (start: Date) => void
+  onReschedule?: (event: CalendarEvent, deltaMinutes: number) => void
 }
 
 /** One day's hour slots, events and now-line. Shared by Day view and the scrolling strip
@@ -133,6 +139,7 @@ export function DayColumn({
   placeholder,
   onSelectEvent,
   onSelectSlot,
+  onReschedule,
 }: ColumnProps) {
   const positioned = useMemo(
     () =>
@@ -169,27 +176,111 @@ export function DayColumn({
         />
       ))}
       {positioned.map(({ event, top, height, left, width }) => (
-        <button
+        <EventBlock
           key={event.id}
-          className="event-block"
-          // A block this short cannot fit a title above a time; the CSS
-          // lays those out on one line instead.
-          data-compact={height < TWO_LINES_PX}
-          style={{
-            top: top - dayStartHour * hourHeight,
-            height,
-            left: `${left}%`,
-            width: `${width}%`,
-            background: event.color,
-          }}
-          onClick={() => onSelectEvent(event)}
-        >
-          <span className="event-block__title">{event.title}</span>
-          <span className="event-block__time">{formatTime(new Date(event.start_at), use24h)}</span>
-        </button>
+          event={event}
+          top={top - dayStartHour * hourHeight}
+          height={height}
+          left={left}
+          width={width}
+          compact={height < TWO_LINES_PX}
+          use24h={use24h}
+          hourHeight={hourHeight}
+          onSelect={() => onSelectEvent(event)}
+          onReschedule={onReschedule}
+        />
       ))}
       {isToday(day) && <NowLine dayStartHour={dayStartHour} hourHeight={hourHeight} />}
     </div>
+  )
+}
+
+/** A timed event. With `onReschedule`, a vertical drag of more than a few pixels
+ *  snaps the whole block by 15 minutes; a tap still opens it. Repeating events
+ *  stay put — moving one visible copy would rewrite the series. */
+function EventBlock({
+  event,
+  top,
+  height,
+  left,
+  width,
+  compact,
+  use24h,
+  hourHeight,
+  onSelect,
+  onReschedule,
+}: {
+  event: CalendarEvent
+  top: number
+  height: number
+  left: number
+  width: number
+  compact: boolean
+  use24h: boolean
+  hourHeight: number
+  onSelect: () => void
+  onReschedule?: (event: CalendarEvent, deltaMinutes: number) => void
+}) {
+  const fill = useEventColor()
+  const drag = useRef<{ y: number; id: number; moved: boolean } | null>(null)
+  const suppressClick = useRef(false)
+  const [lift, setLift] = useState(0)
+  const canDrag = !!onReschedule && event.editable && !event.recurring
+
+  const endDrag = (clientY: number) => {
+    const current = drag.current
+    drag.current = null
+    setLift(0)
+    if (!current) return
+    if (!current.moved) return
+    suppressClick.current = true
+    const minutes = Math.round(((clientY - current.y) / hourHeight) * 4) * 15
+    if (minutes !== 0) onReschedule?.(event, minutes)
+  }
+
+  return (
+    <button
+      className="event-block"
+      data-compact={compact}
+      data-draggable={canDrag}
+      data-dragging={lift !== 0}
+      style={{
+        top: top + lift,
+        height,
+        left: `${left}%`,
+        width: `${width}%`,
+        background: fill(event.color),
+      }}
+      onPointerDown={(e) => {
+        if (!canDrag) return
+        drag.current = { y: e.clientY, id: e.pointerId, moved: false }
+        e.currentTarget.setPointerCapture(e.pointerId)
+      }}
+      onPointerMove={(e) => {
+        const current = drag.current
+        if (!current || current.id !== e.pointerId) return
+        const dy = e.clientY - current.y
+        if (Math.abs(dy) > 8) current.moved = true
+        if (current.moved) setLift(dy)
+      }}
+      onPointerUp={(e) => {
+        if (drag.current?.id === e.pointerId) endDrag(e.clientY)
+      }}
+      onPointerCancel={() => {
+        drag.current = null
+        setLift(0)
+      }}
+      onClick={() => {
+        if (suppressClick.current) {
+          suppressClick.current = false
+          return
+        }
+        onSelect()
+      }}
+    >
+      <span className="event-block__title">{event.title}</span>
+      <span className="event-block__time">{formatTime(new Date(event.start_at), use24h)}</span>
+    </button>
   )
 }
 
@@ -203,6 +294,7 @@ export function AllDayChips({
   events: CalendarEvent[]
   onSelectEvent: (e: CalendarEvent) => void
 }) {
+  const fill = useEventColor()
   return (
     <>
       {events
@@ -211,7 +303,7 @@ export function AllDayChips({
           <button
             key={e.id}
             className="chip"
-            style={{ background: e.color }}
+            style={{ background: fill(e.color) }}
             onClick={() => onSelectEvent(e)}
           >
             {e.title}

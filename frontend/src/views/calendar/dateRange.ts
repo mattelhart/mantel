@@ -10,9 +10,9 @@ import {
   startOfWeek,
 } from 'date-fns'
 
-export type ViewKind = 'today' | '3day' | 'week' | 'month'
+export type ViewKind = 'today' | '3day' | 'week' | 'month' | 'schedule'
 
-export const VIEW_KINDS: ViewKind[] = ['today', '3day', 'week', 'month']
+export const VIEW_KINDS: ViewKind[] = ['today', '3day', 'week', 'month', 'schedule']
 
 export function isViewKind(v: string | undefined): v is ViewKind {
   return !!v && (VIEW_KINDS as string[]).includes(v)
@@ -27,6 +27,13 @@ export interface Range {
 /** The visible span for a view anchored on `anchor`. Month view is padded out to whole
  *  weeks so the grid is always rectangular. */
 export function rangeFor(view: ViewKind, anchor: Date, weekStartsOn: 0 | 1): Range {
+  // A fortnight of agenda rows. Long enough to see the week ahead, short enough
+  // that the list still feels like a page you can scan from the doorway.
+  if (view === 'schedule') {
+    const start = startOfDay(anchor)
+    const end = addDays(start, 14)
+    return { start, end, days: eachDay(start, end) }
+  }
   if (view === 'month') {
     const start = startOfWeek(startOfMonth(anchor), { weekStartsOn })
     // endOfWeek lands on 23:59:59, so normalize before stepping to the exclusive end --
@@ -54,6 +61,8 @@ export function step(view: ViewKind, anchor: Date, direction: 1 | -1): Date {
       return addDays(anchor, 7 * direction)
     case 'month':
       return addMonths(anchor, direction)
+    case 'schedule':
+      return addDays(anchor, 7 * direction)
   }
 }
 
