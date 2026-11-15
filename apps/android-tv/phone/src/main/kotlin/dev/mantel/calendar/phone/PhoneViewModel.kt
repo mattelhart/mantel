@@ -1,0 +1,754 @@
+package dev.mantel.calendar.phone
+
+import android.app.Application
+import android.content.Context
+import android.os.Build
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import dev.mantel.calendar.core.CalEvent
+import dev.mantel.calendar.core.CalInfo
+import dev.mantel.calendar.core.ChoreBoard
+import dev.mantel.calendar.core.FAMILYCAL_ORIGIN
+import dev.mantel.calendar.core.FamilyMember
+import dev.mantel.calendar.core.HouseholdSettings
+import dev.mantel.calendar.core.LiveMessage
+import dev.mantel.calendar.core.MantelClient
+import dev.mantel.calendar.core.MantelException
+import dev.mantel.calendar.core.PendingWrite
+import dev.mantel.calendar.core.RepeatChoice
+import dev.mantel.calendar.core.ScreenCache
+import dev.mantel.calendar.core.ScreenCacheStore
+import dev.mantel.calendar.core.SharedList
+import dev.mantel.calendar.core.SseParser
+import dev.mantel.calendar.core.WriteOutbox
+import dev.mantel.calendar.core.allDaySpan
+import dev.mantel.calendar.core.applyChoreCheck
+import dev.mantel.calendar.core.applyListCheck
+import dev.mantel.calendar.core.applyRedeem
+import dev.mantel.calendar.core.buildRepeat
+import dev.mantel.calendar.core.cleartextPermitted
+import dev.mantel.calendar.core.discoveryCandidates
+import dev.mantel.calendar.core.eventEditKind
+import dev.mantel.calendar.core.EventEditKind
+import dev.mantel.calendar.core.fetchInstants
+import dev.mantel.calendar.core.normalizePairCode
+import dev.mantel.calendar.core.normalizeServer
+import dev.mantel.calendar.core.offlineLabel
+import dev.mantel.calendar.core.pairCodeComplete
+import dev.mantel.calendar.core.parsePairingLink
+import dev.mantel.calendar.core.reconnectDelayMs
+import dev.mantel.calendar.core.syncedLabel
+import dev.mantel.calendar.core.timedRange
+import dev.mantel.calendar.core.todayIn
+import dev.mantel.calendar.core.weekdayCode
+import dev.mantel.calendar.core.zoneOrUtc
+import dev.mantel.calendar.device.SecureTokenStore
+import dev.mantel.calendar.phone.notify.UpcomingNotifier
+import dev.mantel.calendar.phone.widget.AgendaWidget
+import io.ktor.client.engine.cio.CIO
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.coroutineContext
+
+enum class Phase { Loading, Address, Pair, Ready }
+
+enum class ThemeChoice { System, Light, Dark }
+
+enum class PhoneTab { Today, Month, Chores, Lists }
+
+data class PhoneState(
+    val phase: Phase = Phase.Loading,
+    val message: String? = null,
+    val offline: Boolean = false,
+    val refreshing: Boolean = false,
+    val origin: String? = null,
+    val settings: HouseholdSettings = HouseholdSettings(),
+    val users: List<FamilyMember> = emptyList(),
+    val calendars: List<CalInfo> = emptyList(),
+    val events: List<CalEvent> = emptyList(),
+    val lists: List<SharedList> = emptyList(),
+    val board: ChoreBoard? = null,
+    val anchor: LocalDate = LocalDate.now(),
+    val choreDay: LocalDate = LocalDate.now(),
+    val offlineDetail: String = "",
+    val syncedDetail: String = "Not synced yet",
+    val theme: ThemeChoice = ThemeChoice.System,
+    val hiddenUserIds: Set<Int> = emptySet(),
+)
+
+const val CACHE_DIR = "mantel-cache"
+const val STORE_NAME = "mantel_phone"
+const val STORE_ALIAS = "mantel_phone_token"
+
+private const val PUBLIC_HTTP =
+    "That address is on the public internet. Use the address on your LAN or VPN, or https."
+
+class PhoneViewModel(app: Application) : AndroidViewModel(app) {
+    private val store = SecureTokenStore(app, STORE_NAME, STORE_ALIAS)
+    private val prefs = app.getSharedPreferences("mantel_phone_ui", Context.MODE_PRIVATE)
+    private val origin = MutableStateFlow<String?>(null)
+    private val token = MutableStateFlow<String?>(null)
+    private val client = MantelClient(CIO.create(), { origin.value ?: FAMILYCAL_ORIGIN }, { token.value })
+    private val snapshots = dev.mantel.calendar.core.FileSnapshotStore(File(app.filesDir, CACHE_DIR))
+    private val screenCache = ScreenCacheStore(snapshots)
+    private val outbox = WriteOutbox(snapshots)
+    private val live = AtomicBoolean(false)
+    private var lastEventId: Long? = null
+    private var lastSynced: String? = null
+    private val pendingTopics = mutableSetOf<String>()
+    private var wantResync = false
+    private var coalescing = false
+    private var choreTouched = false
+
+    private val _state = MutableStateFlow(PhoneState(theme = loadTheme()))
+    val state: StateFlow<PhoneState> = _state
+
+    init {
+        viewModelScope.launch { boot() }
+        viewModelScope.launch {
+            while (isActive) {
+                delay(60_000)
+                if (_state.value.phase == Phase.Ready && !live.get()) reload()
+            }
+        }
+        viewModelScope.launch { listen() }
+    }
+
+    fun refresh() {
+        if (_state.value.phase != Phase.Ready && origin.value == null) return
+        viewModelScope.launch { reload(spinner = true) }
+    }
+
+    fun connect(raw: String) {
+        val normalized = normalizeServer(raw)
+        if (normalized == null) {
+            _state.update { it.copy(message = "Enter an address like 192.168.1.20") }
+            return
+        }
+        if (!cleartextPermitted(normalized)) {
+            _state.update { it.copy(phase = Phase.Address, message = PUBLIC_HTTP) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(phase = Phase.Loading, message = null) }
+            if (!client.reachable(normalized)) {
+                _state.update { it.copy(phase = Phase.Address, origin = normalized, message = "Can't reach $normalized") }
+                return@launch
+            }
+            origin.value = normalized
+            store.saveOrigin(normalized)
+            enter()
+        }
+    }
+
+    fun pair(code: String) {
+        val normalized = normalizePairCode(code)
+        if (!pairCodeComplete(normalized)) {
+            _state.update { it.copy(phase = Phase.Pair, message = "The code is 8 characters, with no 0, O, 1 or I.") }
+            return
+        }
+        viewModelScope.launch { pairNormalized(normalized) }
+    }
+
+    fun openPairingLink(raw: String) {
+        val link = parsePairingLink(raw)
+        if (link == null) {
+            if (pairCodeComplete(raw) && !origin.value.isNullOrBlank()) pair(raw)
+            else _state.update { it.copy(message = "That QR isn't a Mantel pairing code.") }
+            return
+        }
+        if (!cleartextPermitted(link.base)) {
+            _state.update { it.copy(phase = Phase.Address, message = PUBLIC_HTTP) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(phase = Phase.Loading, message = null) }
+            origin.value = link.base
+            store.saveOrigin(link.base)
+            if (!client.reachable(link.base)) {
+                _state.update { it.copy(phase = Phase.Address, origin = link.base, message = "Can't reach ${link.base}") }
+                return@launch
+            }
+            pairNormalized(link.code)
+        }
+    }
+
+    fun editServer() {
+        _state.update { it.copy(phase = Phase.Address, message = null) }
+    }
+
+    fun forgetServer() {
+        viewModelScope.launch {
+            origin.value = null
+            token.value = null
+            store.clear()
+            _state.update { PhoneState(phase = Phase.Address, theme = it.theme) }
+        }
+    }
+
+    fun dismissMessage() {
+        _state.update { it.copy(message = null) }
+    }
+
+    fun setAnchor(day: LocalDate) {
+        _state.update { it.copy(anchor = day) }
+        viewModelScope.launch { reload() }
+    }
+
+    fun setChoreDay(day: LocalDate) {
+        choreTouched = true
+        _state.update { it.copy(choreDay = day) }
+        viewModelScope.launch { refreshTopics(setOf("chores")) }
+    }
+
+    fun toggleUser(id: Int) {
+        _state.update { state ->
+            val hidden = state.hiddenUserIds.toMutableSet()
+            if (!hidden.add(id)) hidden.remove(id)
+            state.copy(hiddenUserIds = hidden)
+        }
+    }
+
+    fun setTheme(choice: ThemeChoice) {
+        prefs.edit().putString("theme", choice.name).apply()
+        _state.update { it.copy(theme = choice) }
+    }
+
+    fun saveEvent(
+        existing: CalEvent?,
+        title: String,
+        location: String,
+        description: String,
+        startDay: LocalDate,
+        endDay: LocalDate,
+        allDay: Boolean,
+        startMinutes: Int,
+        endMinutes: Int,
+        calendarId: Int,
+        repeat: RepeatChoice,
+        onDone: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        val name = title.trim()
+        if (name.isEmpty()) {
+            onError("Add a title")
+            return
+        }
+        val kind = eventEditKind(existing)
+        if (kind == EventEditKind.ReadOnly) {
+            onError("This calendar is read-only, so it can't be changed here.")
+            return
+        }
+        val chosen = if (repeat.freq == dev.mantel.calendar.core.RepeatFreq.WEEKLY && repeat.byday.isEmpty()) {
+            repeat.copy(byday = listOf(weekdayCode(startDay)))
+        } else {
+            repeat
+        }
+        val rule = buildRepeat(chosen)
+        val zone = zone()
+        val (start, end) = if (allDay) allDaySpan(startDay, endDay) else timedRange(startDay, startMinutes, endMinutes, zone)
+        val body = buildJsonObject {
+            if (kind != EventEditKind.Occurrence) put("calendar_id", calendarId)
+            put("title", name)
+            if (location.isBlank()) put("location", JsonNull) else put("location", location.trim())
+            if (description.isBlank()) put("description", JsonNull) else put("description", description.trim())
+            put("start_at", start)
+            put("end_at", end)
+            put("all_day", allDay)
+            if (!allDay) put("timezone", _state.value.settings.homeTimezone)
+            if (kind != EventEditKind.Occurrence) {
+                if (rule != null) put("recurrence_rule", rule)
+                else if (kind == EventEditKind.Series) put("recurrence_rule", JsonNull)
+            }
+        }
+        viewModelScope.launch {
+            try {
+                if (existing == null) client.createEvent(body) else client.updateEvent(existing.id, body)
+                reload()
+                onDone()
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not save")
+            }
+        }
+    }
+
+    fun deleteEvent(id: Int, onDone: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                client.deleteEvent(id)
+                reload()
+                onDone()
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not delete")
+            }
+        }
+    }
+
+    fun toggleItem(listId: Int, itemId: Int, checked: Boolean) {
+        viewModelScope.launch {
+            try {
+                client.setItemChecked(listId, itemId, checked)
+                refreshTopics(setOf("lists"))
+            } catch (e: MantelException) {
+                if (e.status != 0) {
+                    _state.update { it.copy(message = e.message) }
+                    return@launch
+                }
+                val body = buildJsonObject { put("checked", checked) }.toString()
+                outbox.add(PendingWrite("list-$listId-$itemId-$checked", "PATCH", "/lists/$listId/items/$itemId", body, null))
+                _state.update {
+                    it.copy(
+                        lists = applyListCheck(it.lists, listId, itemId, checked),
+                        offline = true,
+                        offlineDetail = offlineNow(),
+                    )
+                }
+            }
+        }
+    }
+
+    fun addItem(listId: Int, text: String, onError: (String) -> Unit) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            try {
+                client.addItem(listId, text.trim())
+                refreshTopics(setOf("lists"))
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not add that")
+            }
+        }
+    }
+
+    fun addList(name: String, onError: (String) -> Unit) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            try {
+                client.addList(name.trim())
+                refreshTopics(setOf("lists"))
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not add that")
+            }
+        }
+    }
+
+    fun deleteItem(listId: Int, itemId: Int) {
+        viewModelScope.launch {
+            try {
+                client.deleteItem(listId, itemId)
+                refreshTopics(setOf("lists"))
+            } catch (e: MantelException) {
+                _state.update { it.copy(message = if (e.status == 0) OFFLINE_EDIT else e.message) }
+            }
+        }
+    }
+
+    fun clearChecked(listId: Int) {
+        viewModelScope.launch {
+            try {
+                client.clearChecked(listId)
+                refreshTopics(setOf("lists"))
+            } catch (e: MantelException) {
+                _state.update { it.copy(message = if (e.status == 0) OFFLINE_EDIT else e.message) }
+            }
+        }
+    }
+
+    fun completeChore(choreId: Int, userId: Int, on: String, done: Boolean) {
+        val requestId = UUID.randomUUID().toString()
+        val body = buildJsonObject {
+            put("user_id", userId)
+            put("on", on)
+            put("done", done)
+            put("request_id", requestId)
+        }.toString()
+        viewModelScope.launch {
+            try {
+                client.completeChore(choreId, userId, on, done, requestId)
+                refreshTopics(setOf("chores"))
+            } catch (e: MantelException) {
+                if (e.status != 0) {
+                    _state.update { it.copy(message = e.message) }
+                    return@launch
+                }
+                outbox.add(PendingWrite(requestId, "POST", "/chores/$choreId/complete", body, requestId))
+                _state.update {
+                    it.copy(
+                        board = it.board?.let { board -> applyChoreCheck(board, userId, choreId, done) },
+                        offline = true,
+                        offlineDetail = offlineNow(),
+                    )
+                }
+            }
+        }
+    }
+
+    fun approve(id: Int) = mutate { client.approveChore(id) }
+
+    fun reject(id: Int) = mutate { client.rejectChore(id) }
+
+    fun redeem(rewardId: Int, userId: Int, onError: (String) -> Unit) {
+        val requestId = UUID.randomUUID().toString()
+        val body = buildJsonObject {
+            put("user_id", userId)
+            put("request_id", requestId)
+        }.toString()
+        viewModelScope.launch {
+            try {
+                client.redeem(rewardId, userId, requestId)
+                refreshTopics(setOf("rewards"))
+            } catch (e: MantelException) {
+                if (e.status == 0) {
+                    outbox.add(PendingWrite(requestId, "POST", "/rewards/$rewardId/redeem", body, requestId))
+                    _state.update {
+                        it.copy(
+                            board = it.board?.let { board -> applyRedeem(board, userId, rewardId) },
+                            offline = true,
+                            offlineDetail = offlineNow(),
+                        )
+                    }
+                } else {
+                    onError(e.message ?: "Could not redeem")
+                }
+            }
+        }
+    }
+
+    fun fulfill(id: Int) = mutate { client.fulfill(id) }
+
+    fun deny(id: Int) = mutate { client.deny(id) }
+
+    fun zone(): ZoneId = zoneOrUtc(_state.value.settings.homeTimezone)
+
+    fun writableCalendars(userId: Int?): List<CalInfo> {
+        val writable = _state.value.calendars.filter { it.writable }
+        if (userId == null) return writable
+        val mine = writable.filter { it.claimedByUserId == userId }
+        return mine.ifEmpty { writable }
+    }
+
+    private suspend fun pairNormalized(code: String) {
+        _state.update { it.copy(phase = Phase.Loading, message = null) }
+        try {
+            val paired = client.pair(code, deviceName())
+            token.value = paired.token
+            store.saveToken(paired.token)
+            enter()
+        } catch (e: MantelException) {
+            _state.update { it.copy(phase = Phase.Pair, origin = origin.value, message = e.message) }
+        }
+    }
+
+    private suspend fun boot() {
+        val saved = store.read()
+        token.value = saved.token
+        var found: String? = null
+        for (candidate in discoveryCandidates(saved.origin)) {
+            if (!cleartextPermitted(candidate)) continue
+            if (client.reachable(candidate)) {
+                found = candidate
+                break
+            }
+        }
+        if (found == null) {
+            val cached = screenCache.load()
+            val savedOrigin = saved.origin
+            if (savedOrigin != null && cached != null && cleartextPermitted(savedOrigin)) {
+                origin.value = savedOrigin
+                showCached(cached, resetDay = true)
+                _state.update { it.copy(phase = Phase.Ready, origin = savedOrigin, message = null) }
+                return
+            }
+            _state.update {
+                it.copy(phase = Phase.Address, message = "Couldn't find familycal.local. Enter the address on your LAN or VPN.")
+            }
+            return
+        }
+        origin.value = found
+        store.saveOrigin(found)
+        enter()
+    }
+
+    private suspend fun enter() {
+        try {
+            val status = client.authStatus()
+            if (status.authorizationRequired && token.value.isNullOrBlank()) {
+                _state.update { it.copy(phase = Phase.Pair, message = null, origin = origin.value) }
+                return
+            }
+            reload()
+            if (_state.value.phase == Phase.Pair || _state.value.phase == Phase.Address) return
+            _state.update { it.copy(phase = Phase.Ready, message = null, origin = origin.value) }
+        } catch (e: MantelException) {
+            if (e.status == 401) {
+                token.value = null
+                store.saveToken(null)
+                _state.update {
+                    it.copy(phase = Phase.Pair, message = "That token is no longer valid. Pair again.", origin = origin.value)
+                }
+            } else {
+                val cached = screenCache.load()
+                if (cached != null) {
+                    showCached(cached, resetDay = true)
+                    _state.update { it.copy(phase = Phase.Ready, message = null, origin = origin.value) }
+                } else {
+                    _state.update { it.copy(phase = Phase.Address, message = e.message, origin = origin.value) }
+                }
+            }
+        }
+    }
+
+    private suspend fun reload(spinner: Boolean = false) {
+        if (spinner) _state.update { it.copy(refreshing = true) }
+        try {
+            outbox.replay { write -> client.replayWrite(write.method, write.path, write.body) }
+            val settings = client.settings()
+            val zone = zoneOrUtc(settings.homeTimezone)
+            val today = todayIn(zone)
+            val first = _state.value.phase == Phase.Loading
+            val anchor = if (first) today else _state.value.anchor
+            val choreOn = if (first && !choreTouched) today else _state.value.choreDay
+            val (start, end) = fetchInstants(anchor.minusDays(7), anchor.plusDays(45), zone)
+            val users = client.users()
+            val calendars = client.calendars()
+            val events = client.events(start.toString(), end.toString())
+            val lists = client.lists()
+            val board = client.choreBoard(choreOn.toString())
+            val at = Instant.now().toString()
+            lastSynced = at
+            _state.update {
+                it.copy(
+                    settings = settings,
+                    users = users,
+                    calendars = calendars,
+                    events = events,
+                    lists = lists,
+                    board = board,
+                    offline = false,
+                    offlineDetail = "",
+                    syncedDetail = syncedLabel(at, zone),
+                    anchor = anchor,
+                    choreDay = choreOn,
+                    origin = origin.value,
+                )
+            }
+            screenCache.save(
+                ScreenCache(at, settings, users, calendars, _state.value.events, lists, _state.value.board),
+            )
+            publish()
+        } catch (e: MantelException) {
+            onRefreshFailed(e)
+        } finally {
+            if (spinner) _state.update { it.copy(refreshing = false) }
+        }
+    }
+
+    private suspend fun refreshTopics(topics: Set<String>) {
+        if (topics.isEmpty()) {
+            reload()
+            return
+        }
+        try {
+            val current = _state.value
+            var settings = current.settings
+            var users = current.users
+            var calendars = current.calendars
+            var events = current.events
+            var lists = current.lists
+            var board = current.board
+            if ("settings" in topics) settings = client.settings()
+            if ("users" in topics) users = client.users()
+            if ("calendars" in topics || "accounts" in topics) calendars = client.calendars()
+            if ("events" in topics || "sync" in topics) {
+                val zone = zoneOrUtc(settings.homeTimezone)
+                val (start, end) = fetchInstants(current.anchor.minusDays(7), current.anchor.plusDays(45), zone)
+                events = client.events(start.toString(), end.toString())
+            }
+            if ("lists" in topics) lists = client.lists()
+            if ("chores" in topics || "rewards" in topics) board = client.choreBoard(current.choreDay.toString())
+            val at = Instant.now().toString()
+            lastSynced = at
+            val zone = zoneOrUtc(settings.homeTimezone)
+            _state.update {
+                it.copy(
+                    settings = settings,
+                    users = users,
+                    calendars = calendars,
+                    events = events,
+                    lists = lists,
+                    board = board,
+                    offline = false,
+                    offlineDetail = "",
+                    syncedDetail = syncedLabel(at, zone),
+                )
+            }
+            screenCache.save(ScreenCache(at, settings, users, calendars, events, lists, board))
+            publish()
+        } catch (e: MantelException) {
+            onRefreshFailed(e)
+        }
+    }
+
+    private fun onRefreshFailed(error: MantelException) {
+        if (error.status == 401) {
+            token.value = null
+            viewModelScope.launch { store.saveToken(null) }
+            _state.update { it.copy(phase = Phase.Pair, message = "Pair this phone again.", offline = false) }
+            return
+        }
+        val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty()
+        if (!haveMemory) {
+            val cached = screenCache.load()
+            if (cached != null) showCached(cached, resetDay = _state.value.phase != Phase.Ready)
+            else if (_state.value.phase != Phase.Ready) {
+                _state.update { it.copy(phase = Phase.Address, message = error.message, offline = true, origin = origin.value) }
+                return
+            }
+        }
+        _state.update { it.copy(offline = true, offlineDetail = offlineNow(), message = null) }
+    }
+
+    private fun showCached(cached: ScreenCache, resetDay: Boolean) {
+        val zone = zoneOrUtc(cached.settings.homeTimezone)
+        val today = todayIn(zone)
+        val chore = runCatching { LocalDate.parse(cached.board?.on) }.getOrDefault(today)
+        lastSynced = cached.savedAt
+        _state.update {
+            it.copy(
+                settings = cached.settings,
+                users = cached.users,
+                calendars = cached.calendars,
+                events = cached.events,
+                lists = cached.lists,
+                board = cached.board,
+                anchor = if (resetDay) today else it.anchor,
+                choreDay = if (resetDay) chore else it.choreDay,
+                offline = true,
+                offlineDetail = offlineLabel(cached.savedAt, zone),
+                syncedDetail = syncedLabel(cached.savedAt, zone),
+            )
+        }
+        AgendaWidget.updateAll(getApplication())
+    }
+
+    private fun publish() {
+        val app = getApplication<Application>()
+        val snapshot = _state.value
+        AgendaWidget.updateAll(app)
+        UpcomingNotifier.consider(app, snapshot.events, zoneOrUtc(snapshot.settings.homeTimezone), snapshot.settings.timeFormat24h)
+    }
+
+    private fun offlineNow(): String = offlineLabel(lastSynced, zone())
+
+    private fun queueTopics(topics: Set<String>, resync: Boolean) {
+        synchronized(pendingTopics) {
+            if (resync) wantResync = true
+            pendingTopics.addAll(topics)
+            if (coalescing) return
+            coalescing = true
+        }
+        viewModelScope.launch {
+            delay(200)
+            val full: Boolean
+            val ready: Set<String>
+            synchronized(pendingTopics) {
+                full = wantResync
+                ready = pendingTopics.toSet()
+                pendingTopics.clear()
+                wantResync = false
+                coalescing = false
+            }
+            if (full) reload() else refreshTopics(ready)
+        }
+    }
+
+    private suspend fun listen() {
+        var attempt = 0
+        val parser = SseParser()
+        while (coroutineContext.isActive) {
+            if (_state.value.phase != Phase.Ready) {
+                delay(500)
+                continue
+            }
+            parser.reset()
+            try {
+                client.listen(lastEventId) { line ->
+                    live.set(true)
+                    for (message in parser.feed(line)) {
+                        when (message) {
+                            is LiveMessage.Hello -> if (message.id != null) lastEventId = message.id
+                            is LiveMessage.Change -> {
+                                if (message.id != null) lastEventId = message.id
+                                queueTopics(message.topics, false)
+                            }
+                            is LiveMessage.Resync -> queueTopics(emptySet(), true)
+                        }
+                    }
+                }
+                live.set(false)
+                attempt = 1
+            } catch (e: MantelException) {
+                live.set(false)
+                if (e.status == 401) {
+                    token.value = null
+                    store.saveToken(null)
+                    _state.update { it.copy(phase = Phase.Pair, message = "Pair this phone again.", offline = false) }
+                    attempt = 6
+                } else {
+                    if (e.status == 0) {
+                        _state.update { it.copy(offline = true, offlineDetail = offlineNow()) }
+                    }
+                    attempt += 1
+                }
+            }
+            delay(reconnectDelayMs(attempt.coerceAtLeast(1), (0..400).random().toLong()))
+        }
+    }
+
+    private fun mutate(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+                reload()
+            } catch (e: MantelException) {
+                _state.update {
+                    it.copy(
+                        message = if (e.status == 0) "Offline. That one needs the calendar." else e.message,
+                        offline = e.status == 0 || it.offline,
+                        offlineDetail = if (e.status == 0) offlineNow() else it.offlineDetail,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun loadTheme(): ThemeChoice =
+        runCatching { ThemeChoice.valueOf(prefs.getString("theme", "System") ?: "System") }.getOrDefault(ThemeChoice.System)
+
+    private fun deviceName(): String {
+        val maker = Build.MANUFACTURER?.takeIf { it.isNotBlank() && !it.equals("unknown", true) }.orEmpty()
+        val model = Build.MODEL?.takeIf { it.isNotBlank() && !it.equals("unknown", true) }.orEmpty()
+        val name = listOf(maker, model).filter { it.isNotBlank() }.distinct().joinToString(" ")
+        return name.ifBlank { "Android phone" }.take(60)
+    }
+
+    override fun onCleared() {
+        client.close()
+    }
+
+    private companion object {
+        const val OFFLINE_EDIT = "Offline. The calendar on the server was kept, and this change was not saved."
+    }
+}

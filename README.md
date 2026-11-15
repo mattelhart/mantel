@@ -396,7 +396,9 @@ sync works with no external account at all — including weather,
 which needs no API key.
 
 **Does it work on a phone?**
-Yes. The layout is responsive and installs to a home screen as a PWA.
+Yes. The layout is responsive and installs to a home screen as a PWA. There is also a native
+Android companion — today, month, chores, rewards, and lists — described in
+[docs/android-phone.md](docs/android-phone.md).
 
 **Can two people edit at the same time?**
 Yes. SQLite is in WAL mode with a busy timeout, and there are tests covering concurrent writes
@@ -414,6 +416,20 @@ Sure. It's a perfectly good family calendar in a browser tab. The wall is just w
 **How is this different from DAKboard or MagicMirror?**
 Those are display frameworks — they render information beautifully but are read-only. Mantel is a
 calendar you write to, with Google and iCloud sync in both directions.
+
+## Android apps
+
+Two apps share one Kotlin core in `apps/android-tv`:
+
+| | |
+| --- | --- |
+| **Phone** (`:phone`) | Today and month, chores, rewards, lists. Sideload and pairing: [docs/android-phone.md](docs/android-phone.md). |
+| **Google TV** (`:app`) | The living room, D-pad only. [apps/android-tv/README.md](apps/android-tv/README.md). |
+
+```bash
+cd apps/android-tv
+./gradlew assembleDebug test
+```
 
 ## Development
 

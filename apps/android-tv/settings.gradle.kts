@@ -16,4 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "mantel-tv"
 include(":core")
+include(":device")
 include(":app")
+include(":phone")
