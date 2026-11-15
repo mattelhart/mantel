@@ -245,6 +245,13 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                                 is Page.Edit -> EditEvent(page.event, page.day, state, vm) { stack = stack.dropLast(1) }
                                 is Page.ListDetail -> ListDetail(page.id, state, vm)
                                 Page.Rewards -> RewardsScreen(state, vm)
+                                is Page.ChoreForm -> ChoreFormScreen(
+                                    state,
+                                    vm,
+                                    page.id,
+                                    onOpen = { id -> stack = stack.dropLast(1) + Page.ChoreForm(id) },
+                                    onDone = { stack = stack.dropLast(1) },
+                                )
                                 Page.Settings -> SettingsScreen(state, vm)
                             }
                         }
@@ -261,6 +268,7 @@ private fun titleFor(tab: PhoneTab, page: Page?): String = when (page) {
     is Page.Edit -> if (page.event == null) "New event" else "Edit event"
     is Page.ListDetail -> "List"
     Page.Rewards -> "Rewards"
+    is Page.ChoreForm -> if (page.id == null) "Add a chore" else "Edit chore"
     Page.Settings -> "Settings"
     null -> tab.label()
 }

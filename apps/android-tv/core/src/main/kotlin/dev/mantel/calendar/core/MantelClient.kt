@@ -21,8 +21,10 @@ import io.ktor.http.content.TextContent
 import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /**
  * The HTTP calls a Mantel screen makes. No Android types, so a phone app can
@@ -117,6 +119,55 @@ class MantelClient(
 
     suspend fun choreBoard(on: String? = null): ChoreBoard =
         get("/chores/board", if (on == null) emptyMap() else mapOf("on" to on))
+
+    suspend fun chores(): List<ChoreDef> = get("/chores")
+
+    suspend fun createChore(
+        title: String,
+        points: Int,
+        schedule: String,
+        weekdays: List<Int>,
+        dueOn: String?,
+        requiresApproval: Boolean,
+        assigneeIds: List<Int>,
+    ): ChoreDef = post("/chores", choreBody(title, points, schedule, weekdays, dueOn, requiresApproval, assigneeIds))
+
+    suspend fun updateChore(
+        id: Int,
+        title: String,
+        points: Int,
+        schedule: String,
+        weekdays: List<Int>,
+        dueOn: String?,
+        requiresApproval: Boolean,
+        assigneeIds: List<Int>,
+    ): ChoreDef = send(
+        HttpMethod.Patch,
+        "/chores/$id",
+        choreBody(title, points, schedule, weekdays, dueOn, requiresApproval, assigneeIds),
+    )
+
+    suspend fun deleteChore(id: Int) {
+        send<Unit>(HttpMethod.Delete, "/chores/$id", null)
+    }
+
+    private fun choreBody(
+        title: String,
+        points: Int,
+        schedule: String,
+        weekdays: List<Int>,
+        dueOn: String?,
+        requiresApproval: Boolean,
+        assigneeIds: List<Int>,
+    ): JsonObject = buildJsonObject {
+        put("title", title)
+        put("points", points)
+        put("schedule", schedule)
+        if (schedule == "weekly") putJsonArray("weekdays") { weekdays.forEach { add(it) } }
+        if (schedule == "once" && dueOn != null) put("due_on", dueOn)
+        put("requires_approval", requiresApproval)
+        putJsonArray("assignee_ids") { assigneeIds.forEach { add(it) } }
+    }
 
     suspend fun completeChore(
         choreId: Int,

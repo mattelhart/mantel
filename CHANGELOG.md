@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+**Chores can be added from the phone.** The same choices as the wall: title, stars, every day or weekly or one day, who it's for, and whether a check needs approval. An existing chore can be edited or deleted. If the phone can't reach the calendar server, the screen says so and the chore is left as it was.
+
 **The phone and the TV follow the device's light or dark theme.** The connect screen, the rest of each app, and the phone's home-screen widget switch with the system. The calendar pages inside the Windows window stay on the theme chosen for the household.
 
 **The phone and TV connect screens can be read across the room.** Field text is near-black, placeholders and labels clear WCAG AA on the warm paper, errors are a dark red, and outlined buttons are no longer pale orange. Filled buttons stay the warm orange, with dark text.

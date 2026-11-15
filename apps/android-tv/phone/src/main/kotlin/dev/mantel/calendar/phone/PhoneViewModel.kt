@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mantel.calendar.core.CalEvent
 import dev.mantel.calendar.core.CalInfo
 import dev.mantel.calendar.core.ChoreBoard
+import dev.mantel.calendar.core.ChoreDef
 import dev.mantel.calendar.core.FAMILYCAL_ORIGIN
 import dev.mantel.calendar.core.FamilyMember
 import dev.mantel.calendar.core.HouseholdSettings
@@ -408,6 +409,73 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun loadChoreDefs(onDone: (List<ChoreDef>) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                onDone(client.chores())
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_LIST else e.message ?: "Could not load chores")
+            }
+        }
+    }
+
+    fun saveChore(
+        existingId: Int?,
+        title: String,
+        points: Int,
+        schedule: String,
+        weekdays: List<Int>,
+        dueOn: String?,
+        requiresApproval: Boolean,
+        assigneeIds: List<Int>,
+        onDone: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        val name = title.trim()
+        if (name.isEmpty()) {
+            onError("Add a title")
+            return
+        }
+        if (schedule == "weekly" && weekdays.isEmpty()) {
+            onError("Pick at least one day")
+            return
+        }
+        if (schedule == "once" && dueOn.isNullOrBlank()) {
+            onError("Pick the day it is due")
+            return
+        }
+        if (assigneeIds.isEmpty()) {
+            onError("Choose who it is for")
+            return
+        }
+        val stars = points.coerceIn(0, 100)
+        viewModelScope.launch {
+            try {
+                if (existingId == null) {
+                    client.createChore(name, stars, schedule, weekdays, dueOn, requiresApproval, assigneeIds)
+                } else {
+                    client.updateChore(existingId, name, stars, schedule, weekdays, dueOn, requiresApproval, assigneeIds)
+                }
+                refreshTopics(setOf("chores"))
+                onDone()
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_CHORE else e.message ?: "Could not save")
+            }
+        }
+    }
+
+    fun deleteChore(id: Int, onDone: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                client.deleteChore(id)
+                refreshTopics(setOf("chores"))
+                onDone()
+            } catch (e: MantelException) {
+                onError(if (e.status == 0) OFFLINE_CHORE_DELETE else e.message ?: "Could not delete")
+            }
+        }
+    }
+
     fun approve(id: Int) = mutate { client.approveChore(id) }
 
     fun reject(id: Int) = mutate { client.rejectChore(id) }
@@ -767,5 +835,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val OFFLINE_EDIT = "Offline. The calendar on the server was kept, and this change was not saved."
+        const val OFFLINE_LIST = "Offline. Can't reach the calendar server, so chores could not be loaded."
+        const val OFFLINE_CHORE = "Offline. Can't reach the calendar server, so this chore was not saved."
+        const val OFFLINE_CHORE_DELETE = "Offline. Can't reach the calendar server, so this chore was not deleted."
     }
 }

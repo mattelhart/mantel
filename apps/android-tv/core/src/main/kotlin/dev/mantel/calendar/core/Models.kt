@@ -102,6 +102,20 @@ data class SharedList(
 )
 
 @Serializable
+data class ChoreDef(
+    val id: Int = 0,
+    val title: String,
+    val notes: String? = null,
+    val points: Int = 1,
+    val schedule: String = "daily",
+    val weekdays: List<Int> = emptyList(),
+    val dueOn: String? = null,
+    val requiresApproval: Boolean = false,
+    val icon: String? = null,
+    val assigneeIds: List<Int> = emptyList(),
+)
+
+@Serializable
 data class ChoreCompletion(
     val id: Int,
     val choreId: Int,
