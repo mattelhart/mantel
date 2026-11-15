@@ -15,9 +15,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -76,21 +79,39 @@ fun MantelTvApp(vm: TvViewModel) {
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
+    val night = isSystemInDarkTheme()
+    val palette = if (night) TvNight else TvDay
+    CompositionLocalProvider(LocalTvPalette provides palette) {
     MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = Ember,
-            onPrimary = Card,
-            background = Paper,
-            onBackground = Ink,
-            surface = Card,
-            onSurface = Ink,
-            onSurfaceVariant = Dim,
-            outline = Line,
-            error = Danger,
-            onError = Card,
-        ),
+        colorScheme = if (night) {
+            darkColorScheme(
+                primary = palette.ember,
+                onPrimary = Ink,
+                background = palette.paper,
+                onBackground = palette.ink,
+                surface = palette.card,
+                onSurface = palette.ink,
+                onSurfaceVariant = palette.dim,
+                outline = palette.line,
+                error = palette.danger,
+                onError = Ink,
+            )
+        } else {
+            lightColorScheme(
+                primary = palette.ember,
+                onPrimary = Card,
+                background = palette.paper,
+                onBackground = palette.ink,
+                surface = palette.card,
+                onSurface = palette.ink,
+                onSurfaceVariant = palette.dim,
+                outline = palette.line,
+                error = palette.danger,
+                onError = Card,
+            )
+        },
     ) {
-        Box(Modifier.fillMaxSize().background(Paper).padding(36.dp)) {
+        Box(Modifier.fillMaxSize().background(palette.paper).padding(36.dp)) {
             when (state.phase) {
                 Phase.Loading -> BigTitle(state.message ?: "Looking for the calendar…")
                 Phase.Address -> AddressScreen(state.message, state.origin, vm::connect)
@@ -98,6 +119,7 @@ fun MantelTvApp(vm: TvViewModel) {
                 Phase.Ready -> Home(state, vm)
             }
         }
+    }
     }
 }
 
@@ -110,26 +132,27 @@ private fun AddressScreen(message: String?, prefill: String?, onConnect: (String
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BigTitle("Where's the calendar?")
         Text(
-            "Enter the calendar server's address. A bare address uses port 8080.",
-            color = Ink,
+            "The calendar server's address. It works at home, or over a VPN such as WireGuard.",
+            color = tvPalette().ink,
             fontSize = 22.sp,
         )
         Text(
-            "Number keys on the remote type an IP. The number pad has the dot. Select Type a name for a hostname.",
-            color = Ink,
+            "For example http://192.168.1.10:8080. Number keys type an IP. Select Type a name for a hostname.",
+            color = tvPalette().ink,
             fontSize = 20.sp,
         )
-        if (message != null) Text(message, color = Danger, fontSize = 20.sp)
+        if (message != null) Text(message, color = tvPalette().danger, fontSize = 20.sp)
         SunnyField(
             address,
             { address = it },
-            "Server address",
+            "Calendar server",
             Modifier.fillMaxWidth().focusRequester(focus),
+            placeholder = "http://192.168.1.10:8080",
             keyboardType = if (numeric) KeyboardType.Decimal else KeyboardType.Uri,
             onSubmit = { onConnect(address) },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SunnyButton(onClick = { numeric = true }, container = if (numeric) Sun else Card) {
+            SunnyButton(onClick = { numeric = true }, container = if (numeric) Sun else tvPalette().card) {
                 Text("IP address", modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
             SunnyButton(
@@ -137,7 +160,7 @@ private fun AddressScreen(message: String?, prefill: String?, onConnect: (String
                     numeric = false
                     runCatching { focus.requestFocus() }
                 },
-                container = if (numeric) Card else Sun,
+                container = if (numeric) tvPalette().card else Sun,
             ) {
                 Text("Type a name", modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
@@ -155,10 +178,10 @@ private fun PairScreen(message: String?, onPair: (String) -> Unit) {
         BigTitle("Pair this TV")
         Text(
             "On the wall: Settings → Devices → Pair a phone. Type that code.",
-            color = Ink,
+            color = tvPalette().ink,
             fontSize = 22.sp,
         )
-        if (message != null) Text(message, color = Danger, fontSize = 20.sp)
+        if (message != null) Text(message, color = tvPalette().danger, fontSize = 20.sp)
         SunnyField(code, { code = it }, "Pairing code", Modifier.fillMaxWidth())
         SunnyButton(onClick = { onPair(code) }) {
             Text("Pair", modifier = Modifier.padding(18.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold)
@@ -177,7 +200,7 @@ private fun Home(state: TvState, vm: TvViewModel) {
         if (state.offline) {
             Text(
                 state.offlineDetail.ifBlank { "Offline, last synced earlier" },
-                color = Ember,
+                color = tvPalette().ember,
                 fontSize = 20.sp,
             )
         }
@@ -188,7 +211,7 @@ private fun Home(state: TvState, vm: TvViewModel) {
                         tab = item
                         stack = emptyList()
                     },
-                    container = if (item == tab && stack.isEmpty()) Sun else Card,
+                    container = if (item == tab && stack.isEmpty()) Sun else tvPalette().card,
                 ) {
                     Text(item.name, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
@@ -226,13 +249,13 @@ private fun Agenda(state: TvState, vm: TvViewModel, day: LocalDate, push: (Overl
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StepButton("Previous day") { vm.setAnchor(step(ViewKind.AGENDA, day, -1)) }
-            Text(dayLabel(day), color = Ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(dayLabel(day), color = tvPalette().ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             StepButton("Next day") { vm.setAnchor(step(ViewKind.AGENDA, day, 1)) }
             SunnyButton(onClick = { push(Overlay.Edit(null, day)) }, container = Coral) {
                 Text("Add", modifier = Modifier.padding(16.dp), color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
-        if (events.isEmpty()) Text("Nothing on this day.", color = Ink, fontSize = 24.sp)
+        if (events.isEmpty()) Text("Nothing on this day.", color = tvPalette().ink, fontSize = 24.sp)
         events.forEach { event ->
             EventCard(event, state, vm) { push(Overlay.Event(event)) }
         }
@@ -245,7 +268,7 @@ private fun Week(state: TvState, vm: TvViewModel, push: (Overlay) -> Unit) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             StepButton("Previous week") { vm.setAnchor(step(ViewKind.WEEK, state.anchor, -1)) }
-            Text(dayLabel(days.first()), color = Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(dayLabel(days.first()), color = tvPalette().ink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             StepButton("Next week") { vm.setAnchor(step(ViewKind.WEEK, state.anchor, 1)) }
         }
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -274,21 +297,21 @@ private fun Month(state: TvState, vm: TvViewModel, push: (Overlay) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             StepButton("Previous month") { vm.setAnchor(step(ViewKind.MONTH, state.anchor, -1)) }
-            Text(state.anchor.month.name.lowercase().replaceFirstChar { it.uppercase() }, color = Ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            Text(state.anchor.month.name.lowercase().replaceFirstChar { it.uppercase() }, color = tvPalette().ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             StepButton("Next month") { vm.setAnchor(step(ViewKind.MONTH, state.anchor, 1)) }
         }
         Row(Modifier.fillMaxWidth()) {
-            names.forEach { Text(it, modifier = Modifier.weight(1f), color = Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            names.forEach { Text(it, modifier = Modifier.weight(1f), color = tvPalette().ink, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
         }
         days.chunked(7).forEach { week ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 week.forEach { day ->
                     val inMonth = day.month == state.anchor.month
                     val count = eventsOn(state.events, day, vm.zone()).size
-                    SunnyButton(onClick = { push(Overlay.Day(day)) }, modifier = Modifier.weight(1f).height(72.dp), container = if (inMonth) Card else Sun) {
+                    SunnyButton(onClick = { push(Overlay.Day(day)) }, modifier = Modifier.weight(1f).height(72.dp), container = if (inMonth) tvPalette().card else Sun) {
                         Column(Modifier.padding(6.dp)) {
                             Text(day.dayOfMonth.toString(), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            if (count > 0) Text("$count", color = Ember, fontSize = 14.sp)
+                            if (count > 0) Text("$count", color = tvPalette().ember, fontSize = 14.sp)
                         }
                     }
                 }
@@ -303,9 +326,9 @@ private fun EventCard(event: CalEvent, state: TvState, vm: TvViewModel, compact:
         Row(Modifier.padding(if (compact) 6.dp else 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.size(if (compact) 12.dp else 18.dp).clip(CircleShape).background(parseColor(event.color)))
             Column {
-                Text(event.title, color = Ink, fontSize = if (compact) 14.sp else 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(event.title, color = tvPalette().ink, fontSize = if (compact) 14.sp else 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (!compact) {
-                    Text(formatWhen(event, vm.zone(), state.settings.timeFormat24h), color = Ink, fontSize = 18.sp)
+                    Text(formatWhen(event, vm.zone(), state.settings.timeFormat24h), color = tvPalette().ink, fontSize = 18.sp)
                 }
             }
         }
@@ -317,14 +340,14 @@ private fun EventDetail(event: CalEvent, state: TvState, vm: TvViewModel, onEdit
     var confirm by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(event.title, color = Ink, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Text(formatWhen(event, vm.zone(), state.settings.timeFormat24h), color = Ink, fontSize = 24.sp)
+        Text(event.title, color = tvPalette().ink, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        Text(formatWhen(event, vm.zone(), state.settings.timeFormat24h), color = tvPalette().ink, fontSize = 24.sp)
         Text(event.calendarName, color = parseColor(event.color), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        if (!event.location.isNullOrBlank()) Text(event.location!!, color = Ink, fontSize = 22.sp)
-        if (!event.description.isNullOrBlank()) Text(event.description!!, color = Ink, fontSize = 20.sp)
-        if (event.recurrenceText != null) Text(event.recurrenceText!!, color = Ink, fontSize = 20.sp)
-        if (event.recurrenceRule != null) Text("Saving changes the whole series.", color = Ember, fontSize = 20.sp)
-        error?.let { Text(it, color = Danger, fontSize = 20.sp) }
+        if (!event.location.isNullOrBlank()) Text(event.location!!, color = tvPalette().ink, fontSize = 22.sp)
+        if (!event.description.isNullOrBlank()) Text(event.description!!, color = tvPalette().ink, fontSize = 20.sp)
+        if (event.recurrenceText != null) Text(event.recurrenceText!!, color = tvPalette().ink, fontSize = 20.sp)
+        if (event.recurrenceRule != null) Text("Saving changes the whole series.", color = tvPalette().ember, fontSize = 20.sp)
+        error?.let { Text(it, color = tvPalette().danger, fontSize = 20.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (event.editable) {
                 SunnyButton(onClick = onEdit) { Text("Edit", modifier = Modifier.padding(16.dp), fontSize = 20.sp) }
@@ -334,11 +357,11 @@ private fun EventDetail(event: CalEvent, state: TvState, vm: TvViewModel, onEdit
                     } else {
                         vm.deleteEvent(event.id, onDone = onBack, onError = { error = it })
                     }
-                }, container = if (confirm) Coral else Card) {
+                }, container = if (confirm) Coral else tvPalette().card) {
                     Text(if (confirm) "Yes, delete" else "Delete", modifier = Modifier.padding(16.dp), fontSize = 20.sp)
                 }
             } else {
-                Text("This one can't be changed from here.", color = Ink, fontSize = 20.sp)
+                Text("This one can't be changed from here.", color = tvPalette().ink, fontSize = 20.sp)
             }
         }
     }
@@ -359,11 +382,11 @@ private fun EditEvent(existing: CalEvent?, day0: LocalDate, state: TvState, vm: 
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         BigTitle(if (existing == null) "New event" else "Edit event")
-        if (existing?.recurrenceRule != null) Text("This changes the whole series.", color = Ember, fontSize = 20.sp)
+        if (existing?.recurrenceRule != null) Text("This changes the whole series.", color = tvPalette().ember, fontSize = 20.sp)
         SunnyField(title, { title = it }, "Title", Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SunnyButton(onClick = { allDay = true }, container = if (allDay) Sun else Card) { Text("All day", modifier = Modifier.padding(12.dp)) }
-            SunnyButton(onClick = { allDay = false }, container = if (!allDay) Sun else Card) { Text("Timed", modifier = Modifier.padding(12.dp)) }
+            SunnyButton(onClick = { allDay = true }, container = if (allDay) Sun else tvPalette().card) { Text("All day", modifier = Modifier.padding(12.dp)) }
+            SunnyButton(onClick = { allDay = false }, container = if (!allDay) Sun else tvPalette().card) { Text("Timed", modifier = Modifier.padding(12.dp)) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             StepButton("Previous") { day = day.minusDays(1) }
@@ -379,19 +402,19 @@ private fun EditEvent(existing: CalEvent?, day0: LocalDate, state: TvState, vm: 
                 SunnyButton(onClick = {
                     person = user.id
                     calendarId = vm.writableCalendars(user.id).firstOrNull()?.id
-                }, container = if (person == user.id) parseColor(user.color) else Card) {
+                }, container = if (person == user.id) parseColor(user.color) else tvPalette().card) {
                     Text(user.name, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             calendars.forEach { cal ->
-                SunnyButton(onClick = { calendarId = cal.id }, container = if (calendarId == cal.id) Sun else Card) {
+                SunnyButton(onClick = { calendarId = cal.id }, container = if (calendarId == cal.id) Sun else tvPalette().card) {
                     Text(cal.name, modifier = Modifier.padding(12.dp))
                 }
             }
         }
-        error?.let { Text(it, color = Danger) }
+        error?.let { Text(it, color = tvPalette().danger) }
         val chosen = calendarId
         SunnyButton(onClick = {
             if (chosen == null) {
@@ -439,7 +462,7 @@ private fun ListsHome(state: TvState, vm: TvViewModel, push: (Overlay) -> Unit) 
             }
         }
         SunnyField(name, { name = it }, "New list", Modifier.fillMaxWidth())
-        error?.let { Text(it, color = Danger) }
+        error?.let { Text(it, color = tvPalette().danger) }
         SunnyButton(onClick = { vm.addList(name) { error = it }; name = "" }, container = Coral) {
             Text("Add list", modifier = Modifier.padding(14.dp), color = Ink, fontWeight = FontWeight.Bold)
         }
@@ -458,12 +481,12 @@ private fun ListDetail(id: Int, state: TvState, vm: TvViewModel) {
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BigTitle("${list.icon ?: ""} ${list.name}")
         list.items.forEach { item ->
-            SunnyButton(onClick = { vm.toggleItem(list.id, item.id, !item.checked) }, modifier = Modifier.fillMaxWidth(), container = if (item.checked) Sun else Card) {
+            SunnyButton(onClick = { vm.toggleItem(list.id, item.id, !item.checked) }, modifier = Modifier.fillMaxWidth(), container = if (item.checked) Sun else tvPalette().card) {
                 Text(if (item.checked) "✓  ${item.text}" else item.text, modifier = Modifier.padding(14.dp), fontSize = 24.sp)
             }
         }
         SunnyField(text, { text = it }, "Add an item", Modifier.fillMaxWidth())
-        error?.let { Text(it, color = Danger) }
+        error?.let { Text(it, color = tvPalette().danger) }
         SunnyButton(onClick = { vm.addItem(list.id, text) { error = it }; text = "" }, container = Coral) {
             Text("Add", modifier = Modifier.padding(14.dp), color = Ink, fontWeight = FontWeight.Bold)
         }
@@ -477,15 +500,15 @@ private fun ChoresHome(state: TvState, vm: TvViewModel, onRewards: () -> Unit) {
     val person = people.find { it.userId == selected } ?: people.firstOrNull()
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Chores", color = Ink, fontSize = 36.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("Chores", color = tvPalette().ink, fontSize = 36.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             SunnyButton(onClick = onRewards, container = Sky) {
                 Text("Rewards", modifier = Modifier.padding(14.dp), fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
         }
-        Text(state.board?.on ?: "", color = Ink, fontSize = 20.sp)
+        Text(state.board?.on ?: "", color = tvPalette().ink, fontSize = 20.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             people.forEach { member ->
-                val chip = if (person?.userId == member.userId) parseColor(member.color) else Card
+                val chip = if (person?.userId == member.userId) parseColor(member.color) else tvPalette().card
                 SunnyButton(onClick = { selected = member.userId }, container = chip) {
                     Text("${member.name}  ${member.stars}★", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = readableOn(chip))
                 }
@@ -505,7 +528,7 @@ private fun ChoresHome(state: TvState, vm: TvViewModel, onRewards: () -> Unit) {
                 SunnyButton(
                     onClick = { vm.completeChore(chore.choreId, person.userId, state.board!!.on, !done) },
                     modifier = Modifier.fillMaxWidth(),
-                    container = if (done) Sun else Card,
+                    container = if (done) Sun else tvPalette().card,
                 ) {
                     Text(
                         "${if (done) "✓" else "○"}  ${chore.icon ?: ""} ${chore.title}   ${chore.points}★",
@@ -529,13 +552,13 @@ private fun Rewards(state: TvState, vm: TvViewModel) {
         BigTitle("Rewards")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             people.forEach { member ->
-                val chip = if (person?.userId == member.userId) parseColor(member.color) else Card
+                val chip = if (person?.userId == member.userId) parseColor(member.color) else tvPalette().card
                 SunnyButton(onClick = { selected = member.userId }, container = chip) {
                     Text("${member.name}  ${member.stars}★", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, color = readableOn(chip))
                 }
             }
         }
-        error?.let { Text(it, color = Danger, fontSize = 20.sp) }
+        error?.let { Text(it, color = tvPalette().danger, fontSize = 20.sp) }
         state.board?.rewards?.forEach { reward ->
             SunnyButton(onClick = {
                 val who = person ?: return@SunnyButton

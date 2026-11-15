@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_paper">#1A1613</color>
+    <color name="widget_ink">#F6EFE6</color>
+    <color name="widget_dim">#D9CBB8</color>
+</resources>
