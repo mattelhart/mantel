@@ -25,7 +25,9 @@ export interface ThemeInfo {
   palette: ThemePalette
 }
 
-export const DEFAULT_THEME: ThemeId = 'midnight'
+/** What a new install and a device with nothing remembered paint first. A household
+ *  that already saved a theme keeps it — defaults only fill a missing setting. */
+export const DEFAULT_THEME: ThemeId = 'airy'
 
 export const THEMES: readonly ThemeInfo[] = [
   {
@@ -74,6 +76,22 @@ export const THEMES: readonly ThemeInfo[] = [
       accent: '#e8a24a',
       onAccent: '#2a1503',
       danger: '#ff8f7d',
+    },
+  },
+  {
+    id: 'airy',
+    label: 'Airy',
+    blurb: 'Bright cards, pastel events, and a touch-first wall layout.',
+    palette: {
+      bg: '#f3f4f6',
+      bgElev: '#ffffff',
+      bgElev2: '#e6e9ef',
+      border: '#5c6573',
+      text: '#1c2430',
+      textDim: '#3d4a5c',
+      accent: '#1d4ed8',
+      onAccent: '#ffffff',
+      danger: '#b91c1c',
     },
   },
 ]

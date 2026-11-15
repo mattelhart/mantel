@@ -905,3 +905,71 @@ a.btn {
     padding-right: 10px;
   }
 }
+
+/* Schedule: a fortnight of days, each a row you can scan without a time grid. */
+
+.schedule {
+  height: 100%;
+  overflow: auto;
+  padding: 4px 8px 24px;
+}
+
+.schedule__day {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--grid-line);
+}
+
+.schedule__date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--touch);
+  background: transparent;
+  padding: 4px;
+}
+
+.schedule__events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.schedule__empty {
+  margin: 0;
+  padding: 12px 4px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+}
+
+.schedule__event {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--touch);
+  padding: 10px 14px;
+  border-radius: 16px;
+  color: var(--chip-ink);
+  text-align: left;
+  font-weight: 700;
+}
+
+.schedule__time {
+  flex: 0 0 auto;
+  min-width: 5.5em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.schedule__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -10,12 +10,22 @@ import './styles/settings.css'
 import './styles/dashboard.css'
 import './styles/screensaver.css'
 import './styles/chores.css'
+import '@fontsource/nunito/latin-400.css'
+import '@fontsource/nunito/latin-600.css'
+import '@fontsource/nunito/latin-700.css'
+import '@fontsource/nunito/latin-800.css'
+import '@fontsource/nunito/latin-ext-400.css'
+import '@fontsource/nunito/latin-ext-600.css'
+import '@fontsource/nunito/latin-ext-700.css'
+import '@fontsource/nunito/latin-ext-800.css'
 import { CalendarPage } from './views/calendar/CalendarPage'
 import { ChoresPage } from './views/chores/ChoresPage'
 import { DashboardPage } from './views/dashboard/DashboardPage'
 import { ListsPage } from './views/lists/ListsPage'
+import { PhotosPage } from './views/photos/PhotosPage'
 import { SettingsPage } from './views/settings/SettingsPage'
 import { hydrate, watchQueries } from './offline/persist'
+import './styles/airy.css'
 
 const router = createBrowserRouter([
   {
@@ -29,6 +39,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'lists', element: <ListsPage /> },
       { path: 'chores', element: <ChoresPage /> },
+      { path: 'photos', element: <PhotosPage /> },
       { path: 'settings', element: <SettingsPage /> },
       // The API guide used to be its own page. Keep old bookmarks and kiosk
       // shortcuts working by sending them to the tab that replaced it.

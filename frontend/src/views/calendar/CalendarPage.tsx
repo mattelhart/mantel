@@ -8,14 +8,17 @@ import {
   isSameMonth,
   startOfMonth,
 } from 'date-fns'
+import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
-import { useEvents, useSettings, useUsers } from '../../api/hooks'
+import { useEvents, useSettings, useUpdateEvent, useUsers } from '../../api/hooks'
 import type { CalendarEvent } from '../../api/types'
+import { useAiryTheme } from '../../components/eventColor'
 import { EventModal } from '../../components/EventModal'
 import { usePersonFilter } from '../../hooks/usePersonFilter'
 import { useSwipe } from '../../hooks/useSwipe'
 import { MonthView, type MonthScrollRequest } from './MonthView'
+import { ScheduleView } from './ScheduleView'
 import { TimeGridView } from './TimeGridView'
 import { TimeStripView, type StripScrollRequest } from './TimeStripView'
 import {
@@ -53,9 +56,21 @@ const VIEW_TABS = [
   { kind: 'month', label: 'Month' },
 ] as const
 
+/** The Airy switcher matches a wall calendar: Day, Week, Month, and an agenda. */
+const AIRY_TABS = [
+  { kind: 'today', label: 'Day' },
+  { kind: 'week', label: 'Week' },
+  { kind: 'month', label: 'Month' },
+  { kind: 'schedule', label: 'Schedule' },
+] as const
+
 export function CalendarPage() {
   const { view } = useParams()
   const navigate = useNavigate()
+  const airy = useAiryTheme()
+  const qc = useQueryClient()
+  const updateEvent = useUpdateEvent()
+  const [moveError, setMoveError] = useState<string | null>(null)
   const { data: settings } = useSettings()
   const { data: users = [] } = useUsers()
   const { toggle, showEveryone, isVisible, anyHidden } = usePersonFilter()
@@ -215,6 +230,36 @@ export function CalendarPage() {
     setModalOpen(true)
   }
 
+  // A finger drag on a single event. The block follows the finger, then the
+  // cache moves immediately; a rejected save puts the block back.
+  const reschedule = (event: CalendarEvent, deltaMinutes: number) => {
+    if (!event.editable || event.recurring || event.all_day || deltaMinutes === 0) return
+    const start = new Date(event.start_at)
+    const end = new Date(event.end_at)
+    start.setMinutes(start.getMinutes() + deltaMinutes)
+    end.setMinutes(end.getMinutes() + deltaMinutes)
+    const start_at = start.toISOString()
+    const end_at = end.toISOString()
+    const snapshots = qc.getQueriesData<CalendarEvent[]>({ queryKey: ['events'] })
+    for (const [key, data] of snapshots) {
+      if (!Array.isArray(data)) continue
+      qc.setQueryData(
+        key,
+        data.map((row) => (row.id === event.id ? { ...row, start_at, end_at } : row)),
+      )
+    }
+    setMoveError(null)
+    updateEvent.mutate(
+      { id: event.id, start_at, end_at },
+      {
+        onError: () => {
+          for (const [key, data] of snapshots) qc.setQueryData(key, data)
+          setMoveError('That event snapped back. The calendar did not take the move.')
+        },
+      },
+    )
+  }
+
   return (
     <div className="calpage">
       <header className="calpage__bar">
@@ -227,7 +272,7 @@ export function CalendarPage() {
         {/* In the toolbar, beside the controls rather than the title, so they don't slide
             sideways every time the title changes length. A phone wraps them onto a
             second line of the same bar. */}
-        {users.length > 0 && (
+        {!airy && users.length > 0 && (
           <div className="peoplefilter">
             {users.map((u) => {
               const shown = isVisible(u.id)
@@ -266,13 +311,20 @@ export function CalendarPage() {
             ›
           </button>
         </div>
-        <button className="iconbtn iconbtn--primary" onClick={() => openSlot(nextHour())} aria-label="Add event">
-          +
-        </button>
+        {!airy && (
+          <button className="iconbtn iconbtn--primary" onClick={() => openSlot(nextHour())} aria-label="Add event">
+            +
+          </button>
+        )}
       </header>
+      {moveError && (
+        <p className="move-error" role="status">
+          {moveError}
+        </p>
+      )}
 
-      <div className="viewtabs">
-        {VIEW_TABS.map((t) => (
+      <div className="viewtabs" role="tablist" aria-label="Calendar view">
+        {(airy ? AIRY_TABS : VIEW_TABS).map((t) => (
           <button
             key={t.kind}
             className="viewtabs__tab"
@@ -299,9 +351,17 @@ export function CalendarPage() {
             onSelectEvent={openEvent}
             onSelectSlot={openSlot}
           />
+        ) : kind === 'schedule' ? (
+          <ScheduleView
+            days={range.days}
+            events={events}
+            use24h={settings?.time_format_24h ?? false}
+            onSelectEvent={openEvent}
+            onSelectSlot={openSlot}
+          />
         ) : stripKind ? (
           <TimeStripView
-            key={`${stripKind}-${stripOpen.epoch}`}
+            key={`${stripKind}-${stripOpen.epoch}-${airy ? 'airy' : 'classic'}`}
             kind={stripKind}
             window={stripWin}
             initialStart={stripOpen.initial}
@@ -316,6 +376,7 @@ export function CalendarPage() {
             onExtend={(side) => setStripWin((w) => extendDayWindow(w, side))}
             onSelectEvent={openEvent}
             onSelectSlot={openSlot}
+            onReschedule={airy ? reschedule : undefined}
           />
         ) : (
           <TimeGridView
@@ -327,9 +388,16 @@ export function CalendarPage() {
             hourHeight={64 * SCALE_FACTOR[settings?.display_scale ?? 'normal']}
             onSelectEvent={openEvent}
             onSelectSlot={openSlot}
+            onReschedule={airy ? reschedule : undefined}
           />
         )}
       </div>
+
+      {airy && (
+        <button type="button" className="fab" onClick={() => openSlot(nextHour())} aria-label="Add event">
+          +
+        </button>
+      )}
 
       {modalOpen && (
         <EventModal

@@ -17,11 +17,12 @@ def test_bookmark_settings_round_trip(client):
     assert body["bookmark_url"] == "http://dash.lan/?view=wall"
 
 
-def test_theme_defaults_to_midnight_and_accepts_each_shipped_theme(client):
-    """Midnight is the look every existing install already has, so it must stay the default."""
-    assert client.get("/api/settings").json()["theme"] == "midnight"
+def test_theme_defaults_to_airy_and_accepts_each_shipped_theme(client):
+    """Airy is the wall-display default for a new install. The older themes stay selectable.
+    An existing database keeps whatever theme it already stored — defaults only fill missing keys."""
+    assert client.get("/api/settings").json()["theme"] == "airy"
 
-    for theme in ("daylight", "hearth", "midnight"):
+    for theme in ("midnight", "daylight", "hearth", "airy"):
         r = client.patch("/api/settings", json={"theme": theme})
         assert r.status_code == 200
         assert client.get("/api/settings").json()["theme"] == theme

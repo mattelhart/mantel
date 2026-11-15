@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useEntityMutation, useEvents, useUsers, useWeather } from '../../api/hooks'
+import { useEventColor } from '../../components/eventColor'
 import { checkChore, checkListItem } from '../../offline/actions'
 import type { SharedList } from '../../api/types'
 import type { CalendarEvent, ChoreBoard } from '../../api/types'
@@ -44,6 +45,7 @@ function people(config: Record<string, unknown>): number[] {
 // ------------------------------ Upcoming events ------------------------------
 
 function UpcomingEvents({ config, onOpenEvent, onNewEvent }: WidgetProps) {
+  const fill = useEventColor()
   const days = num(config, 'days', 7)
   const max = num(config, 'max_items', 12)
   // Anchored to midnight so the query key is stable across renders; "upcoming" is then
@@ -65,7 +67,7 @@ function UpcomingEvents({ config, onOpenEvent, onNewEvent }: WidgetProps) {
       <ul className="agenda">
         {visible.map((e) => (
           <li key={e.id} className="agenda__row">
-            <span className="agenda__dot" style={{ background: e.color }} />
+            <span className="agenda__dot" style={{ background: fill(e.color) }} />
             <button className="agenda__main" onClick={() => onOpenEvent(e)}>
               <span className="agenda__title">{e.title}</span>
               <span className="agenda__when">{whenLabel(e)}</span>
@@ -80,6 +82,7 @@ function UpcomingEvents({ config, onOpenEvent, onNewEvent }: WidgetProps) {
 // ------------------------------- Today agenda --------------------------------
 
 function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
+  const fill = useEventColor()
   const { data: users = [] } = useUsers()
   const today = new Date()
   const dayStart = startOfToday()
@@ -110,7 +113,7 @@ function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
                 <button
                   key={e.id}
                   className="chip"
-                  style={{ background: e.color }}
+                  style={{ background: fill(e.color) }}
                   onClick={() => onOpenEvent(e)}
                 >
                   {e.all_day ? '' : `${format(new Date(e.start_at), 'h:mm')} `}

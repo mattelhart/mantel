@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { ApiError, api } from '../../api/client'
 import { useEntityMutation, useUsers } from '../../api/hooks'
+import { useAiryTheme, useEventColor } from '../../components/eventColor'
+import { usePersonFilter } from '../../hooks/usePersonFilter'
 import { checkChore, redeemReward, reviewChore } from '../../offline/actions'
 import type { ChoreBoard, ChoreDef, PersonBoard } from '../../api/types'
 import { formatBoardDay, shiftDay, weekdayLabel } from './dates'
@@ -22,6 +24,9 @@ export function ChoresPage() {
   })
 
   const day = data?.on
+  const airy = useAiryTheme()
+  const { isVisible } = usePersonFilter()
+  const people = data?.people.filter((person) => !airy || isVisible(person.user_id)) ?? []
 
   return (
     <div className="chores">
@@ -75,11 +80,15 @@ export function ChoresPage() {
         {data && data.people.length === 0 && (
           <p className="hint">Add a family member in Settings before assigning chores.</p>
         )}
+        {airy && data && data.people.length > 0 && people.length === 0 && (
+          <p className="hint">Everyone is hidden. Tap a profile along the top to bring their chores back.</p>
+        )}
 
         <div className="chores__people">
-          {data?.people.map((person) => (
-            <PersonColumn key={person.user_id} person={person} day={data.on} />
-          ))}
+          {data &&
+            people.map((person) => (
+              <PersonColumn key={person.user_id} person={person} day={data.on} />
+            ))}
         </div>
 
         {data && (
@@ -129,17 +138,32 @@ function ApprovalRow({ item }: { item: ChoreBoard['pending_approvals'][number] }
   )
 }
 
+const CHEER = ['#f6c9a6', '#b7d4fb', '#f6e3a4', '#b7e4c7', '#f6c1d6', '#d4c4f5', '#b7e3dc', '#f6c4c2']
+
 function PersonColumn({ person, day }: { person: PersonBoard; day: string }) {
   const qc = useQueryClient()
-  const toggle = (choreId: number, done: boolean) =>
+  const airy = useAiryTheme()
+  const fill = useEventColor()
+  const tone = fill(person.color)
+  const [cheer, setCheer] = useState<number | null>(null)
+  const toggle = (choreId: number, done: boolean) => {
+    if (done && airy) {
+      setCheer(choreId)
+      window.setTimeout(() => setCheer((current) => (current === choreId ? null : current)), 800)
+    }
     void checkChore({ choreId, userId: person.user_id, on: day, done }, qc).catch(() => undefined)
+  }
+  const letter = person.name.trim().charAt(0).toUpperCase() || '?'
 
   return (
     <section className="chores__person">
       <header style={{ borderColor: person.color }}>
+        <span className="chores__avatar" style={{ background: tone }} aria-hidden>
+          {person.avatar_emoji || letter}
+        </span>
         <span className="chores__swatch" style={{ background: person.color }} />
         <h2>
-          {person.avatar_emoji ? `${person.avatar_emoji} ` : ''}
+          {!airy && person.avatar_emoji ? `${person.avatar_emoji} ` : ''}
           {person.name}
         </h2>
         <span className="chores__stars">{person.stars}★</span>
@@ -150,11 +174,30 @@ function PersonColumn({ person, day }: { person: PersonBoard; day: string }) {
           const status = chore.completion?.status
           const checked = status === 'done' || status === 'pending'
           return (
-            <li key={chore.chore_id} data-status={status ?? 'open'}>
+            <li
+              key={chore.chore_id}
+              data-status={status ?? 'open'}
+              className={cheer === chore.chore_id ? 'is-cheering' : undefined}
+            >
+              {cheer === chore.chore_id && (
+                <span className="cheer" aria-hidden>
+                  {CHEER.map((color, i) => (
+                    <i key={color} style={{ '--i': i, '--c': color } as CSSProperties} />
+                  ))}
+                </span>
+              )}
               <button
                 className="listitem__check"
                 aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
-                style={!checked ? { borderColor: person.color } : undefined}
+                style={
+                  airy
+                    ? checked
+                      ? { background: tone, borderColor: tone, color: '#0b1220' }
+                      : { borderColor: '#c5cad3', background: '#fff' }
+                    : !checked
+                      ? { borderColor: person.color }
+                      : undefined
+                }
                 onClick={() => toggle(chore.chore_id, !checked)}
               >
                 {status === 'done' ? '✓' : status === 'pending' ? '…' : ''}

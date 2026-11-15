@@ -51,7 +51,8 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
     description=(
         "Send only the keys you want to change, e.g. `{\"display_scale\": \"wall\"}`. Unknown "
         "keys are rejected so a typo cannot silently do nothing. `theme` must be one of "
-        "`midnight` (default), `daylight` or `hearth`; it restyles every screen at once."
+        "`airy` (the default on a new install), `midnight`, `daylight` or `hearth`. "
+        "It restyles every screen at once. A database that already has a theme keeps it."
     ),
 )
 def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:

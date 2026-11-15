@@ -101,6 +101,33 @@
   color-scheme: dark;
 }
 
+/* Airy: the bright wall layout. Off-white ground so the white cards lift, with
+   borders dark enough to hold up in a sunlit kitchen. Grid lines are quieter
+   than --border on purpose — the events should be what you see from the doorway. */
+:root[data-theme='airy'] {
+  --bg: #f3f4f6;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #e6e9ef;
+  --border: #5c6573;
+  --text: #1c2430;
+  --text-dim: #3d4a5c;
+  --accent: #1d4ed8;
+  --danger: #b91c1c;
+  --on-accent: #ffffff;
+  --accent-faint: rgba(29, 78, 216, 0.05);
+  --accent-wash: rgba(29, 78, 216, 0.08);
+  --accent-soft: rgba(29, 78, 216, 0.14);
+  --danger-soft: rgba(185, 28, 28, 0.12);
+  --danger-faint: rgba(185, 28, 28, 0.09);
+  --grid-line: rgba(28, 36, 48, 0.08);
+  --overlay: rgba(28, 36, 48, 0.45);
+  --saver-bg: #0c1016;
+  --radius: 22px;
+  --touch: 56px;
+  --nav-size: 112px;
+  color-scheme: light;
+}
+
 :root[data-scale='large'] {
   --scale: 1.2;
   --nav-size: 104px;

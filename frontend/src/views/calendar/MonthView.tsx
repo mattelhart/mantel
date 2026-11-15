@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarMonths, format, isSameMonth, isToday } from 'date-fns'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CalendarEvent } from '../../api/types'
+import { useEventColor } from '../../components/eventColor'
 import { useLightSnap } from '../../hooks/useLightSnap'
 import { FULL_RENDER_PAD, monthsIn, rangeFor, type MonthWindow } from './dateRange'
 import { overlapsDay } from './overlap'
@@ -243,6 +244,7 @@ function FullMonthBlock({
   onSelectEvent,
   onSelectSlot,
 }: Omit<BlockProps, 'full'>) {
+  const fill = useEventColor()
   const { days, start, end } = useMemo(() => rangeFor('month', month, weekStartsOn), [month, weekStartsOn])
   // Narrowed once per block so each of the ~35 cells filters a handful of events, not
   // everything in the seven-month window. Padded a day each side because all-day events
@@ -302,7 +304,7 @@ function FullMonthBlock({
                   <button
                     key={e.id}
                     className="chip chip--month"
-                    style={{ background: e.color }}
+                    style={{ background: fill(e.color) }}
                     onClick={() => onSelectEvent(e)}
                   >
                     {e.title}

@@ -38,6 +38,14 @@ describe('rangeFor', () => {
     expect(rangeFor('3day', at('2026-07-30T15:00:00'), 0).days).toHaveLength(3)
   })
 
+  it('gives a fortnight for schedule view and steps a week', () => {
+    const anchor = at('2026-07-30T15:00:00')
+    expect(rangeFor('schedule', anchor, 0).days).toHaveLength(14)
+    const next = step('schedule', anchor, 1)
+    expect(next.getMonth()).toBe(7)
+    expect(next.getDate()).toBe(6)
+  })
+
   it('gives seven days starting on the configured first day', () => {
     const sunday = rangeFor('week', at('2026-07-30T15:00:00'), 0)
     expect(sunday.days).toHaveLength(7)

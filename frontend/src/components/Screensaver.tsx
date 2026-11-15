@@ -40,7 +40,14 @@ export function Screensaver() {
     enabled: mode !== 'clock',
   })
 
-  const showing = asleep || idle
+  const [forced, setForced] = useState(false)
+  useEffect(() => {
+    const show = () => setForced(true)
+    window.addEventListener('mantel:show-saver', show)
+    return () => window.removeEventListener('mantel:show-saver', show)
+  }, [])
+
+  const showing = forced || asleep || idle
   const usePhotos = mode !== 'clock' && photos.length > 0
 
   // Any interaction dismisses it; the capture-phase handler stops that same
@@ -48,6 +55,7 @@ export function Screensaver() {
   const dismiss = (e: React.SyntheticEvent) => {
     e.stopPropagation()
     e.preventDefault()
+    setForced(false)
     window.dispatchEvent(new Event('pointerdown'))
   }
 
@@ -153,7 +161,12 @@ function ClockOverlay() {
 /** Dim clock for the overnight window -- enough to read at 3am, not enough to light a room. */
 function SleepClock() {
   const now = useNow(30_000)
-  return <div className="saver__sleeptime">{format(now, 'h:mm')}</div>
+  return (
+    <div className="saver__sleepstack">
+      <div className="saver__sleeptime">{format(now, 'h:mm')}</div>
+      <div className="saver__sleepdate">{format(now, 'EEEE, MMMM d')}</div>
+    </div>
+  )
 }
 
 function useNow(intervalMs: number): Date {

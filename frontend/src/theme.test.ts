@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { THEMES, contrastRatio, isThemeId, type ThemePalette } from './theme'
+import { DEFAULT_THEME, THEMES, contrastRatio, isThemeId, type ThemePalette } from './theme'
 
 const css = readFileSync(new URL('./styles/global.css', import.meta.url), 'utf8')
 
@@ -44,6 +44,18 @@ describe('isThemeId', () => {
     expect(THEMES.every((t) => isThemeId(t.id))).toBe(true)
     expect(isThemeId('neon')).toBe(false)
     expect(isThemeId(undefined)).toBe(false)
+  })
+
+  it('ships airy as a theme id and as the default for a new install', () => {
+    expect(isThemeId('airy')).toBe(true)
+    expect(THEMES.some((t) => t.id === 'airy' && t.label === 'Airy')).toBe(true)
+    expect(DEFAULT_THEME).toBe('airy')
+  })
+
+  it('is named in the first-paint script so a reload does not flash another theme', () => {
+    const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+    expect(html).toContain("airy: '#f3f4f6'")
+    expect(html).toContain("if (!themes[t]) t = 'airy'")
   })
 })
 
