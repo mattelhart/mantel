@@ -8,5 +8,6 @@ sealed interface Page {
     data class Edit(val event: CalEvent?, val day: LocalDate) : Page
     data class ListDetail(val id: Int) : Page
     data object Rewards : Page
+    data class ChoreForm(val id: Int?) : Page
     data object Settings : Page
 }
