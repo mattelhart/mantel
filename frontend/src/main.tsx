@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { ApiError } from './api/client'
+import { queryClient } from './api/queryClient'
 import { App } from './App'
 import './styles/global.css'
 import './styles/calendar.css'
@@ -15,21 +15,7 @@ import { ChoresPage } from './views/chores/ChoresPage'
 import { DashboardPage } from './views/dashboard/DashboardPage'
 import { ListsPage } from './views/lists/ListsPage'
 import { SettingsPage } from './views/settings/SettingsPage'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchInterval: 60_000,
-      refetchOnWindowFocus: true,
-      staleTime: 15_000,
-      // A 401 will not succeed on a retry, and the pairing screen should appear at once.
-      retry: (count, err) => {
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return false
-        return count < 1
-      },
-    },
-  },
-})
+import { hydrate, watchQueries } from './offline/persist'
 
 const router = createBrowserRouter([
   {
@@ -63,10 +49,19 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-createRoot(document.getElementById('root')!).render(
+const root = createRoot(document.getElementById('root')!)
+const tree = (
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 )
+
+// Draw the last schedule immediately, then keep writing successful fetches
+// back. A slow or missing IndexedDB must not hold the first paint.
+watchQueries(queryClient)
+void Promise.race([
+  hydrate(queryClient),
+  new Promise((resolve) => window.setTimeout(resolve, 1500)),
+]).finally(() => root.render(tree))

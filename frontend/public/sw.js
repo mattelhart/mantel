@@ -35,6 +35,9 @@ const CACHEABLE_API = [
   '/api/dashboard/widgets',
   '/api/dashboard/widget-types',
   '/api/lists',
+  '/api/chores',
+  '/api/chores/board',
+  '/api/rewards',
   '/api/weather',
 ]
 
@@ -97,11 +100,30 @@ async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
   try {
     const response = await fetch(request)
-    if (response.ok) cache.put(request, response.clone())
+    if (response.ok) {
+      const headers = new Headers(response.headers)
+      headers.set('X-Mantel-Saved-At', new Date().toISOString())
+      await cache.put(
+        request,
+        new Response(response.clone().body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        }),
+      )
+    }
     return response
   } catch (err) {
     const hit = await cache.match(request)
-    if (hit) return hit
+    if (hit) {
+      const headers = new Headers(hit.headers)
+      headers.set('X-Mantel-From-Cache', '1')
+      return new Response(hit.body, {
+        status: hit.status,
+        statusText: hit.statusText,
+        headers,
+      })
+    }
     // A navigation with nothing cached still needs *something* back.
     if (request.mode === 'navigate') {
       const shell = await cache.match('/')

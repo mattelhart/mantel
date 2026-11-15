@@ -124,7 +124,11 @@ private fun Home(state: TvState, vm: TvViewModel) {
     val push = { page: Overlay -> stack = stack + page }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (state.offline) {
-            Text(state.message ?: "Can't reach the calendar. Showing the last update.", color = Coral, fontSize = 20.sp)
+            Text(
+                state.offlineDetail.ifBlank { "Offline, last synced earlier" },
+                color = Coral,
+                fontSize = 20.sp,
+            )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Tab.entries.forEach { item ->

@@ -56,7 +56,7 @@ IDs, and everyone's calendars sit side by side on the same wall.
 | 🌤️ **Weather, no API key**  | National Weather Service in the US (with alerts), Open-Meteo everywhere else             |
 | 📱 **Subscribe on a phone** | A read-only feed for Apple Calendar, Outlook or Google — and for Home Assistant          |
 | 🔄 **Updates itself**       | Wall tablets hard-reload on their own when you deploy; nobody hunts for a refresh button |
-| 🔌 **Works offline**        | Network drops and the display keeps showing the last known schedule instead of blanking  |
+| 🔌 **Works offline**        | Keeps the last calendar, chores and rewards, and replays chore taps when the link returns |
 | 🖼️ **Photo screensaver**    | With burn-in protection and an overnight blackout window                                 |
 | 🍓 **Runs on a Pi**         | Multi-architecture images for `amd64` and `arm64`                                        |
 | 🤖 **Everything is an API** | Documented for humans *and* for AI agents                                                |
@@ -403,8 +403,10 @@ Yes. SQLite is in WAL mode with a busy timeout, and there are tests covering con
 from many screens at once.
 
 **What happens when my internet drops?**
-The wall display keeps showing the last known schedule with an offline banner. Changes you make
-while offline aren't queued — that's on the roadmap.
+The wall keeps the last calendar, chores and rewards, and says `Offline, last synced <time>`.
+Chore check-offs and list ticks queue and replay when the link returns, without awarding stars
+twice. Event edits wait — the server's calendar wins. See
+[Live updates and offline mode](docs/live-and-offline.md).
 
 **Can I use it without a wall display?**
 Sure. It's a perfectly good family calendar in a browser tab. The wall is just where it's best.

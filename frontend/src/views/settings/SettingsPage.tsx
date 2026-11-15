@@ -171,7 +171,6 @@ function CalendarsTab() {
   const { data: status } = useQuery({
     queryKey: ['sync-status'],
     queryFn: () => api.get<CalendarSyncStatus>('/sync/status'),
-    refetchInterval: 30_000,
   })
   const [name, setName] = useState('')
   const [checking, setChecking] = useState(false)

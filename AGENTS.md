@@ -76,6 +76,7 @@ backend/app/
   routers/             HTTP; docstrings here become the public OpenAPI text
   services/
     sync_engine.py     provider-agnostic: discover, pull, push, conflicts, resync
+    live.py            in-process SSE hub; one notice per commit burst, not per row
     providers/
       base.py          RemoteEvent / RemoteCalendar / CalendarProvider — the contract
       google.py        Google JSON <-> RemoteEvent

@@ -333,6 +333,25 @@ Redeem fails with `400` when the balance is short. Stars are held immediately.
 `POST /api/redemptions/{id}/deny` returns the stars. Deleting a chore or a reward
 retires it: stars already earned stay, and an open request is sent back.
 
+### 9. Hear about a change instead of polling
+
+```http
+GET /api/live
+Accept: text/event-stream
+Last-Event-ID: 12
+```
+
+Server-Sent Events. Same door as the rest of the API: a trusted address, or
+`Authorization: Bearer`. A `change` event names what was committed
+(`events`, `chores`, `rewards`, `lists`, and the other areas in
+`docs/live-and-offline.md`). Refetch those. Send the last `id` you saw as
+`Last-Event-ID` when you reconnect; `resync` means that id is gone and you
+should refetch. Keep polling about once a minute while the stream is down.
+
+Chore checks and reward redeems should carry a `request_id`. A screen that
+was offline replays the same id, and the second delivery does not move stars
+again. Event edits are not replayed: the server's copy wins.
+
 The `/api/feeds/*.ics` endpoints take their own `?token=` from `GET /api/feeds/token`, because a
 feed URL is pasted into a calendar app and cannot send a device token. Everything else on the
 home network is open. Off the network, send `Authorization: Bearer` with a token from

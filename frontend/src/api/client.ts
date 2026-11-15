@@ -1,3 +1,5 @@
+import { noteCachedAt, noteSynced } from '../offline/kv'
+
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -62,6 +64,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       /* non-JSON error body */
     }
     throw new ApiError(code, message, res.status)
+  }
+  // The service worker answers from its cache with this header once the
+  // network fetch threw. That data is still worth showing, and it is not a
+  // fresh sync.
+  if (res.headers.get('X-Mantel-From-Cache') === '1') {
+    window.dispatchEvent(new Event('famcal:unreachable'))
+    const saved = res.headers.get('X-Mantel-Saved-At')
+    if (saved) noteCachedAt(saved)
+  } else {
+    window.dispatchEvent(new Event('famcal:reachable'))
+    noteSynced()
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T)
 }

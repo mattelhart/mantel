@@ -17,6 +17,13 @@ interface Props {
   onClose: () => void
 }
 
+/** Event edits are not queued. A half-sent change would fight the next Google
+ * or iCloud pull, so the server's copy stays the one on the wall. */
+function saveError(e: unknown, fallback = 'Could not save the event.'): string {
+  if (e instanceof TypeError) return 'Offline. The calendar on the server was kept, and this change was not saved.'
+  return e instanceof Error ? e.message : fallback
+}
+
 
 export function EventModal({ event, defaultStart, onClose }: Props) {
   const { data: calendars = [] } = useCalendars()
@@ -121,7 +128,7 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
       }
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save the event.')
+      setError(saveError(e))
     }
   }
 
@@ -131,7 +138,7 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
       await remove.mutateAsync(event.id)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete the event.')
+      setError(saveError(e, 'Could not delete the event.'))
     }
   }
 
