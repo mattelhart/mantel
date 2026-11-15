@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -60,7 +59,7 @@ fun ChoresScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                     Icon(Icons.Filled.ChevronRight, contentDescription = "Next day")
                 }
             }
-            Button(onClick = { open(Page.Rewards) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
+            WarmButton(onClick = { open(Page.Rewards) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
                 val stars = person?.stars ?: 0
                 Text(if (person == null) "Rewards" else "${person.name} · $stars stars")
             }
@@ -70,7 +69,7 @@ fun ChoresScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                 waiting.forEach { item ->
                     Text("${item.userName} · ${item.title} · ${item.points} stars · ${item.on}", fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { vm.approve(item.completionId) }, modifier = Modifier.touchTarget()) { Text("Approve") }
+                        WarmButton(onClick = { vm.approve(item.completionId) }, modifier = Modifier.touchTarget()) { Text("Approve") }
                         OutlinedButton(onClick = { vm.reject(item.completionId) }, modifier = Modifier.touchTarget()) { Text("Not yet") }
                     }
                 }
@@ -142,9 +141,9 @@ fun RewardsScreen(state: PhoneState, vm: PhoneViewModel) {
         state.board?.rewards?.forEach { reward ->
             val who = person
             val short = who != null && who.stars < reward.pointsCost
-            Button(
+            WarmButton(
                 onClick = {
-                    if (who == null) return@Button
+                    if (who == null) return@WarmButton
                     if (short) {
                         error = "${who.name} needs ${reward.pointsCost - who.stars} more stars."
                     } else {
@@ -161,7 +160,7 @@ fun RewardsScreen(state: PhoneState, vm: PhoneViewModel) {
         state.board?.pendingRedemptions?.forEach { row ->
             Text("${row.userName} wants ${row.rewardTitle}", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { vm.fulfill(row.id) }, modifier = Modifier.touchTarget()) { Text("Given") }
+                WarmButton(onClick = { vm.fulfill(row.id) }, modifier = Modifier.touchTarget()) { Text("Given") }
                 OutlinedButton(onClick = { vm.deny(row.id) }, modifier = Modifier.touchTarget()) { Text("Send back") }
             }
         }

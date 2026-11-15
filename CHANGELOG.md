@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+**The phone and TV connect screens can be read across the room.** Field text is near-black, placeholders and labels clear WCAG AA on the warm paper, errors are a dark red, and outlined buttons are no longer pale orange. Filled buttons stay the warm orange, with dark text.
+
 **TV and phone updates install over the last copy.** Debug and release APKs are signed with one keystore in the repo, so a build from another machine no longer forces an uninstall. The version code is the number of git commits, and the version name is `VERSION` plus that count.
 
 **The TV and phone apps ask for the calendar server.** The last address that

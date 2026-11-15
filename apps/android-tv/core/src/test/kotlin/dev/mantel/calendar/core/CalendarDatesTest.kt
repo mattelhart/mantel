@@ -106,7 +106,8 @@ class ServerAddressTest {
         assertTrue(missed.contains("saved"))
         assertFalse(missed.contains("Pi"))
         val fresh = discoveryMissMessage(null)
-        assertTrue(fresh.contains("familycal.local"))
+        assertTrue(fresh.contains("192.168.1.20"))
+        assertFalse(fresh.contains("familycal"))
         assertFalse(fresh.contains("Pi"))
     }
 

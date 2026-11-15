@@ -22,7 +22,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -69,30 +69,50 @@ import dev.mantel.calendar.phone.PhoneTab
 import dev.mantel.calendar.phone.PhoneViewModel
 import dev.mantel.calendar.phone.ThemeChoice
 
-private val Ink = Color(0xFF1C2430)
-private val Paper = Color(0xFFF6F3EE)
-private val Coral = Color(0xFFE36A3A)
-
-private fun mantelLight() = lightColorScheme(
-    primary = Coral,
+internal fun mantelLight() = lightColorScheme(
+    primary = Ember,
     onPrimary = Color.White,
-    secondary = Color(0xFF2F6FED),
+    primaryContainer = Color(0xFFFFE3C2),
+    onPrimaryContainer = Ink,
+    secondary = Ember,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFFE3C2),
+    onSecondaryContainer = Ink,
     background = Paper,
-    surface = Color.White,
     onBackground = Ink,
+    surface = Color.White,
     onSurface = Ink,
+    surfaceVariant = Color(0xFFE7E1D8),
+    onSurfaceVariant = Dim,
+    outline = Line,
+    error = Danger,
+    onError = Color.White,
+    errorContainer = Color(0xFFF8D4CE),
+    onErrorContainer = Color(0xFF6E2B12),
     tertiaryContainer = Color(0xFFFFE3C2),
     onTertiaryContainer = Ink,
 )
 
-private fun mantelDark() = darkColorScheme(
+internal fun mantelDark() = darkColorScheme(
     primary = Color(0xFFFF8A5B),
     onPrimary = Color(0xFF2A1208),
-    secondary = Color(0xFF9DB7FF),
+    primaryContainer = Color(0xFF4A3418),
+    onPrimaryContainer = Color(0xFFFFE3C2),
+    secondary = Color(0xFFFFB086),
+    onSecondary = Color(0xFF2A1208),
+    secondaryContainer = Color(0xFF4A3418),
+    onSecondaryContainer = Color(0xFFF4EFE6),
     background = Color(0xFF12151C),
-    surface = Color(0xFF1C2230),
     onBackground = Color(0xFFF4EFE6),
+    surface = Color(0xFF1C2230),
     onSurface = Color(0xFFF4EFE6),
+    surfaceVariant = Color(0xFF2A3142),
+    onSurfaceVariant = Color(0xFFD7C4B0),
+    outline = Color(0xFFC4B3A0),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF3B0907),
+    errorContainer = Color(0xFF5C2018),
+    onErrorContainer = Color(0xFFFFD0C8),
     tertiaryContainer = Color(0xFF4A3418),
     onTertiaryContainer = Color(0xFFFFE3C2),
 )
@@ -185,7 +205,11 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                     if (state.offline) OfflineBanner(state.offlineDetail.ifBlank { "Offline, last synced earlier" })
                     state.message?.let { text ->
                         MessageBanner(text)
-                        TextButton(onClick = vm::dismissMessage, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        TextButton(
+                            onClick = vm::dismissMessage,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                        ) {
                             Text("Dismiss")
                         }
                     }
@@ -254,11 +278,11 @@ private fun Loading(message: String?) {
 @Composable
 private fun AddressScreen(state: PhoneState, vm: PhoneViewModel, onScan: () -> Unit) {
     var address by remember(state.origin) { mutableStateOf(state.origin.orEmpty()) }
-    val submit = { vm.connect(address.ifBlank { "familycal.local" }) }
+    val submit = { vm.connect(address) }
     SetupColumn(state.message) {
         Text("Connect to your calendar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Same Wi-Fi as the calendar, or Tailscale or WireGuard. Mantel does not need a port forward.")
-        Text("The first try is familycal.local:8080. A bare address uses port 8080. A saved address is tried before that.")
+        Text("Same Wi-Fi as the calendar, or Tailscale or WireGuard. No port forward.")
+        Text("The computer running Mantel, for example 192.168.1.20. A bare address uses port 8080.")
         OutlinedTextField(
             value = address,
             onValueChange = { address = it },
@@ -266,13 +290,19 @@ private fun AddressScreen(state: PhoneState, vm: PhoneViewModel, onScan: () -> U
             placeholder = { Text("192.168.1.20") },
             singleLine = true,
             label = { Text("Calendar server") },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            colors = mantelFieldColors(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
-        Button(onClick = submit, modifier = Modifier.fillMaxWidth().touchTarget()) {
+        WarmButton(onClick = submit, modifier = Modifier.fillMaxWidth().touchTarget()) {
             Text("Connect")
         }
-        OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth().touchTarget()) {
+        OutlinedButton(
+            onClick = onScan,
+            modifier = Modifier.fillMaxWidth().touchTarget(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        ) {
             Text("Scan pairing QR")
         }
     }
@@ -292,11 +322,21 @@ private fun PairScreen(state: PhoneState, vm: PhoneViewModel, onScan: () -> Unit
             placeholder = { Text("K7NQ-4RMP") },
             singleLine = true,
             label = { Text("Pairing code") },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            colors = mantelFieldColors(),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
         )
-        Button(onClick = { vm.pair(code) }, modifier = Modifier.fillMaxWidth().touchTarget()) { Text("Pair") }
-        OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth().touchTarget()) { Text("Scan pairing QR") }
-        TextButton(onClick = vm::editServer, modifier = Modifier.touchTarget()) { Text("Use a different server") }
+        WarmButton(onClick = { vm.pair(code) }, modifier = Modifier.fillMaxWidth().touchTarget()) { Text("Pair") }
+        OutlinedButton(
+            onClick = onScan,
+            modifier = Modifier.fillMaxWidth().touchTarget(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        ) { Text("Scan pairing QR") }
+        TextButton(
+            onClick = vm::editServer,
+            modifier = Modifier.touchTarget(),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        ) { Text("Use a different server") }
     }
 }
 
@@ -335,7 +375,11 @@ fun SettingsScreen(state: PhoneState, vm: PhoneViewModel) {
             "The token stays in the Android Keystore. Revoke this phone from the wall and it will ask to pair again.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = vm::forgetServer, modifier = Modifier.fillMaxWidth().touchTarget()) {
+        OutlinedButton(
+            onClick = vm::forgetServer,
+            modifier = Modifier.fillMaxWidth().touchTarget(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        ) {
             Text("Forget this server")
         }
     }

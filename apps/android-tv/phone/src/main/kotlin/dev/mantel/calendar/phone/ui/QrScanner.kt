@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,7 +55,7 @@ fun QrScanner(onResult: (String) -> Unit, onClose: () -> Unit) {
         Text("On the wall: Settings → Devices → Pair a phone.")
         if (!granted) {
             Text("The camera is used only to read that code. You can type it instead.")
-            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
+            WarmButton(onClick = { launcher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
                 Text("Allow the camera")
             }
         } else {
