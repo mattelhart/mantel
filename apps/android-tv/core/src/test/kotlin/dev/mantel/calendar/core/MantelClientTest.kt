@@ -11,6 +11,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -64,9 +65,11 @@ class MantelClientTest {
     @Test
     fun pairPostsTheCodeAndReadsTheToken() = runBlocking {
         var body = ""
+        var seenAuth: String? = "sent"
         val client = client(
             MockEngine { request ->
                 body = (request.body as TextContent).text
+                seenAuth = request.headers[HttpHeaders.Authorization]
                 respond(
                     """{"token":"mantel_abc","token_type":"bearer","device":{"id":3,"name":"Living room TV","token_prefix":"mantel_ab","created_at":"2026-11-15T00:00:00Z"}}""",
                     HttpStatusCode.Created,
@@ -77,6 +80,7 @@ class MantelClientTest {
         val paired = client.pair("k7nq-4rmp", "Living room TV")
         assertEquals("mantel_abc", paired.token)
         assertTrue(body.contains("k7nq-4rmp"))
+        assertNull("a revoked bearer must not ride along on the pairing call", seenAuth)
         client.close()
     }
 
@@ -89,7 +93,45 @@ class MantelClientTest {
         } catch (e: MantelException) {
             assertEquals("unreachable", e.code)
             assertEquals(0, e.status)
+            assertTrue(e.message!!.contains("familycal.local"))
+            assertTrue(e.message!!.contains("calendar server"))
         }
+        client.close()
+    }
+
+    @Test
+    fun aRefusedHealthCheckIsDownRatherThanACrash() = runBlocking {
+        val client = client(MockEngine { throw java.net.ConnectException("refused") })
+        val probe = client.probeServer("http://10.0.0.8:8080", 500)
+        assertTrue(probe is ServerProbe.Down)
+        assertTrue(probe.failureMessage("http://10.0.0.8:8080")!!.contains("10.0.0.8"))
+        assertFalse(client.reachable("http://10.0.0.8:8080", 500))
+        client.close()
+    }
+
+    @Test
+    fun healthOkMeansTheServerIsUp() = runBlocking {
+        var path = ""
+        val client = client(
+            MockEngine { request ->
+                path = request.url.encodedPath
+                respond("""{"status":"ok"}""", HttpStatusCode.OK, json)
+            },
+        )
+        assertTrue(client.probeServer("http://10.0.0.8:8080", 500) is ServerProbe.Up)
+        assertTrue(path.endsWith("/api/health"))
+        client.close()
+    }
+
+    @Test
+    fun aHealthCheckThatErrorsIsNotTreatedAsSilence() = runBlocking {
+        val client = client(MockEngine { respond("no", HttpStatusCode.ServiceUnavailable, json) })
+        val probe = client.probeServer("http://10.0.0.8:8080", 500)
+        assertTrue(probe is ServerProbe.Unhealthy)
+        assertEquals(503, (probe as ServerProbe.Unhealthy).status)
+        val message = probe.failureMessage("http://10.0.0.8:8080")
+        assertTrue(message!!.contains("503"))
+        assertTrue(message.contains("not ready"))
         client.close()
     }
 

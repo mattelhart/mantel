@@ -26,17 +26,24 @@ import dev.mantel.calendar.core.applyChoreCheck
 import dev.mantel.calendar.core.applyListCheck
 import dev.mantel.calendar.core.applyRedeem
 import dev.mantel.calendar.core.buildRepeat
+import dev.mantel.calendar.core.CONNECT_TIMEOUT_MS
+import dev.mantel.calendar.core.ServerProbe
 import dev.mantel.calendar.core.cleartextPermitted
-import dev.mantel.calendar.core.discoveryCandidates
+import dev.mantel.calendar.core.discoveryMissMessage
 import dev.mantel.calendar.core.eventEditKind
 import dev.mantel.calendar.core.EventEditKind
 import dev.mantel.calendar.core.fetchInstants
+import dev.mantel.calendar.core.firstReachable
 import dev.mantel.calendar.core.normalizePairCode
 import dev.mantel.calendar.core.normalizeServer
 import dev.mantel.calendar.core.offlineLabel
 import dev.mantel.calendar.core.pairCodeComplete
+import dev.mantel.calendar.core.pairingFailureMessage
 import dev.mantel.calendar.core.parsePairingLink
+import dev.mantel.calendar.core.probeSchedule
 import dev.mantel.calendar.core.reconnectDelayMs
+import dev.mantel.calendar.core.revokedDeviceMessage
+import dev.mantel.calendar.core.savedAddressPrefill
 import dev.mantel.calendar.core.syncedLabel
 import dev.mantel.calendar.core.timedRange
 import dev.mantel.calendar.core.todayIn
@@ -139,13 +146,16 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (!cleartextPermitted(normalized)) {
-            _state.update { it.copy(phase = Phase.Address, message = PUBLIC_HTTP) }
+            _state.update { it.copy(phase = Phase.Address, origin = normalized, message = PUBLIC_HTTP) }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(phase = Phase.Loading, message = null) }
-            if (!client.reachable(normalized)) {
-                _state.update { it.copy(phase = Phase.Address, origin = normalized, message = "Can't reach $normalized") }
+            _state.update { it.copy(phase = Phase.Loading, message = null, origin = normalized) }
+            val probe = client.probeServer(normalized, CONNECT_TIMEOUT_MS)
+            if (probe !is ServerProbe.Up) {
+                _state.update {
+                    it.copy(phase = Phase.Address, origin = normalized, message = probe.failureMessage(normalized))
+                }
                 return@launch
             }
             origin.value = normalized
@@ -171,15 +181,18 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (!cleartextPermitted(link.base)) {
-            _state.update { it.copy(phase = Phase.Address, message = PUBLIC_HTTP) }
+            _state.update { it.copy(phase = Phase.Address, origin = link.base, message = PUBLIC_HTTP) }
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(phase = Phase.Loading, message = null) }
             origin.value = link.base
             store.saveOrigin(link.base)
-            if (!client.reachable(link.base)) {
-                _state.update { it.copy(phase = Phase.Address, origin = link.base, message = "Can't reach ${link.base}") }
+            val probe = client.probeServer(link.base, CONNECT_TIMEOUT_MS)
+            if (probe !is ServerProbe.Up) {
+                _state.update {
+                    it.copy(phase = Phase.Address, origin = link.base, message = probe.failureMessage(link.base))
+                }
                 return@launch
             }
             pairNormalized(link.code)
@@ -447,32 +460,36 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             store.saveToken(paired.token)
             enter()
         } catch (e: MantelException) {
-            _state.update { it.copy(phase = Phase.Pair, origin = origin.value, message = e.message) }
+            _state.update {
+                it.copy(phase = Phase.Pair, origin = origin.value, message = pairingFailureMessage(e.status, e.message))
+            }
         }
     }
 
     private suspend fun boot() {
         val saved = store.read()
         token.value = saved.token
-        var found: String? = null
-        for (candidate in discoveryCandidates(saved.origin)) {
-            if (!cleartextPermitted(candidate)) continue
-            if (client.reachable(candidate)) {
-                found = candidate
-                break
-            }
-        }
+        val found = firstReachable(
+            probeSchedule(saved.origin),
+            probe = { candidate, timeoutMs -> client.reachable(candidate, timeoutMs) },
+            pause = { delay(it) },
+            allow = ::cleartextPermitted,
+        )
         if (found == null) {
+            val prefill = savedAddressPrefill(saved.origin)
             val cached = screenCache.load()
-            val savedOrigin = saved.origin
-            if (savedOrigin != null && cached != null && cleartextPermitted(savedOrigin)) {
-                origin.value = savedOrigin
+            if (prefill.isNotEmpty() && cached != null && cleartextPermitted(prefill)) {
+                origin.value = prefill
                 showCached(cached, resetDay = true)
-                _state.update { it.copy(phase = Phase.Ready, origin = savedOrigin, message = null) }
+                _state.update { it.copy(phase = Phase.Ready, origin = prefill, message = null) }
                 return
             }
             _state.update {
-                it.copy(phase = Phase.Address, message = "Couldn't find familycal.local. Enter the address on your LAN or VPN.")
+                it.copy(
+                    phase = Phase.Address,
+                    origin = prefill.ifEmpty { null },
+                    message = discoveryMissMessage(saved.origin),
+                )
             }
             return
         }
@@ -496,7 +513,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 token.value = null
                 store.saveToken(null)
                 _state.update {
-                    it.copy(phase = Phase.Pair, message = "That token is no longer valid. Pair again.", origin = origin.value)
+                    it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), origin = origin.value)
                 }
             } else {
                 val cached = screenCache.load()
@@ -605,7 +622,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         if (error.status == 401) {
             token.value = null
             viewModelScope.launch { store.saveToken(null) }
-            _state.update { it.copy(phase = Phase.Pair, message = "Pair this phone again.", offline = false) }
+            _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), offline = false) }
             return
         }
         val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty()
@@ -704,7 +721,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 if (e.status == 401) {
                     token.value = null
                     store.saveToken(null)
-                    _state.update { it.copy(phase = Phase.Pair, message = "Pair this phone again.", offline = false) }
+                    _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), offline = false) }
                     attempt = 6
                 } else {
                     if (e.status == 0) {

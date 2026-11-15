@@ -4,11 +4,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -18,6 +19,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
@@ -65,6 +68,8 @@ fun SunnyField(
     onValue: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    onSubmit: (() -> Unit)? = null,
 ) {
     val focus = LocalFocusManager.current
     OutlinedTextField(
@@ -73,6 +78,17 @@ fun SunnyField(
         label = { Text(label, fontSize = 18.sp) },
         singleLine = true,
         textStyle = TextStyle(fontSize = 24.sp, color = Ink, fontWeight = FontWeight.SemiBold),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = keyboardType,
+            imeAction = if (onSubmit == null) ImeAction.Default else ImeAction.Done,
+            autoCorrectEnabled = keyboardType == KeyboardType.Text,
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                onSubmit?.invoke()
+                focus.clearFocus()
+            },
+        ),
         modifier = modifier.onPreviewKeyEvent { event ->
             if (event.type == KeyEventType.KeyUp && event.key == Key.Back) {
                 focus.clearFocus()

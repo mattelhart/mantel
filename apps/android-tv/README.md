@@ -45,12 +45,20 @@ Without a computer: install **Downloader** or **Send Files to TV** from the Play
 Store on the TV, copy the APK to the TV, and open it. You may have to allow
 installs from that app under security settings.
 
-## Point it at the Pi
+## Point it at the server
 
-The first launch tries `http://familycal.local:8080`. That name is the Pi's
-mDNS hostname (Avahi), not something Mantel advertises. If the Pi is not named
-`familycal`, enter its address with the on-screen keyboard, for example
-`192.168.1.20`. A bare address is tried on port 8080.
+The first launch tries the last address that worked, then
+`http://familycal.local:8080`. That name is an mDNS hostname (Avahi on a Linux
+host), not something Mantel advertises. Windows Docker Desktop does not publish
+it. If nothing answers, the address box opens with the saved address filled in.
+Type the calendar server's address with the on-screen keyboard, for example
+`192.168.1.20`. The number keys on the remote type an IP, and **IP address**
+selects the number pad (it has the dot). **Type a name** is for a hostname.
+A bare address is tried on port 8080.
+
+`familycal.local` uses a short timeout, so a missing name falls through instead
+of holding the spinner. The saved address is tried twice, with a brief pause,
+because a TV often wakes before Wi-Fi answers.
 
 If the TV is off the trusted network, or the server is in `AUTH_MODE=token`,
 the app asks for a pairing code. On the wall: **Settings → Devices → Pair a
@@ -76,7 +84,7 @@ a code while `AUTH_MODE=lan`.
   changed. If the stream drops, it polls about every 60 seconds. Offline, the
   last calendar, lists and chores stay up with `Offline, last synced <time>`.
   A chore check or list tick made then is replayed, with the same `request_id`,
-  when the TV can reach the Pi again.
+  when the TV can reach the server again.
 - Optional screensaver: in the TV's screensaver settings, pick **Mantel today**.
   It shows today's agenda.
 
@@ -89,8 +97,10 @@ iCloud account.
 
 Gaps:
 
-- The server does not advertise itself over mDNS. Discovery is the hostname
-  `familycal.local`.
+- The server does not advertise itself over mDNS. Discovery is the last saved
+  address, then the hostname `familycal.local`. A Windows host does not publish
+  that name; type its LAN address. See
+  [docs/windows-server.md](../../docs/windows-server.md).
 - Editing one occurrence of a series is still not available. The TV edits the
   whole series when the event has a recurrence rule.
 - Weekly and one-off chores are created on the wall. The TV checks today's list

@@ -2,7 +2,7 @@ use url::Url;
 
 pub const DEFAULT_SERVER: &str = "http://localhost:8080";
 
-/// The address the window should open. A bare host is the Pi on port 8080.
+/// The address the window should open. A bare host is the server on port 8080.
 /// A path is dropped: Mantel is served from the origin, and the web app routes itself.
 pub fn normalize_server(raw: &str) -> Result<String, String> {
     let text = raw.trim();

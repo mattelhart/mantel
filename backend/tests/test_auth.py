@@ -216,3 +216,34 @@ def test_wrong_codes_are_rate_limited(client, locked):
     # A different address is not caught in the same net.
     other = call("1.2.3.9", "POST", "/api/auth/pair", json={"code": "AAAA-AAAA"})
     assert other.status_code == 401
+
+
+def test_an_expired_pairing_code_is_refused_even_with_a_stale_token(client, locked):
+    """A code past its ten minutes is not a credential. A revoked bearer must
+    not turn the public pair route into the generic "needs a device token"
+    401 — the phone is here because it has no working token."""
+    from datetime import timedelta
+
+    from app.models import PairingCode, utcnow
+    from app.services.auth import hash_code, normalize_code
+
+    code = "K7NQ4RMP"
+    with SessionLocal() as db:
+        db.add(
+            PairingCode(
+                code_hash=hash_code(normalize_code(code)),
+                expires_at=utcnow() - timedelta(minutes=1),
+            )
+        )
+        db.commit()
+    refused = call(
+        "1.2.3.4",
+        "POST",
+        "/api/auth/pair",
+        json={"code": "K7NQ-4RMP", "name": "Phone"},
+        headers={"Authorization": "Bearer mantel_not-a-real-token"},
+    )
+    assert refused.status_code == 401, refused.text
+    message = refused.json()["error"]["message"].lower()
+    assert "expired" in message
+    assert "device token" not in message

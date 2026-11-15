@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mantel.calendar.core.CalEvent
 import dev.mantel.calendar.core.CalInfo
 import dev.mantel.calendar.core.ChoreBoard
+import dev.mantel.calendar.core.CONNECT_TIMEOUT_MS
 import dev.mantel.calendar.core.FAMILYCAL_ORIGIN
 import dev.mantel.calendar.core.FamilyMember
 import dev.mantel.calendar.core.HouseholdSettings
@@ -15,6 +16,7 @@ import dev.mantel.calendar.core.MantelException
 import dev.mantel.calendar.core.PendingWrite
 import dev.mantel.calendar.core.ScreenCache
 import dev.mantel.calendar.core.ScreenCacheStore
+import dev.mantel.calendar.core.ServerProbe
 import dev.mantel.calendar.core.SharedList
 import dev.mantel.calendar.core.SseParser
 import dev.mantel.calendar.core.WriteOutbox
@@ -22,11 +24,16 @@ import dev.mantel.calendar.core.allDayRange
 import dev.mantel.calendar.core.applyChoreCheck
 import dev.mantel.calendar.core.applyListCheck
 import dev.mantel.calendar.core.applyRedeem
-import dev.mantel.calendar.core.offlineLabel
-import dev.mantel.calendar.core.reconnectDelayMs
-import dev.mantel.calendar.core.discoveryCandidates
+import dev.mantel.calendar.core.discoveryMissMessage
 import dev.mantel.calendar.core.fetchInstants
+import dev.mantel.calendar.core.firstReachable
 import dev.mantel.calendar.core.normalizeServer
+import dev.mantel.calendar.core.offlineLabel
+import dev.mantel.calendar.core.pairingFailureMessage
+import dev.mantel.calendar.core.probeSchedule
+import dev.mantel.calendar.core.reconnectDelayMs
+import dev.mantel.calendar.core.revokedDeviceMessage
+import dev.mantel.calendar.core.savedAddressPrefill
 import dev.mantel.calendar.core.timedRange
 import dev.mantel.calendar.core.zoneOrUtc
 import dev.mantel.calendar.device.SecureTokenStore
@@ -104,9 +111,12 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(phase = Phase.Loading, message = null) }
-            if (!client.reachable(normalized)) {
-                _state.update { it.copy(phase = Phase.Address, message = "Can't reach $normalized") }
+            _state.update { it.copy(phase = Phase.Loading, message = null, origin = normalized) }
+            val probe = client.probeServer(normalized, CONNECT_TIMEOUT_MS)
+            if (probe !is ServerProbe.Up) {
+                _state.update {
+                    it.copy(phase = Phase.Address, origin = normalized, message = probe.failureMessage(normalized))
+                }
                 return@launch
             }
             origin.value = normalized
@@ -124,7 +134,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 store.saveToken(paired.token)
                 enter()
             } catch (e: MantelException) {
-                _state.update { it.copy(phase = Phase.Pair, message = e.message) }
+                _state.update { it.copy(phase = Phase.Pair, message = pairingFailureMessage(e.status, e.message)) }
             }
         }
     }
@@ -133,7 +143,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             origin.value = null
             token.value = null
-            store.saveToken(null)
+            store.clear()
             _state.update { TvState(phase = Phase.Address) }
         }
     }
@@ -319,22 +329,27 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun boot() {
         val saved = store.read()
         token.value = saved.token
-        var found: String? = null
-        for (candidate in discoveryCandidates(saved.origin)) {
-            if (client.reachable(candidate)) {
-                found = candidate
-                break
-            }
-        }
+        val found = firstReachable(
+            probeSchedule(saved.origin),
+            probe = { candidate, timeoutMs -> client.reachable(candidate, timeoutMs) },
+            pause = { delay(it) },
+        )
         if (found == null) {
+            val prefill = savedAddressPrefill(saved.origin)
             val cached = screenCache.load()
-            if (saved.origin != null && cached != null) {
-                origin.value = saved.origin
+            if (prefill.isNotEmpty() && cached != null) {
+                origin.value = prefill
                 showCached(cached)
-                _state.update { it.copy(phase = Phase.Ready, origin = saved.origin, message = null) }
+                _state.update { it.copy(phase = Phase.Ready, origin = prefill, message = null) }
                 return
             }
-            _state.update { it.copy(phase = Phase.Address, message = "Couldn't find familycal.local. Enter the Pi's address.") }
+            _state.update {
+                it.copy(
+                    phase = Phase.Address,
+                    origin = prefill.ifEmpty { null },
+                    message = discoveryMissMessage(saved.origin),
+                )
+            }
             return
         }
         origin.value = found
@@ -357,7 +372,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
             if (e.status == 401) {
                 token.value = null
                 store.saveToken(null)
-                _state.update { it.copy(phase = Phase.Pair, message = "That token is no longer valid. Pair again.", origin = origin.value) }
+                _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), origin = origin.value) }
             } else {
                 val cached = screenCache.load()
                 if (cached != null) {
@@ -450,7 +465,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
         if (e.status == 401) {
             token.value = null
             viewModelScope.launch { store.saveToken(null) }
-            _state.update { it.copy(phase = Phase.Pair, message = "Pair this TV again.", offline = false) }
+            _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), offline = false) }
             return
         }
         val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty()
@@ -535,7 +550,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 if (e.status == 401) {
                     token.value = null
                     store.saveToken(null)
-                    _state.update { it.copy(phase = Phase.Pair, message = "Pair this TV again.", offline = false) }
+                    _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), offline = false) }
                     attempt = 6
                 } else {
                     if (e.status == 0) {

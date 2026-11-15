@@ -51,8 +51,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -244,26 +247,29 @@ private fun Loading(message: String?) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CircularProgressIndicator()
-        Text(message ?: "Looking for familycal.local…", modifier = Modifier.padding(top = 16.dp))
+        Text(message ?: "Looking for the calendar server…", modifier = Modifier.padding(top = 16.dp))
     }
 }
 
 @Composable
 private fun AddressScreen(state: PhoneState, vm: PhoneViewModel, onScan: () -> Unit) {
-    var address by remember { mutableStateOf("") }
+    var address by remember(state.origin) { mutableStateOf(state.origin.orEmpty()) }
+    val submit = { vm.connect(address.ifBlank { "familycal.local" }) }
     SetupColumn(state.message) {
         Text("Connect to your calendar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Same Wi-Fi as the wall, or Tailscale or WireGuard. Mantel does not need a port forward.")
-        Text("The first try is familycal.local:8080. A bare address uses port 8080.")
+        Text("Same Wi-Fi as the calendar, or Tailscale or WireGuard. Mantel does not need a port forward.")
+        Text("The first try is familycal.local:8080. A bare address uses port 8080. A saved address is tried before that.")
         OutlinedTextField(
             value = address,
             onValueChange = { address = it },
             modifier = Modifier.fillMaxWidth().touchTarget(),
-            placeholder = { Text("familycal.local") },
+            placeholder = { Text("192.168.1.20") },
             singleLine = true,
-            label = { Text("Server") },
+            label = { Text("Calendar server") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
         )
-        Button(onClick = { vm.connect(address.ifBlank { "familycal.local" }) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
+        Button(onClick = submit, modifier = Modifier.fillMaxWidth().touchTarget()) {
             Text("Connect")
         }
         OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth().touchTarget()) {

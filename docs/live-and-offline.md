@@ -97,4 +97,4 @@ server's events are what get drawn.
 
 The TV keeps the same snapshot in its app files and shows the same offline
 line. A chore check, a reward redeem and a list tick made while it cannot
-reach the Pi are replayed with the same `request_id` once it can.
+reach the server are replayed with the same `request_id` once it can.

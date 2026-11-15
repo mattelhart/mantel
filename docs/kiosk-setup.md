@@ -25,8 +25,9 @@ The best option for a 24–32" display. No battery to swell, and you can turn th
 properly.
 
 **A Pi 4 or Pi 5 is recommended.** A Pi 3 works but is sluggish. You can run the container on
-the Pi itself, or run it on a NAS/server elsewhere and let the Pi be a dumb browser — the
-second option is lighter and means an SD card failure costs you nothing.
+the Pi itself, or run it on a NAS, a Windows PC, or another server and let the Pi be a dumb
+browser — the second option is lighter and means an SD card failure costs you nothing. Docker
+Desktop on Windows is [windows-server.md](windows-server.md).
 
 ### 1. Chromium in kiosk mode
 

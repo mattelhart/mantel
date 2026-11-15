@@ -58,7 +58,7 @@ IDs, and everyone's calendars sit side by side on the same wall.
 | 🔄 **Updates itself**       | Wall tablets hard-reload on their own when you deploy; nobody hunts for a refresh button |
 | 🔌 **Works offline**        | Keeps the last calendar, chores and rewards, and replays chore taps when the link returns |
 | 🖼️ **Photo screensaver**    | With burn-in protection and an overnight blackout window                                 |
-| 🍓 **Runs on a Pi**         | Multi-architecture images for `amd64` and `arm64`                                        |
+| 🍓 **Runs at home**         | Docker on a PC or a Pi. Images for `amd64` and `arm64`                                   |
 | 🤖 **Everything is an API** | Documented for humans *and* for AI agents                                                |
 
 ---
@@ -261,8 +261,12 @@ See [docs/sharing-and-home-assistant.md](docs/sharing-and-home-assistant.md).
 The image is built for `linux/amd64` and `linux/arm64`, so a Pi 4 or Pi 5 runs the same tag as a
 desktop, and `./run.sh` works unchanged.
 
-You can also keep the Pi dumb: run the container on a NAS or server and let the Pi be nothing but
-a browser pointed at it. That's lighter, and an SD card failure then costs you nothing.
+You can also keep the Pi dumb: run the container on a NAS, a Windows PC, or another server and
+let the Pi be nothing but a browser pointed at it. That's lighter, and an SD card failure then
+costs you nothing. A Windows PC with Docker Desktop is covered in
+[docs/windows-server.md](docs/windows-server.md): port 8080, the firewall limited to the Private
+profile and the local subnet, and no port forward. Phones away from home use Tailscale or
+WireGuard.
 
 To build the multi-architecture image yourself:
 

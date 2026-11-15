@@ -2,6 +2,8 @@
 
 A window around the calendar you already run. The app does not contain a second copy of the interface. It opens the Mantel server in WebView2, so pairing, live updates, and offline mode are the web app's.
 
+To run the server itself on this PC, see [windows-server.md](windows-server.md). This page is only the window.
+
 Windows 11 already includes WebView2. The installer is current-user only: it does not ask for an administrator.
 
 ## First launch
@@ -10,7 +12,7 @@ The address starts as `http://localhost:8080`, which is this PC's Docker contain
 
 A bare address such as `10.0.15.178` is tried on port 8080. `https://` keeps the port you typed. The next launch opens the saved address directly, including when the server is down, so the web app can show its last calendar.
 
-To point it at a Raspberry Pi later: **File → Change server…**, enter that machine's address, and test again.
+To point it at another machine later: **File → Change server…**, enter that machine's address, and test again.
 
 ## Pairing
 
