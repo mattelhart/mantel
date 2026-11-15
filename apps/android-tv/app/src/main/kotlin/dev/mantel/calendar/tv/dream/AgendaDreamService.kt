@@ -42,7 +42,7 @@ class AgendaDreamService : DreamService() {
             val client = MantelClient(CIO.create(), { origin }, { saved.token })
             try {
                 if (!client.reachable(origin)) {
-                    root.addView(text("Can't reach the calendar", 24f))
+                    root.addView(text("Can't reach the calendar server", 24f))
                     return@launch
                 }
                 val settings = client.settings()
@@ -56,7 +56,7 @@ class AgendaDreamService : DreamService() {
                     root.addView(text("${event.title}   ${formatWhen(event, zone, settings.timeFormat24h)}", 28f))
                 }
             } catch (_: Exception) {
-                root.addView(text("Can't reach the calendar", 24f))
+                root.addView(text("Can't reach the calendar server", 24f))
             } finally {
                 client.close()
             }

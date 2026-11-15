@@ -1,5 +1,6 @@
 package dev.mantel.calendar.core
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -11,7 +12,7 @@ import java.time.ZoneId
 
 class ServerAddressTest {
     @Test
-    fun bareIpGetsThePiPort() {
+    fun bareIpUsesTheServerPort() {
         assertEquals("http://192.168.1.20:8080", normalizeServer("192.168.1.20"))
         assertEquals("http://192.168.1.20:9090", normalizeServer("192.168.1.20:9090"))
     }
@@ -37,6 +38,127 @@ class ServerAddressTest {
             discoveryCandidates("10.0.0.8"),
         )
         assertEquals(listOf(FAMILYCAL_ORIGIN), discoveryCandidates(null))
+        assertEquals(listOf(FAMILYCAL_ORIGIN), discoveryCandidates("http://familycal.local:8080"))
+        assertEquals(listOf(FAMILYCAL_ORIGIN), discoveryCandidates("not a url %%"))
+    }
+
+    @Test
+    fun aSavedAddressIsProbedTwiceBeforeTheShortHostnameGuess() {
+        val steps = probeSchedule("10.0.0.8")
+        assertEquals(listOf("http://10.0.0.8:8080", "http://10.0.0.8:8080", FAMILYCAL_ORIGIN), steps.map { it.origin })
+        assertTrue(steps[0].saved && steps[1].saved)
+        assertFalse(steps[2].saved)
+        assertEquals(SAVED_PROBE_TIMEOUT_MS, steps[0].timeoutMs)
+        assertEquals(DISCOVERY_TIMEOUT_MS, steps[2].timeoutMs)
+        assertTrue("familycal.local should give up before the saved address does", DISCOVERY_TIMEOUT_MS < SAVED_PROBE_TIMEOUT_MS)
+    }
+
+    @Test
+    fun theSavedHostnameIsNotProbedAgainAsDiscovery() {
+        val steps = probeSchedule("familycal.local")
+        assertEquals(SAVED_PROBE_ATTEMPTS, steps.size)
+        assertTrue(steps.all { it.origin == FAMILYCAL_ORIGIN && it.saved && it.timeoutMs == SAVED_PROBE_TIMEOUT_MS })
+    }
+
+    @Test
+    fun firstReachableReturnsTheSavedAddressWithoutTryingTheHostname() = runBlocking {
+        val seen = mutableListOf<String>()
+        val found = firstReachable(probeSchedule("10.1.1.1"), probe = { origin, _ ->
+            seen += origin
+            origin.contains("10.1.1.1")
+        })
+        assertEquals("http://10.1.1.1:8080", found)
+        assertEquals(listOf("http://10.1.1.1:8080"), seen)
+    }
+
+    @Test
+    fun aDeadSavedAddressWaitsOnceThenTriesFamilycalQuickly() = runBlocking {
+        val pauses = mutableListOf<Long>()
+        val seen = mutableListOf<Pair<String, Long>>()
+        val found = firstReachable(
+            probeSchedule("10.1.1.1"),
+            probe = { origin, timeoutMs ->
+                seen += origin to timeoutMs
+                origin == FAMILYCAL_ORIGIN
+            },
+            pause = { pauses += it },
+        )
+        assertEquals(FAMILYCAL_ORIGIN, found)
+        assertEquals(
+            listOf(
+                "http://10.1.1.1:8080" to SAVED_PROBE_TIMEOUT_MS,
+                "http://10.1.1.1:8080" to SAVED_PROBE_TIMEOUT_MS,
+                FAMILYCAL_ORIGIN to DISCOVERY_TIMEOUT_MS,
+            ),
+            seen,
+        )
+        assertEquals(listOf(PROBE_BACKOFF_MS), pauses)
+    }
+
+    @Test
+    fun nothingReachableLeavesTheSavedAddressToPrefill() = runBlocking {
+        val found = firstReachable(probeSchedule("192.168.1.20"), probe = { _, _ -> false })
+        assertNull(found)
+        assertEquals("http://192.168.1.20:8080", savedAddressPrefill("192.168.1.20"))
+        assertEquals("", savedAddressPrefill(null))
+        assertEquals("", savedAddressPrefill("   "))
+        val missed = discoveryMissMessage("192.168.1.20")
+        assertTrue(missed.contains("saved"))
+        assertFalse(missed.contains("Pi"))
+        val fresh = discoveryMissMessage(null)
+        assertTrue(fresh.contains("familycal.local"))
+        assertFalse(fresh.contains("Pi"))
+    }
+
+    @Test
+    fun aPublicAddressIsSkippedSoTheHostnameCanStillAnswer() = runBlocking {
+        val seen = mutableListOf<String>()
+        val found = firstReachable(
+            probeSchedule("8.8.8.8"),
+            probe = { origin, _ ->
+                seen += origin
+                true
+            },
+            allow = ::cleartextPermitted,
+        )
+        assertEquals(FAMILYCAL_ORIGIN, found)
+        assertEquals(listOf(FAMILYCAL_ORIGIN), seen)
+    }
+
+    @Test
+    fun anIpPrefersTheNumericKeypadAndANameDoesNot() {
+        assertTrue(prefersNumericKeypad(""))
+        assertTrue(prefersNumericKeypad("192.168.1.20"))
+        assertTrue(prefersNumericKeypad("http://10.0.0.8:8080"))
+        assertFalse(prefersNumericKeypad("familycal.local"))
+        assertFalse(prefersNumericKeypad("http://familycal.local:8080"))
+    }
+
+    @Test
+    fun anUnreachableServerNamesTheAddress() {
+        val text = unreachableMessage("http://192.168.1.20:8080")
+        assertTrue(text.contains("192.168.1.20"))
+        assertTrue(text.contains("calendar server"))
+        assertFalse(text.contains("Pi"))
+        val down = ServerProbe.Down.failureMessage("http://10.0.0.8:8080")
+        assertTrue(down!!.contains("10.0.0.8"))
+        val sick = ServerProbe.Unhealthy(503).failureMessage("http://10.0.0.8:8080")
+        assertTrue(sick!!.contains("503"))
+    }
+
+    @Test
+    fun anExpiredPairingCodeIsToldApartFromARevokedDevice() {
+        val expired = pairingFailureMessage(401, "That pairing code is wrong or has expired.")
+        assertTrue(expired.contains("expired"))
+        val bare = pairingFailureMessage(401, "This API needs a device token.")
+        assertTrue(bare.contains("expired") || bare.contains("already used"))
+        assertEquals(
+            "Too many pairing attempts. Wait a few minutes and try again.",
+            pairingFailureMessage(429, "  "),
+        )
+        val revoked = revokedDeviceMessage()
+        assertTrue(revoked.contains("no longer paired"))
+        assertFalse(revoked.contains("Pi"))
     }
 }
 

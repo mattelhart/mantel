@@ -4,7 +4,7 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
-/** The address the TV should call. A bare IP gets the port the Pi uses. */
+/** The address a screen should call. A bare IP gets port 8080, the server's default. */
 fun normalizeServer(raw: String): String? {
     var text = raw.trim()
     if (text.isEmpty()) return null
@@ -31,12 +31,123 @@ fun normalizeServer(raw: String): String? {
 
 const val FAMILYCAL_ORIGIN = "http://familycal.local:8080"
 
+/** How long a missing familycal.local may stall launch before the address box. */
+const val DISCOVERY_TIMEOUT_MS = 2_000L
+
+/** A saved address is worth waiting for. Wi-Fi on a TV is often late to the first packet. */
+const val SAVED_PROBE_TIMEOUT_MS = 3_000L
+
+const val SAVED_PROBE_ATTEMPTS = 2
+
+/** Gap between the two tries of the same saved address. */
+const val PROBE_BACKOFF_MS = 500L
+
+/** Connect, after someone typed an address, can wait a little longer than discovery. */
+const val CONNECT_TIMEOUT_MS = 4_000L
+
+data class ProbeStep(
+    val origin: String,
+    val timeoutMs: Long,
+    val saved: Boolean,
+)
+
+/**
+ * Launch order. The last address that worked is tried first, twice. familycal.local
+ * is one short guess after that, and it is not added again when it is already the
+ * saved address. A missing name should open the address box, not sit on a spinner.
+ */
+fun probeSchedule(saved: String?): List<ProbeStep> {
+    val normalized = saved?.let(::normalizeServer)
+    val steps = mutableListOf<ProbeStep>()
+    if (normalized != null) {
+        repeat(SAVED_PROBE_ATTEMPTS) {
+            steps += ProbeStep(normalized, SAVED_PROBE_TIMEOUT_MS, saved = true)
+        }
+    }
+    if (normalized != FAMILYCAL_ORIGIN) {
+        steps += ProbeStep(FAMILYCAL_ORIGIN, DISCOVERY_TIMEOUT_MS, saved = false)
+    }
+    return steps
+}
+
 /** What the first launch tries, before anyone types an address. */
-fun discoveryCandidates(saved: String?): List<String> {
-    val out = LinkedHashSet<String>()
-    saved?.let { normalizeServer(it)?.let(out::add) }
-    out.add(FAMILYCAL_ORIGIN)
-    return out.toList()
+fun discoveryCandidates(saved: String?): List<String> =
+    probeSchedule(saved).map { it.origin }.distinct()
+
+/**
+ * Walk [steps] until a probe succeeds. The pause runs only between two tries of
+ * the same address, so a dead familycal.local is not asked to wait out the saved
+ * address's backoff.
+ */
+suspend fun firstReachable(
+    steps: List<ProbeStep>,
+    probe: suspend (origin: String, timeoutMs: Long) -> Boolean,
+    pause: suspend (millis: Long) -> Unit = {},
+    allow: (String) -> Boolean = { true },
+): String? {
+    var previous: String? = null
+    for (step in steps) {
+        if (!allow(step.origin)) continue
+        if (previous == step.origin) pause(PROBE_BACKOFF_MS)
+        previous = step.origin
+        if (probe(step.origin, step.timeoutMs)) return step.origin
+    }
+    return null
+}
+
+/** The address box after discovery misses. Empty when nothing usable was saved. */
+fun savedAddressPrefill(saved: String?): String = saved?.let(::normalizeServer).orEmpty()
+
+fun discoveryMissMessage(saved: String?): String =
+    if (savedAddressPrefill(saved).isEmpty()) {
+        "Couldn't find familycal.local. Enter the calendar server's address."
+    } else {
+        "Couldn't reach the saved calendar server. The last address is filled in below."
+    }
+
+fun unreachableMessage(origin: String): String =
+    "Can't reach $origin. Check that the calendar server is running, and that this device is on the same network or a VPN."
+
+/**
+ * An empty box or an IP is easier from a TV remote's number keys. A hostname
+ * needs letters, so the address screen can offer a full keyboard instead.
+ */
+fun prefersNumericKeypad(raw: String): Boolean {
+    val text = raw.trim()
+        .removePrefix("https://")
+        .removePrefix("http://")
+        .substringBefore('/')
+        .substringBefore('?')
+    if (text.isEmpty()) return true
+    return text.all { it.isDigit() || it == '.' || it == ':' || it == '[' || it == ']' }
+}
+
+fun pairingFailureMessage(status: Int, serverMessage: String?): String {
+    val text = serverMessage?.trim().orEmpty()
+    return when (status) {
+        401 -> when {
+            text.contains("expired", ignoreCase = true) || text.contains("wrong", ignoreCase = true) -> text
+            else -> "That pairing code has expired or was already used. On the wall, open Settings → Devices and show a new code."
+        }
+        429 -> text.ifEmpty { "Too many pairing attempts. Wait a few minutes and try again." }
+        0 -> text.ifEmpty { unreachableMessage("the calendar server") }
+        else -> text.ifEmpty { "Could not pair with the calendar server." }
+    }
+}
+
+fun revokedDeviceMessage(): String =
+    "This device is no longer paired. On the wall, open Settings → Devices and pair it again."
+
+sealed class ServerProbe {
+    data object Up : ServerProbe()
+    data object Down : ServerProbe()
+    data class Unhealthy(val status: Int) : ServerProbe()
+
+    fun failureMessage(origin: String): String? = when (this) {
+        Up -> null
+        Down -> unreachableMessage(origin)
+        is Unhealthy -> "The calendar server at $origin answered, but it is not ready (HTTP $status)."
+    }
 }
 
 /**

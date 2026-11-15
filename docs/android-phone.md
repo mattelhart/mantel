@@ -22,7 +22,7 @@ Without a computer: copy `phone-debug.apk` onto the phone and open it. Android w
 
 The phone reaches Mantel over the home Wi-Fi, or over Tailscale or WireGuard. Do not port-forward the server. The app refuses cleartext HTTP to a public IP. It allows cleartext to private addresses (the LAN, and WireGuard's `10.x`), to Tailscale's `100.64.0.0/10` range, and to names such as `familycal.local` or a MagicDNS hostname. HTTPS is allowed anywhere.
 
-1. First launch tries `http://familycal.local:8080`. That name is the Pi's mDNS hostname, not something Mantel advertises. If it does not answer, type the address. A bare address such as `192.168.1.20` is tried on port 8080.
+1. First launch tries the last address that worked, then `http://familycal.local:8080`. That name is an mDNS hostname, not something Mantel advertises, and a Windows PC running Docker Desktop does not publish it. The hostname check uses a short timeout. If it does not answer, the address box opens with the saved address filled in. A bare address such as `192.168.1.20` is tried on port 8080. The server can be a Raspberry Pi or any other machine on the LAN. See [windows-server.md](windows-server.md) when that machine is a Windows PC.
 2. On the home LAN, or on a WireGuard address, `AUTH_MODE=lan` (the default) needs no code.
 3. Tailscale addresses are not private. Add `AUTH_TRUSTED_CIDRS=100.64.0.0/10` if those phones should skip pairing. Otherwise pair once.
 4. When the server asks for a token, on the wall open **Settings → Devices → Pair a phone**. Scan the QR, or type the 8-character code. The QR is a `mantel://pair` link carrying the server address and the code. The code is single use and expires after 10 minutes. Dashes and case do not matter.

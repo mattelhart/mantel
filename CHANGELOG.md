@@ -25,6 +25,12 @@ they cannot write back.
 
 ## Unreleased
 
+**The TV and phone apps ask for the calendar server.** The last address that
+worked is tried first. `familycal.local` gives up quickly, and the address box
+comes back with that address filled in. A TV remote can type an IP from the
+number keys. Notes for running the server on a Windows PC with Docker Desktop
+are in [docs/windows-server.md](docs/windows-server.md).
+
 **Screens hear about a change within a second.** `GET /api/live` is a
 Server-Sent Events stream. A commit — including a Google or iCloud pull —
 names what changed, and open browsers and the TV app refetch that. Polling

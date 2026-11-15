@@ -167,7 +167,8 @@ pairing codes that are still on screen, which expire in ten minutes anyway.
 ## Phones away from home
 
 Keep the server on a machine that stays on: the Pi, or a PC that does not sleep
-while anyone might look at the wall. The database stays on that machine's disk.
+while anyone might look at the wall. Docker Desktop on a Windows PC is
+[windows-server.md](windows-server.md). The database stays on that machine's disk.
 Do not put `family.db` in a live sync folder.
 
 A phone on WireGuard is already on a private address (`10.x`, `192.168.x`, or

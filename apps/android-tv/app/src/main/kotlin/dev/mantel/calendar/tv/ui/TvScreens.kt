@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,6 +42,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mantel.calendar.core.CalEvent
 import dev.mantel.calendar.core.ViewKind
+import dev.mantel.calendar.core.prefersNumericKeypad
 import dev.mantel.calendar.core.dayLabel
 import dev.mantel.calendar.core.endMinutes
 import dev.mantel.calendar.core.eventsOn
@@ -75,7 +80,7 @@ fun MantelTvApp(vm: TvViewModel) {
         Box(Modifier.fillMaxSize().background(Paper).padding(36.dp)) {
             when (state.phase) {
                 Phase.Loading -> BigTitle(state.message ?: "Looking for the calendar…")
-                Phase.Address -> AddressScreen(state.message, vm::connect)
+                Phase.Address -> AddressScreen(state.message, state.origin, vm::connect)
                 Phase.Pair -> PairScreen(state.message, vm::pair)
                 Phase.Ready -> Home(state, vm)
             }
@@ -84,13 +89,46 @@ fun MantelTvApp(vm: TvViewModel) {
 }
 
 @Composable
-private fun AddressScreen(message: String?, onConnect: (String) -> Unit) {
-    var address by remember { mutableStateOf("") }
+private fun AddressScreen(message: String?, prefill: String?, onConnect: (String) -> Unit) {
+    var address by remember(prefill) { mutableStateOf(prefill.orEmpty()) }
+    var numeric by remember(prefill) { mutableStateOf(prefersNumericKeypad(prefill.orEmpty())) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(prefill) { runCatching { focus.requestFocus() } }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BigTitle("Where's the calendar?")
-        Text("Try familycal.local didn't answer. Type the Pi's address.", color = Ink, fontSize = 22.sp)
+        Text(
+            "Enter the calendar server's address. A bare address uses port 8080.",
+            color = Ink,
+            fontSize = 22.sp,
+        )
+        Text(
+            "Number keys on the remote type an IP. The number pad has the dot. Select Type a name for a hostname.",
+            color = Ink,
+            fontSize = 20.sp,
+        )
         if (message != null) Text(message, color = Coral, fontSize = 20.sp)
-        SunnyField(address, { address = it }, "192.168.1.20", Modifier.fillMaxWidth())
+        SunnyField(
+            address,
+            { address = it },
+            "Server address",
+            Modifier.fillMaxWidth().focusRequester(focus),
+            keyboardType = if (numeric) KeyboardType.Decimal else KeyboardType.Uri,
+            onSubmit = { onConnect(address) },
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SunnyButton(onClick = { numeric = true }, container = if (numeric) Sun else Card) {
+                Text("IP address", modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+            SunnyButton(
+                onClick = {
+                    numeric = false
+                    runCatching { focus.requestFocus() }
+                },
+                container = if (numeric) Card else Sun,
+            ) {
+                Text("Type a name", modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        }
         SunnyButton(onClick = { onConnect(address) }) {
             Text("Connect", modifier = Modifier.padding(18.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }

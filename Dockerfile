@@ -39,11 +39,14 @@ RUN pip install --no-cache-dir . && mkdir -p /data
 COPY --from=frontend /build/dist /app/static
 COPY docs /app/docs
 COPY VERSION /app/VERSION
+COPY docker/healthcheck.py /app/healthcheck.py
 
 EXPOSE 8080
 VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/api/health').status==200 else 1)"
+# The script retries a few times. Docker's own --retries is a second backoff
+# across the interval, for a server that is down rather than mid-accept.
+HEALTHCHECK --interval=30s --timeout=8s --start-period=15s --retries=3 \
+  CMD ["python", "/app/healthcheck.py"]
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

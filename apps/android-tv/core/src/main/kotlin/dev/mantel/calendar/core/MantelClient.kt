@@ -42,11 +42,31 @@ class MantelClient(
         }
     }
 
-    suspend fun reachable(base: String): Boolean = try {
-        val response = http.get("$base/api/health")
-        response.status.value in 200..299
-    } catch (_: Exception) {
-        false
+    suspend fun reachable(base: String, timeoutMs: Long = CONNECT_TIMEOUT_MS): Boolean =
+        probeServer(base, timeoutMs) is ServerProbe.Up
+
+    /**
+     * A short timeout belongs on discovery. The client default is ten seconds to
+     * connect, which is how a missing familycal.local used to hold the spinner.
+     * Cancellation must still propagate, or leaving the screen would look like
+     * "the server is down".
+     */
+    suspend fun probeServer(base: String, timeoutMs: Long = CONNECT_TIMEOUT_MS): ServerProbe {
+        try {
+            val response = http.get("$base/api/health") {
+                timeout {
+                    connectTimeoutMillis = timeoutMs
+                    requestTimeoutMillis = timeoutMs
+                    socketTimeoutMillis = timeoutMs
+                }
+            }
+            val status = response.status.value
+            runCatching { response.bodyAsText() }
+            return if (status in 200..299) ServerProbe.Up else ServerProbe.Unhealthy(status)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            return ServerProbe.Down
+        }
     }
 
     suspend fun authStatus(): AuthStatus = get("/auth/status")
@@ -57,6 +77,7 @@ class MantelClient(
             put("code", code.trim())
             put("name", name.trim().ifEmpty { "Living room TV" })
         },
+        authenticate = false,
     )
 
     suspend fun settings(): HouseholdSettings = get("/settings")
@@ -208,24 +229,33 @@ class MantelClient(
                 auth()
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw unreachable(e)
         }
         return read(response)
     }
 
-    private suspend inline fun <reified T> post(path: String, body: JsonObject): T =
-        send(HttpMethod.Post, path, body)
+    private suspend inline fun <reified T> post(path: String, body: JsonObject, authenticate: Boolean = true): T =
+        send(HttpMethod.Post, path, body, authenticate)
 
-    private suspend inline fun <reified T> send(method: HttpMethod, path: String, body: JsonObject?): T {
+    private suspend inline fun <reified T> send(
+        method: HttpMethod,
+        path: String,
+        body: JsonObject?,
+        authenticate: Boolean = true,
+    ): T {
         val response = try {
             http.request(url(path)) {
                 this.method = method
-                auth()
+                // Pairing is how a revoked token gets replaced. Sending the old
+                // bearer would only confuse a proxy, and the route does not want it.
+                if (authenticate) auth()
                 if (body != null) {
                     setBody(TextContent(body.toString(), ContentType.Application.Json))
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw unreachable(e)
         }
         if (response.status.value == 204) {
@@ -256,6 +286,7 @@ class MantelClient(
 
     private fun unreachable(error: Exception): MantelException {
         if (error is MantelException) return error
-        return MantelException("unreachable", "Can't reach the calendar", 0)
+        val target = origin().ifBlank { "the calendar server" }
+        return MantelException("unreachable", unreachableMessage(target), 0)
     }
 }
