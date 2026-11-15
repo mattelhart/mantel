@@ -398,7 +398,8 @@ which needs no API key.
 **Does it work on a phone?**
 Yes. The layout is responsive and installs to a home screen as a PWA. There is also a native
 Android companion — today, month, chores, rewards, and lists — described in
-[docs/android-phone.md](docs/android-phone.md).
+[docs/android-phone.md](docs/android-phone.md). On the Windows PC that runs the server, Mantel
+Calendar is a window around this same interface: [docs/windows.md](docs/windows.md).
 
 **Can two people edit at the same time?**
 Yes. SQLite is in WAL mode with a busy timeout, and there are tests covering concurrent writes
@@ -430,6 +431,9 @@ Two apps share one Kotlin core in `apps/android-tv`:
 cd apps/android-tv
 ./gradlew assembleDebug test
 ```
+
+**Mantel Calendar** for Windows is a WebView2 window around this web app. Install notes:
+[docs/windows.md](docs/windows.md).
 
 ## Development
 
