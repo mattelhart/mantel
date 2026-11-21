@@ -39,7 +39,7 @@ interface Props {
 const EXTEND_SCREENS = 3
 
 /**
- * Week and 3 Day: the day columns are one horizontal strip that scrolls forever. One
+ * Week: the day columns are one horizontal strip that scrolls forever. One
  * scroller owns both axes so the header, all-day band and hour gutter can be `sticky`
  * against it -- they then move with the columns on one axis and stay put on the other,
  * with no scroll syncing between separate elements to drift.

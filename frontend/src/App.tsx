@@ -17,12 +17,10 @@ import { lastSyncedLabel } from './offline/board'
 import { useLastSynced } from './offline/useLastSynced'
 import { applyTheme, isThemeId } from './theme'
 
-/** The four calendar views, each its own destination. A phone shows one entry for
- *  all of them instead — seven items plus a version badge do not fit across 390px,
- *  and the last one (Settings) was falling off the end. */
+/** The calendar views, each its own destination. A phone shows one entry for all of
+ *  them instead — so many items plus a version badge do not fit across 390px, and the
+ *  last one (Settings) was falling off the end. */
 const CALENDAR_VIEWS = [
-  { to: '/calendar/today', label: 'Today' },
-  { to: '/calendar/3day', label: '3 Day' },
   { to: '/calendar/week', label: 'Week' },
   { to: '/calendar/month', label: 'Month' },
 ]
@@ -106,14 +104,13 @@ export function App() {
           <AiryNav onCalendar={onCalendar} />
         ) : (
           <>
-            {/* One entry on a phone, four on anything larger. Both are rendered and the
+            {/* One entry on a phone, two on anything larger. Both are rendered and the
                 stylesheet picks -- a JS breakpoint would disagree with the CSS one that
                 already decides whether this nav is a side rail or a bottom bar. */}
             <NavLink
-              to="/calendar/today"
+              to="/calendar/week"
               className="navbtn navbtn--calendar"
-              // Stays lit on every calendar view, not just Today, since it is now the
-              // way back to all four.
+              // Stays lit on every calendar view, since it is the way back to both.
               aria-current={onCalendar ? 'page' : undefined}
             >
               <span>Calendar</span>
