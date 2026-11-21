@@ -9,7 +9,7 @@ import {
   startOfMonth,
 } from 'date-fns'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useEvents, useSettings, useUpdateEvent, useUsers } from '../../api/hooks'
 import type { CalendarEvent } from '../../api/types'
@@ -18,6 +18,7 @@ import { EventModal } from '../../components/EventModal'
 import { usePersonFilter } from '../../hooks/usePersonFilter'
 import { useSwipe } from '../../hooks/useSwipe'
 import { MonthView, type MonthScrollRequest } from './MonthView'
+import { WeekCardsView } from './WeekCardsView'
 import { ScheduleView } from './ScheduleView'
 import { TimeGridView } from './TimeGridView'
 import { TimeStripView, type StripScrollRequest } from './TimeStripView'
@@ -68,13 +69,21 @@ export function CalendarPage() {
   const { view } = useParams()
   const navigate = useNavigate()
   const airy = useAiryTheme()
+  const [weekLayout, setWeekLayout] = useState<'cards' | 'hours'>('cards')
   const qc = useQueryClient()
   const updateEvent = useUpdateEvent()
   const [moveError, setMoveError] = useState<string | null>(null)
   const { data: settings } = useSettings()
   const { data: users = [] } = useUsers()
   const { toggle, showEveryone, isVisible, anyHidden } = usePersonFilter()
-  const [anchor, setAnchor] = useState(() => new Date())
+  const [anchor, setAnchor] = useState(() => {
+    const saved = sessionStorage.getItem('mantel.calendar.anchor')
+    const date = saved && view !== 'today' ? new Date(saved) : new Date()
+    return Number.isNaN(date.getTime()) ? new Date() : date
+  })
+  useEffect(() => {
+    sessionStorage.setItem('mantel.calendar.anchor', anchor.toISOString())
+  }, [anchor])
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [creatingAt, setCreatingAt] = useState<Date | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -96,7 +105,8 @@ export function CalendarPage() {
   // Week and 3 Day scroll through a window of days the same way. `stripStart` is the first
   // fully visible day: it names the toolbar title and picks what to fetch, while `anchor`
   // only follows it so the other views open somewhere sensible.
-  const stripKind = isStripKind(kind) ? kind : null
+  const compactWeek = airy && kind === 'week' && weekLayout === 'cards'
+  const stripKind = isStripKind(kind) && !compactWeek ? kind : null
   const [stripOpen, setStripOpen] = useState(() => ({
     epoch: 0,
     initial: stripStartFor(stripKind ?? 'week', anchor, weekStartsOn),
@@ -104,9 +114,11 @@ export function CalendarPage() {
   const [stripWin, setStripWin] = useState<DayWindow>(() => dayWindow(stripOpen.initial))
   const [stripStart, setStripStart] = useState(stripOpen.initial)
   const [stripReq, setStripReq] = useState<StripScrollRequest | null>(null)
+  const [prevCompact, setPrevCompact] = useState(compactWeek)
   const [prevKind, setPrevKind] = useState(kind)
   const [prevWeekStart, setPrevWeekStart] = useState(weekStartsOn)
-  if (kind !== prevKind || weekStartsOn !== prevWeekStart) {
+  if (kind !== prevKind || weekStartsOn !== prevWeekStart || compactWeek !== prevCompact) {
+    setPrevCompact(compactWeek)
     setPrevKind(kind)
     setPrevWeekStart(weekStartsOn)
     // Coming back to month view from Week/Day: open on wherever the anchor is now.
@@ -336,9 +348,19 @@ export function CalendarPage() {
         ))}
       </div>
 
+      {airy && kind === 'week' && (
+        <div className="week-layout" role="group" aria-label="Week layout">
+          <button aria-pressed={weekLayout === 'cards'} onClick={() => setWeekLayout('cards')}>Compact</button>
+          <button aria-pressed={weekLayout === 'hours'} onClick={() => setWeekLayout('hours')}>Hourly</button>
+        </div>
+      )}
+
       {/* Week and 3 Day scroll natively, so the swipe-to-page handler would only fight it. */}
-      <div className="calpage__body" {...(stripKind ? {} : swipe)}>
-        {kind === 'month' ? (
+      <div className="calpage__body" {...(stripKind || compactWeek ? {} : swipe)}>
+        {compactWeek ? (
+          <WeekCardsView days={range.days} events={events} use24h={settings?.time_format_24h ?? false}
+            onSelectEvent={openEvent} onSelectSlot={openSlot} />
+        ) : kind === 'month' ? (
           <MonthView
             key={monthOpen.epoch}
             window={monthWin}

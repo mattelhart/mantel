@@ -68,6 +68,7 @@ export function AiryBar({
                 onClick={() => toggle(u.id)}
               >
                 <span aria-hidden>{u.avatar_emoji || letter}</span>
+                <span className="airy-avatar__name">{u.name}</span>
               </button>
             )
           })}
@@ -83,9 +84,12 @@ export function AiryBar({
 }
 
 const NAV = [
+  { to: '/dashboard', label: 'Today', icon: 'calendar' },
   { to: '/chores', label: 'Chores', icon: 'chores' },
   { to: '/lists', label: 'Lists', icon: 'lists' },
   { to: '/photos', label: 'Photos', icon: 'photos' },
+  { to: '/meals', label: 'Meals', icon: 'lists' },
+  { to: '/show-on-tv', label: 'Show on TV', icon: 'calendar' },
 ] as const
 
 export function AiryNav({ onCalendar }: { onCalendar: boolean }) {

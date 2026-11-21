@@ -97,6 +97,25 @@ class MantelClient(
         send<Unit>(HttpMethod.Delete, "/events/$id", null)
     }
 
+    suspend fun mealPlan(start: String, end: String): Map<String, String> =
+        get("/meals?start=$start&end=$end")
+
+    suspend fun saveMeal(day: String, meal: String, title: String): Unit {
+        post<JsonObject>("/meals", buildJsonObject { put("day", day); put("meal", meal); put("title", title) })
+    }
+
+    suspend fun pollDisplay(id: String, name: String): String? =
+        post<JsonObject>("/displays/$id/poll", buildJsonObject { put("name", name) })["destination"]
+            ?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+            ?.takeUnless { it is kotlinx.serialization.json.JsonNull }
+            ?.content
+
+    suspend fun displays(): List<DisplayTarget> = get("/displays")
+
+    suspend fun showOnDisplay(id: String, destination: String): Unit {
+        post<JsonObject>("/displays/$id/show", buildJsonObject { put("destination", destination) })
+    }
+
     suspend fun lists(): List<SharedList> = get("/lists")
 
     suspend fun setItemChecked(listId: Int, itemId: Int, checked: Boolean): ListItem =
@@ -114,6 +133,25 @@ class MantelClient(
 
     suspend fun clearChecked(listId: Int): SharedList =
         post("/lists/$listId/clear-checked", buildJsonObject {})
+
+    suspend fun renameList(id: Int, name: String): SharedList =
+        send(HttpMethod.Patch, "/lists/$id", buildJsonObject { put("name", name) })
+
+    suspend fun deleteList(id: Int) {
+        send<Unit>(HttpMethod.Delete, "/lists/$id", null)
+    }
+
+    suspend fun renameItem(listId: Int, itemId: Int, text: String): ListItem =
+        send(HttpMethod.Patch, "/lists/$listId/items/$itemId", buildJsonObject { put("text", text) })
+
+    suspend fun chores(): List<ChoreDefinition> = get("/chores")
+
+    suspend fun saveChore(id: Int?, body: JsonObject): ChoreDefinition =
+        if (id == null) post("/chores", body) else send(HttpMethod.Patch, "/chores/$id", body)
+
+    suspend fun deleteChore(id: Int) {
+        send<Unit>(HttpMethod.Delete, "/chores/$id", null)
+    }
 
     suspend fun choreBoard(on: String? = null): ChoreBoard =
         get("/chores/board", if (on == null) emptyMap() else mapOf("on" to on))

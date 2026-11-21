@@ -78,7 +78,7 @@ export function DashboardPage() {
   return (
     <div className="dash">
       <header className="dash__bar">
-        <h1 className="dash__title">Dashboard</h1>
+        <h1 className="dash__title">Today</h1>
         <button className="iconbtn" onClick={() => setAdding(true)}>
           + Widget
         </button>
@@ -91,14 +91,17 @@ export function DashboardPage() {
         </button>
       </header>
 
-      {widgets.length === 0 && (
-        <div className="placeholder">
-          <div style={{ fontSize: 'var(--font-lg)' }}>Your dashboard is empty</div>
-          <div style={{ fontSize: 'var(--font-sm)' }}>
-            Tap “+ Widget” to build the wall however you like.
-          </div>
-        </div>
-      )}
+      <div className="dash__grid">
+        {(['today_agenda', 'chores'] as const).map((type) => {
+          const widget = WIDGETS[type]
+          return (
+            <section key={type} className="widget" data-size="large">
+              <widget.component config={{}} onConfigChange={() => {}}
+                onOpenEvent={showEvent} onNewEvent={createAt} />
+            </section>
+          )
+        })}
+      </div>
 
       <div className="dash__grid">
         {widgets.map((w, i) => {

@@ -21,7 +21,11 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +37,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,24 +77,24 @@ import dev.mantel.calendar.phone.ThemeChoice
 internal fun mantelLight() = lightColorScheme(
     primary = Ember,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE3C2),
+    primaryContainer = Color(0xFFDCEFF1),
     onPrimaryContainer = Ink,
     secondary = Ember,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFE3C2),
+    secondaryContainer = Color(0xFFDCEFF1),
     onSecondaryContainer = Ink,
     background = Paper,
     onBackground = Ink,
     surface = Color.White,
     onSurface = Ink,
-    surfaceVariant = Color(0xFFE7E1D8),
+    surfaceVariant = Color(0xFFF0F2F5),
     onSurfaceVariant = Dim,
     outline = Line,
     error = Danger,
     onError = Color.White,
     errorContainer = Color(0xFFF8D4CE),
     onErrorContainer = Color(0xFF6E2B12),
-    tertiaryContainer = Color(0xFFFFE3C2),
+    tertiaryContainer = Color(0xFFDCEFF1),
     onTertiaryContainer = Ink,
 )
 
@@ -127,7 +132,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
     }
     var scanning by remember { mutableStateOf(false) }
     var stack by remember { mutableStateOf(listOf<Page>()) }
-    var tab by remember { mutableStateOf(PhoneTab.Today) }
+    var tab by remember { mutableStateOf(PhoneTab.Home) }
     val lifecycle = LocalLifecycleOwner.current
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -163,9 +168,15 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
             Phase.Ready -> Scaffold(
                 topBar = {
                     TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                        navigationIcon = {
+                            if (stack.isNotEmpty()) {
+                                TextButton(onClick = { stack = stack.dropLast(1) }) { Text("Back") }
+                            }
+                        },
                         title = {
                             Column {
-                                Text(titleFor(tab, stack.lastOrNull()), fontWeight = FontWeight.Bold)
+                                Text(titleFor(tab, stack.lastOrNull()), fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium)
                                 Text(
                                     if (state.offline) state.offlineDetail.ifBlank { "Offline, last synced earlier" } else state.syncedDetail,
                                     style = MaterialTheme.typography.labelMedium,
@@ -184,10 +195,10 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                 },
                 bottomBar = {
                     if (stack.isEmpty()) {
-                        NavigationBar {
-                            PhoneTab.entries.forEach { item ->
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                            listOf(PhoneTab.Home, PhoneTab.Today, PhoneTab.Chores, PhoneTab.Lists).forEach { item ->
                                 NavigationBarItem(
-                                    selected = tab == item,
+                                    selected = tab == item || (item == PhoneTab.Today && tab in listOf(PhoneTab.Week, PhoneTab.Month)),
                                     onClick = {
                                         tab = item
                                         stack = emptyList()
@@ -213,11 +224,20 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                             Text("Dismiss")
                         }
                     }
+                    if (stack.isEmpty() && tab in listOf(PhoneTab.Today, PhoneTab.Week, PhoneTab.Month)) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(PhoneTab.Today, PhoneTab.Week, PhoneTab.Month).forEach { view ->
+                                FilterChip(selected = tab == view, onClick = { tab = view }, label = { Text(if (view == PhoneTab.Today) "Schedule" else view.label()) }, modifier = Modifier.touchTarget())
+                            }
+                        }
+                    }
                     val page = stack.lastOrNull()
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         if (page == null) {
                             when (tab) {
+                                PhoneTab.Home -> FamilyHomeScreen(state, vm, selectTab = { tab = it }, open = { stack = stack + it })
                                 PhoneTab.Today -> TodayScreen(state, vm) { stack = stack + it }
+                                PhoneTab.Week -> WeekScreen(state, vm) { stack = stack + it }
                                 PhoneTab.Month -> MonthScreen(state, vm) { stack = stack + it }
                                 PhoneTab.Chores -> ChoresScreen(state, vm) { stack = stack + it }
                                 PhoneTab.Lists -> ListsScreen(state, vm) { stack = stack + it }
@@ -228,8 +248,12 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                                     stack = stack + Page.Edit(page.event, eventDay(page.event, vm.zone()))
                                 }, onBack = { stack = stack.dropLast(1) })
                                 is Page.Edit -> EditEvent(page.event, page.day, state, vm) { stack = stack.dropLast(1) }
-                                is Page.ListDetail -> ListDetail(page.id, state, vm)
+                                is Page.ListDetail -> ListDetail(page.id, state, vm) { stack = stack.dropLast(1) }
+                                is Page.EditChore -> ChoreEditor(page.chore, state, vm) { stack = stack.dropLast(1) }
+                                Page.AllChores -> AllChoresScreen(state, vm) { stack = stack + it }
                                 Page.Rewards -> RewardsScreen(state, vm)
+                                Page.Meals -> MealsScreen(vm)
+                                Page.ShowOnTv -> ShowOnTvScreen(vm)
                                 Page.Settings -> SettingsScreen(state, vm)
                             }
                         }
@@ -244,20 +268,28 @@ private fun titleFor(tab: PhoneTab, page: Page?): String = when (page) {
     is Page.Event -> "Event"
     is Page.Edit -> if (page.event == null) "New event" else "Edit event"
     is Page.ListDetail -> "List"
+    is Page.EditChore -> if (page.chore == null) "New chore" else "Edit chore"
+    Page.AllChores -> "All chores"
     Page.Rewards -> "Rewards"
+    Page.Meals -> "Meal plan"
+    Page.ShowOnTv -> "Show on TV"
     Page.Settings -> "Settings"
-    null -> tab.label()
+    null -> if (tab == PhoneTab.Home) "Family calendar" else tab.label()
 }
 
 private fun PhoneTab.label(): String = when (this) {
-    PhoneTab.Today -> "Today"
+    PhoneTab.Home -> "Home"
+    PhoneTab.Today -> "Calendar"
+    PhoneTab.Week -> "Week"
     PhoneTab.Month -> "Month"
     PhoneTab.Chores -> "Chores"
     PhoneTab.Lists -> "Lists"
 }
 
 private fun PhoneTab.icon(): ImageVector = when (this) {
+    PhoneTab.Home -> Icons.Filled.Home
     PhoneTab.Today -> Icons.Filled.Today
+    PhoneTab.Week -> Icons.Filled.DateRange
     PhoneTab.Month -> Icons.Filled.CalendarMonth
     PhoneTab.Chores -> Icons.Filled.CheckCircle
     PhoneTab.Lists -> Icons.Filled.Checklist
@@ -342,12 +374,20 @@ private fun PairScreen(state: PhoneState, vm: PhoneViewModel, onScan: () -> Unit
 
 @Composable
 private fun SetupColumn(message: String?, content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        content()
-        if (message != null) Text(message, color = MaterialTheme.colorScheme.error)
+    MaterialTheme(colorScheme = mantelDark()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+        ) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                content()
+                if (message != null) Text(message, color = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 }
 

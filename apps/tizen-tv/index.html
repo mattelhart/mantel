@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, user-scalable=no">
+  <title>Mantel</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main id="setup">
+    <h1>Family calendar</h1>
+    <p>Connect your Samsung TV to Mantel.</p>
+    <form id="connect-form">
+      <label for="server">Calendar server</label>
+      <input id="server" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="http://your-server:8080">
+      <button type="submit">Open calendar</button>
+      <button id="exit" type="button">Exit</button>
+    </form>
+    <p id="status" role="status"></p>
+    <p class="hint">Use arrows to move, Select to open, and Back to return here.<br>Keep your Mantel desktop server running.</p>
+  </main>
+  <iframe id="calendar" title="Mantel family calendar" hidden></iframe>
+  <script src="app.js"></script>
+</body>
+</html>

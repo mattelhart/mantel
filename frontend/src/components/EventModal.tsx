@@ -8,6 +8,7 @@ import { moveNote } from './moveNote'
 import { calendarsForProfile, initialSelection, profilesWithCalendars } from './eventProfiles'
 import { rememberLastTarget } from './lastEventTarget'
 import { DEFAULT_MINUTES, endFor, toLocalInput } from './eventTimes'
+import { useAiryTheme, useEventColor } from './eventColor'
 import { acquireReloadGuard } from '../hooks/useVersionPoll'
 import { type Freq, RecurrencePicker, buildRule, parseRule } from './RecurrencePicker'
 
@@ -28,6 +29,8 @@ function saveError(e: unknown, fallback = 'Could not save the event.'): string {
 export function EventModal({ event, defaultStart, onClose }: Props) {
   const { data: calendars = [] } = useCalendars()
   const { data: users = [] } = useUsers()
+  const airy = useAiryTheme()
+  const fill = useEventColor()
   const create = useCreateEvent()
   const update = useUpdateEvent()
   const remove = useDeleteEvent()
@@ -180,6 +183,22 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
           />
         </label>
 
+        {airy ? (
+          <fieldset className="event-profiles">
+            <legend>Who is this for?</legend>
+            {profiles.map((profile) => (
+              <button key={profile.id ?? 'household'} type="button"
+                aria-pressed={profileId === profile.id} disabled={calendarLocked}
+                style={{ background: fill(users.find((u) => u.id === profile.id)?.color ?? '#cbd5e1') }}
+                onClick={() => {
+                  setProfileId(profile.id)
+                  setCalendarId(calendarsForProfile(choices, profile.id)[0]?.id ?? null)
+                }}>
+                {profile.name}
+              </button>
+            ))}
+          </fieldset>
+        ) : (
         <label className="field">
           <span>Who is this for?</span>
           <select
@@ -200,6 +219,7 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
             ))}
           </select>
         </label>
+        )}
 
         <label className="field">
           <span>Calendar</span>

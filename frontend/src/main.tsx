@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { queryClient } from './api/queryClient'
+import { MealsPage, ShowOnTvPage } from './HouseholdDisplay'
 import { App } from './App'
 import './styles/global.css'
 import './styles/calendar.css'
@@ -26,6 +27,10 @@ import { PhotosPage } from './views/photos/PhotosPage'
 import { SettingsPage } from './views/settings/SettingsPage'
 import { hydrate, watchQueries } from './offline/persist'
 import './styles/airy.css'
+import './styles/tv.css'
+import { installTvNavigation } from './tv/navigation'
+
+installTvNavigation()
 
 const router = createBrowserRouter([
   {
@@ -37,6 +42,8 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/calendar/today" replace /> },
       { path: 'calendar/:view', element: <CalendarPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'meals', element: <MealsPage /> },
+      { path: 'show-on-tv', element: <ShowOnTvPage /> },
       { path: 'lists', element: <ListsPage /> },
       { path: 'chores', element: <ChoresPage /> },
       { path: 'photos', element: <PhotosPage /> },

@@ -731,3 +731,44 @@ html[data-theme='airy'] .move-error {
     color: var(--accent);
   }
 }
+
+/* Compact family week: the full day remains readable without empty hourly rows. */
+.week-layout { display: flex; gap: 6px; padding: 0 18px 10px; }
+.week-layout button, .event-profiles button {
+  min-height: 48px; padding: 10px 18px; border: 2px solid transparent;
+  border-radius: 14px; font: inherit; color: var(--text); cursor: pointer;
+}
+.week-layout button[aria-pressed='true'], .event-profiles button[aria-pressed='true'] {
+  border-color: var(--accent); box-shadow: 0 0 0 2px var(--bg);
+}
+.week-cards { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); height: 100%; overflow: auto; padding: 0 18px 80px; gap: 8px; }
+.week-cards__day { background: #fff; border-radius: 18px; min-width: 0; }
+.week-cards__day[data-today='true'] { background: #f0f5ff; }
+.week-cards__heading { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; color: var(--text-dim); }
+.week-cards__heading strong { display: grid; place-items: center; width: 44px; height: 44px; font-size: 1.5rem; color: var(--text); }
+.week-cards__heading strong[aria-current='date'] { background: var(--accent); color: white; border-radius: 50%; }
+.week-cards__events { display: flex; flex-direction: column; gap: 10px; padding: 8px; }
+.week-cards__event { display: flex; flex-direction: column; text-align: left; gap: 5px; padding: 12px; border: 0; border-left: 4px solid; border-radius: 12px; color: #243047; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.week-cards__event span, .week-cards__event small { font-size: .85em; }
+.week-cards__add { min-height: 48px; background: transparent; border: 1px dashed #c4cedc; border-radius: 12px; color: var(--text-dim); font-size: 1.5rem; cursor: pointer; }
+.week-cards__empty { color: var(--text-dim); text-align: center; font-size: .85em; }
+.event-profiles { border: 0; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.event-profiles legend { margin-bottom: 10px; }
+html[data-theme='airy'] .airy-avatar { width: auto; min-width: 56px; height: auto; min-height: 64px; display: flex; flex-direction: column; padding: 8px 12px; border-radius: 18px; }
+.airy-avatar__name { font-size: .8rem; line-height: 1.2; }
+.week-cards button:focus-visible, .event-profiles button:focus-visible, .week-layout button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+html[data-theme='airy'] .modal__card input, html[data-theme='airy'] .modal__card select { min-height: 52px; }
+
+/* Serif headings and quiet surfaces echo the family display layout. */
+html[data-theme='airy'] .airybar__date,
+html[data-theme='airy'] .calpage__title,
+html[data-theme='airy'] .lists__title,
+html[data-theme='airy'] .chores__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+html[data-theme='airy'] .shell__nav {
+  background: #f7f9fa;
+  box-shadow: none;
+}

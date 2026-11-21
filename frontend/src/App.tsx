@@ -1,3 +1,4 @@
+import { useDisplayReceiver } from './HouseholdDisplay'
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ApiError } from './api/client'
@@ -29,6 +30,8 @@ const CALENDAR_VIEWS = [
 const NAV = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/lists', label: 'Lists' },
+  { to: '/meals', label: 'Meals' },
+  { to: '/show-on-tv', label: 'Show on TV' },
   { to: '/chores', label: 'Chores' },
   { to: '/settings', label: 'Settings' },
 ]
@@ -36,6 +39,7 @@ const NAV = [
 export function App() {
   const settingsQuery = useSettings()
   const settings = settingsQuery.data
+  useDisplayReceiver(settingsQuery.isSuccess)
   const onCalendar = useLocation().pathname.startsWith('/calendar')
 
   // Keeps the app the height of the space actually available, so a phone keyboard

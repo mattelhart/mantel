@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -30,14 +31,14 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Surface
 
 val Ink = Color(0xFF1C2430)
-val Paper = Color(0xFFFFF6E4)
-val Sun = Color(0xFFFFE38A)
-val Coral = Color(0xFFFF7A45)
+val Paper = Color(0xFFFFFFFF)
+val Sun = Color(0xFFDCEFF1)
+val Coral = Color(0xFFBDE2EA)
 val Sky = Color(0xFFD7F0FF)
 val Card = Color.White
 
 /** Text on paper. Coral itself is about 2.4:1 on this paper, so it stays a button fill. */
-val Ember = Color(0xFF8C3A16)
+val Ember = Color(0xFF176B7C)
 val Danger = Color(0xFF9B1C1C)
 val Dim = Color(0xFF3D4A5C)
 val Line = Color(0xFF4E5968)
@@ -80,8 +81,8 @@ fun SunnyButton(
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         border = ClickableSurfaceDefaults.border(
-            border = Border(border = BorderStroke(2.dp, Color(0xFFFFD78A)), shape = Round),
-            focusedBorder = Border(border = BorderStroke(5.dp, Ink), shape = Round),
+            border = Border(border = BorderStroke(2.dp, Color(0xFFE1E6EB)), shape = Round),
+            focusedBorder = Border(border = BorderStroke(4.dp, Color(0xFF1D4ED8)), shape = Round),
         ),
         content = content,
     )
@@ -97,28 +98,33 @@ fun SunnyField(
     onSubmit: (() -> Unit)? = null,
 ) {
     val focus = LocalFocusManager.current
+    val scheme = MaterialTheme.colorScheme
     OutlinedTextField(
         value = value,
         onValueChange = onValue,
         label = { Text(label, fontSize = 18.sp) },
         singleLine = true,
-        textStyle = TextStyle(fontSize = 24.sp, color = Ink, fontWeight = FontWeight.SemiBold),
+        textStyle = TextStyle(fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Ink,
-            unfocusedTextColor = Ink,
-            disabledTextColor = Ink,
-            errorTextColor = Ink,
-            focusedLabelColor = Ember,
-            unfocusedLabelColor = Dim,
-            disabledLabelColor = Dim,
-            errorLabelColor = Danger,
-            focusedPlaceholderColor = Dim,
-            unfocusedPlaceholderColor = Dim,
-            cursorColor = Ember,
-            errorCursorColor = Danger,
-            focusedBorderColor = Ember,
-            unfocusedBorderColor = Line,
-            errorBorderColor = Danger,
+            focusedContainerColor = scheme.surface,
+            unfocusedContainerColor = scheme.surface,
+            disabledContainerColor = scheme.surface,
+            errorContainerColor = scheme.surface,
+            focusedTextColor = scheme.onSurface,
+            unfocusedTextColor = scheme.onSurface,
+            disabledTextColor = scheme.onSurface,
+            errorTextColor = scheme.onSurface,
+            focusedLabelColor = scheme.primary,
+            unfocusedLabelColor = scheme.onSurfaceVariant,
+            disabledLabelColor = scheme.onSurfaceVariant,
+            errorLabelColor = scheme.error,
+            focusedPlaceholderColor = scheme.onSurfaceVariant,
+            unfocusedPlaceholderColor = scheme.onSurfaceVariant,
+            cursorColor = scheme.primary,
+            errorCursorColor = scheme.error,
+            focusedBorderColor = scheme.primary,
+            unfocusedBorderColor = scheme.outline,
+            errorBorderColor = scheme.error,
         ),
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboardType,
@@ -144,7 +150,7 @@ fun SunnyField(
 
 @Composable
 fun BigTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier.padding(bottom = 8.dp), color = Ink, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Text(text, modifier = modifier.padding(bottom = 8.dp), color = MaterialTheme.colorScheme.onSurface, fontSize = 36.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontWeight = FontWeight.Medium)
 }
 
 fun parseColor(hex: String): Color {

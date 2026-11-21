@@ -54,7 +54,7 @@ describe('isThemeId', () => {
 
   it('is named in the first-paint script so a reload does not flash another theme', () => {
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
-    expect(html).toContain("airy: '#f3f4f6'")
+    expect(html).toContain("airy: '#ffffff'")
     expect(html).toContain("if (!themes[t]) t = 'airy'")
   })
 })

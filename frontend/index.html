@@ -8,7 +8,7 @@
     />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#f3f4f6" />
+    <meta name="theme-color" content="#ffffff" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" href="/icon-192.png" type="image/png" />
@@ -18,7 +18,7 @@
       // the wrong ground on every reload. Nothing remembered means Airy, the default
       // for a new install. Keep the key and ids in step with src/theme.ts.
       try {
-        var themes = { midnight: '#0f172a', daylight: '#f6f1e7', hearth: '#1c1613', airy: '#f3f4f6' }
+        var themes = { midnight: '#0f172a', daylight: '#f6f1e7', hearth: '#1c1613', airy: '#ffffff' }
         var t = localStorage.getItem('mantel.theme')
         if (!themes[t]) t = 'airy'
         document.documentElement.dataset.theme = t

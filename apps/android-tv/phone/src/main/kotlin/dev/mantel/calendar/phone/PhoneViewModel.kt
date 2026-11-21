@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mantel.calendar.core.CalEvent
 import dev.mantel.calendar.core.CalInfo
+import dev.mantel.calendar.core.ChoreDefinition
 import dev.mantel.calendar.core.ChoreBoard
 import dev.mantel.calendar.core.FAMILYCAL_ORIGIN
 import dev.mantel.calendar.core.FamilyMember
@@ -59,6 +60,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -74,7 +76,7 @@ enum class Phase { Loading, Address, Pair, Ready }
 
 enum class ThemeChoice { System, Light, Dark }
 
-enum class PhoneTab { Today, Month, Chores, Lists }
+enum class PhoneTab { Home, Today, Week, Month, Chores, Lists }
 
 data class PhoneState(
     val phase: Phase = Phase.Loading,
@@ -92,7 +94,7 @@ data class PhoneState(
     val choreDay: LocalDate = LocalDate.now(),
     val offlineDetail: String = "",
     val syncedDetail: String = "Not synced yet",
-    val theme: ThemeChoice = ThemeChoice.System,
+    val theme: ThemeChoice = ThemeChoice.Light,
     val hiddenUserIds: Set<Int> = emptySet(),
 )
 
@@ -108,6 +110,11 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("mantel_phone_ui", Context.MODE_PRIVATE)
     private val origin = MutableStateFlow<String?>(null)
     private val token = MutableStateFlow<String?>(null)
+    suspend fun mealPlan(start: LocalDate) = client.mealPlan(start.toString(), start.plusDays(6).toString())
+    suspend fun saveMeal(day: LocalDate, meal: String, title: String) = client.saveMeal(day.toString(), meal, title)
+    suspend fun displays() = client.displays()
+    suspend fun showOnDisplay(id: String, destination: String) = client.showOnDisplay(id, destination)
+
     private val client = MantelClient(CIO.create(), { origin.value ?: FAMILYCAL_ORIGIN }, { token.value })
     private val snapshots = dev.mantel.calendar.core.FileSnapshotStore(File(app.filesDir, CACHE_DIR))
     private val screenCache = ScreenCacheStore(snapshots)
@@ -216,7 +223,11 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(message = null) }
     }
 
+    private fun savedAnchor(today: LocalDate): LocalDate =
+        runCatching { LocalDate.parse(prefs.getString("calendar_anchor", null)) }.getOrDefault(today)
+
     fun setAnchor(day: LocalDate) {
+        prefs.edit().putString("calendar_anchor", day.toString()).apply()
         _state.update { it.copy(anchor = day) }
         viewModelScope.launch { reload() }
     }
@@ -333,49 +344,63 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addItem(listId: Int, text: String, onError: (String) -> Unit) {
-        if (text.isBlank()) return
+    fun createList(name: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.addList(name.trim())
+    }
+
+    fun createItem(listId: Int, text: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.addItem(listId, text.trim())
+    }
+
+    fun renameList(id: Int, name: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.renameList(id, name.trim())
+    }
+
+    fun removeList(id: Int, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.deleteList(id)
+    }
+
+    fun renameItem(listId: Int, itemId: Int, text: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.renameItem(listId, itemId, text.trim())
+    }
+
+    fun removeItem(listId: Int, itemId: Int, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.deleteItem(listId, itemId)
+    }
+
+    fun removeChecked(listId: Int, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.clearChecked(listId)
+    }
+
+    fun loadChores(result: (List<ChoreDefinition>?, String?) -> Unit) {
         viewModelScope.launch {
             try {
-                client.addItem(listId, text.trim())
-                refreshTopics(setOf("lists"))
+                result(client.chores(), null)
             } catch (e: MantelException) {
-                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not add that")
+                result(null, if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not load chores")
             }
         }
     }
 
-    fun addList(name: String, onError: (String) -> Unit) {
-        if (name.isBlank()) return
-        viewModelScope.launch {
-            try {
-                client.addList(name.trim())
-                refreshTopics(setOf("lists"))
-            } catch (e: MantelException) {
-                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not add that")
-            }
-        }
+    fun saveChore(id: Int?, body: JsonObject, result: (String?) -> Unit) = saveHouseholdChange("chores", result) {
+        client.saveChore(id, body)
     }
 
-    fun deleteItem(listId: Int, itemId: Int) {
-        viewModelScope.launch {
-            try {
-                client.deleteItem(listId, itemId)
-                refreshTopics(setOf("lists"))
-            } catch (e: MantelException) {
-                _state.update { it.copy(message = if (e.status == 0) OFFLINE_EDIT else e.message) }
-            }
-        }
+    fun removeChore(id: Int, result: (String?) -> Unit) = saveHouseholdChange("chores", result) {
+        client.deleteChore(id)
     }
 
-    fun clearChecked(listId: Int) {
+    private fun saveHouseholdChange(topic: String, result: (String?) -> Unit, action: suspend () -> Unit) {
         viewModelScope.launch {
             try {
-                client.clearChecked(listId)
-                refreshTopics(setOf("lists"))
+                action()
             } catch (e: MantelException) {
-                _state.update { it.copy(message = if (e.status == 0) OFFLINE_EDIT else e.message) }
+                result(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not save changes")
+                return@launch
             }
+            // A successful write must not be resubmitted because refreshing the screen failed.
+            result(null)
+            refreshTopics(setOf(topic))
         }
     }
 
@@ -535,7 +560,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             val zone = zoneOrUtc(settings.homeTimezone)
             val today = todayIn(zone)
             val first = _state.value.phase == Phase.Loading
-            val anchor = if (first) today else _state.value.anchor
+            val anchor = if (first) savedAnchor(today) else _state.value.anchor
             val choreOn = if (first && !choreTouched) today else _state.value.choreDay
             val (start, end) = fetchInstants(anchor.minusDays(7), anchor.plusDays(45), zone)
             val users = client.users()
@@ -650,7 +675,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 events = cached.events,
                 lists = cached.lists,
                 board = cached.board,
-                anchor = if (resetDay) today else it.anchor,
+                anchor = if (resetDay) savedAnchor(today) else it.anchor,
                 choreDay = if (resetDay) chore else it.choreDay,
                 offline = true,
                 offlineDetail = offlineLabel(cached.savedAt, zone),
@@ -751,8 +776,15 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun loadTheme(): ThemeChoice =
-        runCatching { ThemeChoice.valueOf(prefs.getString("theme", "System") ?: "System") }.getOrDefault(ThemeChoice.System)
+    private fun loadTheme(): ThemeChoice {
+        // The white redesign becomes the initial appearance once; later choices remain saved.
+        if (!prefs.getBoolean("white_redesign_applied", false)) {
+            prefs.edit().putBoolean("white_redesign_applied", true).putString("theme", "Light").apply()
+            return ThemeChoice.Light
+        }
+        return runCatching { ThemeChoice.valueOf(prefs.getString("theme", "Light") ?: "Light") }
+            .getOrDefault(ThemeChoice.Light)
+    }
 
     private fun deviceName(): String {
         val maker = Build.MANUFACTURER?.takeIf { it.isNotBlank() && !it.equals("unknown", true) }.orEmpty()

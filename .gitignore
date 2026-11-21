@@ -30,6 +30,13 @@ apps/android-tv/.idea/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 
+# Samsung TV generated packages and signing material.
+apps/tizen-tv/build/
+apps/tizen-tv/*.wgt
+apps/tizen-tv/*.p12
+apps/tizen-tv/author-signature.xml
+apps/tizen-tv/signature1.xml
+
 # OneDrive conflicted copies. This repo lives in a synced folder, and OneDrive
 # writes "<name>-<device> Probably.<ext>" beside a file edited on two machines.
 # They are duplicates, never source.

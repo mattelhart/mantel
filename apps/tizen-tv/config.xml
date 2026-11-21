@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://mantel.local/tv" version="1.0.1" viewmodes="maximized">
+  <tizen:application id="MantelTV01.Mantel" package="MantelTV01" required_version="6.0" />
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920" />
+  <content src="index.html" />
+  <name>Mantel</name>
+  <icon src="icon.png" />
+  <access origin="*" subdomains="true" />
+  <tizen:privilege name="http://tizen.org/privilege/internet" />
+  <tizen:profile name="tv-samsung" />
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable" />
+  <tizen:metadata key="http://samsung.com/tv/metadata/devel.api.version" value="6.0" />
+</widget>

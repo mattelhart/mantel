@@ -20,6 +20,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -59,13 +61,25 @@ fun ChoresScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                     Icon(Icons.Filled.ChevronRight, contentDescription = "Next day")
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WarmButton(onClick = { open(Page.EditChore()) }, modifier = Modifier.touchTarget()) { Text("Add chore") }
+                OutlinedButton(onClick = { open(Page.AllChores) }, modifier = Modifier.touchTarget()) { Text("All chores / edit") }
+            }
+            person?.let { member ->
+                val completed = member.chores.count { it.completion?.status == "done" }
+                Text("${member.name}: $completed of ${member.chores.size} complete", fontWeight = FontWeight.Bold)
+                LinearProgressIndicator(
+                    progress = { if (member.chores.isEmpty()) 0f else completed.toFloat() / member.chores.size },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             WarmButton(onClick = { open(Page.Rewards) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
                 val stars = person?.stars ?: 0
                 Text(if (person == null) "Rewards" else "${person.name} · $stars stars")
             }
             val waiting = state.board?.pendingApprovals.orEmpty()
             if (waiting.isNotEmpty()) {
-                Text("Waiting for a parent", fontWeight = FontWeight.Bold)
+                Text("Waiting for approval", fontWeight = FontWeight.Bold)
                 waiting.forEach { item ->
                     Text("${item.userName} · ${item.title} · ${item.points} stars · ${item.on}", fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -93,9 +107,7 @@ fun ChoresScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                     append(if (done) "✓  " else if (pending) "…  " else "○  ")
                     if (!chore.icon.isNullOrBlank()) append(chore.icon).append(' ')
                     append(chore.title)
-                    append("   ")
-                    append(chore.points)
-                    append("★")
+                    if (chore.points > 0) append("   ${chore.points}★")
                     if (pending) append("  waiting")
                 }
                 Surface(

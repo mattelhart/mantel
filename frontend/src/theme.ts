@@ -83,7 +83,7 @@ export const THEMES: readonly ThemeInfo[] = [
     label: 'Airy',
     blurb: 'Bright cards, pastel events, and a touch-first wall layout.',
     palette: {
-      bg: '#f3f4f6',
+      bg: '#ffffff',
       bgElev: '#ffffff',
       bgElev2: '#e6e9ef',
       border: '#5c6573',

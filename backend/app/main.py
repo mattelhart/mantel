@@ -20,6 +20,7 @@ from .routers import (
     dashboard,
     events,
     feeds,
+    household_display,
     lists,
     live,
     meta,
@@ -119,6 +120,7 @@ app.include_router(chores.router, prefix="/api")
 app.include_router(chores.rewards_router, prefix="/api")
 app.include_router(chores.redemptions_router, prefix="/api")
 app.include_router(feeds.router, prefix="/api")
+app.include_router(household_display.router, prefix="/api")
 
 
 def custom_openapi():

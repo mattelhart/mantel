@@ -174,3 +174,20 @@ data class ChoreBoard(
 
 @Serializable
 data class CompleteResult(val completion: ChoreCompletion? = null)
+
+@Serializable
+data class ChoreDefinition(
+    val id: Int,
+    val title: String,
+    val notes: String? = null,
+    val points: Int = 0,
+    val schedule: String = "daily",
+    val weekdays: List<Int> = emptyList(),
+    val dueOn: String? = null,
+    val requiresApproval: Boolean = false,
+    val icon: String? = null,
+    val assigneeIds: List<Int> = emptyList(),
+)
+
+@Serializable
+data class DisplayTarget(val id: String, val name: String)
