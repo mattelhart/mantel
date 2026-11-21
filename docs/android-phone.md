@@ -30,6 +30,14 @@ The phone reaches Mantel over the home Wi-Fi, or over Tailscale or WireGuard. Do
 4. When the server asks for a token, on the wall open **Settings → Devices → Pair a phone**. Scan the QR, or type the 8-character code. The QR is a `mantel://pair` link carrying the server address and the code. The code is single use and expires after 10 minutes. Dashes and case do not matter.
 5. The token is encrypted with an Android Keystore key before it is written. Revoke the phone from the wall. The next call asks you to pair again.
 
+### Pair a TV from the phone
+
+A paired phone can pair a TV without walking to the wall. Open **Settings → Pair a TV** (or the **Pair TV** button on the family home screen). The phone asks the server for a one-time code and shows it large, with a QR for another phone. Type the code on the TV when it says **Pair this TV**. The code works once and expires after 10 minutes; **New code** mints another. A TV on a trusted network with `AUTH_MODE=lan` is let in without a token and never asks for a code.
+
+### Home Assistant from the phone
+
+**Settings → Home control** holds the Home Assistant address and the long-lived access token. The token field is masked, is kept in memory only, is cleared after saving, and is never read back: the server reports only whether a token is set. **Test connection** saves first if needed, then shows Home Assistant's answer. **Remove token** clears it on the server. **Open lights** shows the Lights page: scenes, a switch per light, fan or switch, open/close for covers, a brightness slider, and a confirmation before any lock changes. The token is stored on the server (see `docs/home-control.md`), not on the phone.
+
 **Settings → Forget this server** drops the address and the token so you can start over.
 
 ## What it does

@@ -13,5 +13,7 @@ sealed interface Page {
     data object Rewards : Page
     data object Meals : Page
     data object ShowOnTv : Page
+    data object PairTv : Page
+    data object HomeControl : Page
     data object Settings : Page
 }

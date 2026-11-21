@@ -247,3 +247,49 @@ def test_an_expired_pairing_code_is_refused_even_with_a_stale_token(client, lock
     message = refused.json()["error"]["message"].lower()
     assert "expired" in message
     assert "device token" not in message
+
+
+def test_a_paired_phone_can_pair_a_tv_without_going_to_the_wall(client, locked):
+    """The phone app's "Pair a TV": a phone away from home, holding only its own token,
+    shows a code that a TV elsewhere exchanges for a token of its own."""
+    first = call("192.168.1.20", "POST", "/api/auth/pairing-codes").json()
+    phone = call(
+        "1.2.3.4", "POST", "/api/auth/pair", json={"code": first["code"], "name": "Matt's phone"}
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {phone}"}
+
+    minted = call(
+        "1.2.3.4",
+        "POST",
+        "/api/auth/pairing-codes",
+        params={"base_url": "http://10.0.15.178:8080"},
+        headers=headers,
+    )
+    assert minted.status_code == 200, minted.text
+    # No token, no code.
+    assert call("1.2.3.4", "POST", "/api/auth/pairing-codes").status_code == 401
+
+    tv = call(
+        "5.6.7.8",
+        "POST",
+        "/api/auth/pair",
+        json={"code": minted.json()["code"], "name": "Living room TV"},
+    )
+    assert tv.status_code == 201, tv.text
+    tv_token = tv.json()["token"]
+    assert tv_token != phone
+    tv_headers = {"Authorization": f"Bearer {tv_token}"}
+    assert call("5.6.7.8", "GET", "/api/users", headers=tv_headers).status_code == 200
+
+    # The phone can also set up Home control, and never gets the token back.
+    saved = call(
+        "1.2.3.4",
+        "PATCH",
+        "/api/settings",
+        json={"ha_base_url": "http://ha:8123", "ha_token": "secret-ha-token"},
+        headers=headers,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["server"]["ha_token_set"] is True
+    assert "secret-ha-token" not in saved.text
+    assert "secret-ha-token" not in call("1.2.3.4", "GET", "/api/settings", headers=headers).text

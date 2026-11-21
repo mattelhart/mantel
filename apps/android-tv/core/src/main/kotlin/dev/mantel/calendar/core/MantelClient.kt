@@ -82,6 +82,41 @@ class MantelClient(
 
     suspend fun settings(): HouseholdSettings = get("/settings")
 
+    /** Mint a code for a TV (or another phone) to type. Needs this phone's own token, or a trusted network. */
+    suspend fun createPairingCode(baseUrl: String): PairingCode =
+        post("/auth/pairing-codes?base_url=${java.net.URLEncoder.encode(baseUrl, "UTF-8")}", buildJsonObject {})
+
+    suspend fun homeSetup(): HomeSetup = get("/settings")
+
+    /**
+     * Saves the Home Assistant address and token on the server. A null argument leaves that
+     * value alone; [clearToken] removes the saved token. The token goes out once and is never
+     * read back: the server only reports whether one is saved.
+     */
+    suspend fun saveHomeConnection(baseUrl: String? = null, token: String? = null, clearToken: Boolean = false) {
+        val body = buildJsonObject {
+            if (baseUrl != null) put("ha_base_url", baseUrl.trim())
+            if (clearToken) put("ha_token", kotlinx.serialization.json.JsonNull)
+            else if (!token.isNullOrBlank()) put("ha_token", token.trim())
+        }
+        send<JsonObject>(HttpMethod.Patch, "/settings", body)
+    }
+
+    suspend fun testHome(): HomeTestResult = post("/home/test", buildJsonObject {})
+
+    suspend fun home(): HomeSnapshot = get("/home")
+
+    suspend fun homeAction(entityId: String, action: String, value: Int? = null, confirm: Boolean = false) {
+        post<JsonObject>(
+            "/home/entities/$entityId/action",
+            buildJsonObject {
+                put("action", action)
+                if (value != null) put("value", value)
+                put("confirm", confirm)
+            },
+        )
+    }
+
     suspend fun users(): List<FamilyMember> = get("/users")
 
     suspend fun calendars(): List<CalInfo> = get("/calendars")

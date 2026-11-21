@@ -64,6 +64,8 @@ fun FamilyHomeScreen(state: PhoneState, vm: PhoneViewModel, selectTab: (PhoneTab
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { open(Page.Meals) }) { Text("Meals") }
             OutlinedButton(onClick = { open(Page.ShowOnTv) }) { Text("Show on TV") }
+            OutlinedButton(onClick = { open(Page.HomeControl) }) { Text("Lights") }
+            OutlinedButton(onClick = { open(Page.PairTv) }) { Text("Pair TV") }
         }
         Text(dayLabel(today), style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Serif)
         if (events.isEmpty()) Text("No events today. A little room to breathe.", color = MaterialTheme.colorScheme.onSurfaceVariant)

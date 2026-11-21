@@ -167,7 +167,7 @@ private fun PairScreen(message: String?, onPair: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BigTitle("Pair this TV")
         Text(
-            "On the wall: Settings → Devices → Pair a phone. Type that code.",
+            "On the wall: Settings → Devices → Pair a phone, or on the phone app: Settings → Pair a TV. Type that code.",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 22.sp,
         )

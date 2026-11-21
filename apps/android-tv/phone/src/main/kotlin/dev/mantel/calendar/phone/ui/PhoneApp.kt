@@ -254,7 +254,9 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                                 Page.Rewards -> RewardsScreen(state, vm)
                                 Page.Meals -> MealsScreen(vm)
                                 Page.ShowOnTv -> ShowOnTvScreen(vm)
-                                Page.Settings -> SettingsScreen(state, vm)
+                                Page.PairTv -> PairTvScreen(vm)
+                                Page.HomeControl -> HomeControlScreen(vm, onSetup = { stack = stack.dropLast(1) + Page.Settings })
+                                Page.Settings -> SettingsScreen(state, vm, open = { stack = stack + it })
                             }
                         }
                     }
@@ -273,6 +275,8 @@ private fun titleFor(tab: PhoneTab, page: Page?): String = when (page) {
     Page.Rewards -> "Rewards"
     Page.Meals -> "Meal plan"
     Page.ShowOnTv -> "Show on TV"
+    Page.PairTv -> "Pair a TV"
+    Page.HomeControl -> "Home control"
     Page.Settings -> "Settings"
     null -> if (tab == PhoneTab.Home) "Family calendar" else tab.label()
 }
@@ -392,7 +396,7 @@ private fun SetupColumn(message: String?, content: @Composable () -> Unit) {
 }
 
 @Composable
-fun SettingsScreen(state: PhoneState, vm: PhoneViewModel) {
+fun SettingsScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit = {}) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -408,6 +412,15 @@ fun SettingsScreen(state: PhoneState, vm: PhoneViewModel) {
                 )
             }
         }
+        Text("TVs", fontWeight = FontWeight.Bold)
+        Text(
+            "Show a code here and type it on the TV to sign it in. A TV on your home network may not ask for one.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        WarmButton(onClick = { open(Page.PairTv) }, modifier = Modifier.fillMaxWidth().touchTarget()) {
+            Text("Pair a TV")
+        }
+        HomeSettingsSection(vm, openHome = { open(Page.HomeControl) })
         Text("Server", fontWeight = FontWeight.Bold)
         Text(state.origin ?: "Not connected")
         Text(if (state.offline) state.offlineDetail else state.syncedDetail, color = MaterialTheme.colorScheme.onSurfaceVariant)
