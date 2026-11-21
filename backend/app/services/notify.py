@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..models import AppSetting
 from . import homeassistant
+from .ha_home import open_token
 
 
 def calendar_changed(db: Session) -> None:
@@ -24,6 +25,6 @@ def calendar_changed(db: Session) -> None:
     }
     homeassistant.notify_async(
         str(rows.get("ha_base_url") or ""),
-        str(rows.get("ha_token") or ""),
+        open_token(rows.get("ha_token")),
         str(rows.get("ha_entity_id") or ""),
     )

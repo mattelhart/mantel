@@ -48,6 +48,10 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "ha_base_url": "",
     "ha_token": "",
     "ha_entity_id": "calendar.family_calendar",
+    # Home control (the Home page) reuses the URL and token above. These two are Mantel's
+    # own: what to pin to the top, and what to leave off the wall. Lists of HA entity ids.
+    "home_favorites": [],
+    "home_hidden": [],
     # Google Calendar. Configured in Settings -> Google rather than .env, so a
     # self-hoster never has to edit a file and restart a container to finish
     # setup. Seeded from .env once on first run for installs that predate this.

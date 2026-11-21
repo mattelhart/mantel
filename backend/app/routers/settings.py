@@ -6,7 +6,7 @@ from ..bootstrap import DEFAULT_SETTINGS, THEMES
 from ..config import get_settings
 from ..db import get_db
 from ..models import AppSetting
-from ..services import google_config, homeassistant
+from ..services import google_config, ha_home, homeassistant
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -49,7 +49,7 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
     "",
     summary="Update app settings",
     description=(
-        "Send only the keys you want to change, e.g. `{\"display_scale\": \"wall\"}`. Unknown "
+        'Send only the keys you want to change, e.g. `{"display_scale": "wall"}`. Unknown '
         "keys are rejected so a typo cannot silently do nothing. `theme` must be one of "
         "`airy` (the default on a new install), `midnight`, `daylight` or `hearth`. "
         "It restyles every screen at once. A database that already has a theme keeps it."
@@ -73,6 +73,34 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
         if secret:
             google_config.save_secret(db, secret)
 
+    # Same rule for the Home Assistant token, plus: `null` clears it. Sealed before it is stored.
+    ha_changed = any(k in payload for k in ("ha_base_url", "ha_token"))
+    if "ha_token" in payload:
+        token = payload.pop("ha_token")
+        if token is None:
+            payload["ha_token"] = ""
+        elif not isinstance(token, str):
+            raise HTTPException(400, "ha_token must be text")
+        elif token.strip():
+            payload["ha_token"] = ha_home.seal_token(token.strip())
+    if "ha_base_url" in payload:
+        url = ha_home.normalize_url(str(payload["ha_base_url"] or ""))
+        if url and not url.startswith(("http://", "https://")):
+            raise HTTPException(
+                400, "The Home Assistant address must start with http:// or https://"
+            )
+        payload["ha_base_url"] = url
+    for key in ("home_favorites", "home_hidden"):
+        if key in payload:
+            ids = payload[key]
+            if (
+                not isinstance(ids, list)
+                or len(ids) > 1000
+                or not all(isinstance(i, str) and len(i) < 120 for i in ids)
+            ):
+                raise HTTPException(400, f"{key} must be a list of device ids")
+            payload[key] = list(dict.fromkeys(ids))
+
     for key, value in payload.items():
         row = db.get(AppSetting, key)
         if row is None:
@@ -80,6 +108,9 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
         else:
             row.value = {"value": value}
     db.commit()
+    if ha_changed:
+        # An open Home screen is on a socket made with the old URL and token.
+        ha_home.stream.reconnect()
     return get_app_settings(db)
 
 
@@ -94,6 +125,6 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
 def test_home_assistant(db: Session = Depends(get_db)) -> dict:
     stored = {row.key: row.value.get("value") for row in db.scalars(select(AppSetting))}
     ok, message = homeassistant.test_connection(
-        str(stored.get("ha_base_url") or ""), str(stored.get("ha_token") or "")
+        str(stored.get("ha_base_url") or ""), ha_home.open_token(stored.get("ha_token"))
     )
     return {"ok": ok, "message": message}

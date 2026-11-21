@@ -102,32 +102,10 @@ export function SharingTab() {
       <p className="hint">
         Optional. Add the family calendar to Home Assistant with its built-in{' '}
         <strong>Remote Calendar</strong> integration, using the link above. Because Remote
-        Calendar only refreshes once a day, fill in the fields below and this app will tell
-        Home Assistant to refresh the moment anything changes.
+        Calendar only refreshes once a day, fill in the calendar entity below and this app will
+        tell Home Assistant to refresh the moment anything changes. The address and access token
+        are set once, under the <a href="/settings?tab=home">Home</a> tab.
       </p>
-
-      <div className="row">
-        <div className="row__name row__name--static">Home Assistant URL</div>
-        <input
-          className="row__name"
-          placeholder="http://homeassistant.local:8123"
-          defaultValue={settings.ha_base_url}
-          onBlur={(e) => save.mutate({ ha_base_url: e.target.value.trim() })}
-        />
-      </div>
-
-      <div className="row">
-        <div className="row__name row__name--static">
-          Long-lived access token
-          <div className="hint">Home Assistant → your profile → Security → Create token</div>
-        </div>
-        <input
-          className="row__name"
-          type="password"
-          placeholder={settings.ha_token ? '••••••••' : 'Paste the token'}
-          onBlur={(e) => e.target.value && save.mutate({ ha_token: e.target.value.trim() })}
-        />
-      </div>
 
       <div className="row">
         <div className="row__name row__name--static">

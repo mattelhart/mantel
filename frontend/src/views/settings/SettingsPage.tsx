@@ -10,6 +10,7 @@ import { DevicesTab } from './DevicesTab'
 import { GoogleTab } from './GoogleTab'
 import { ICloudTab } from './ICloudTab'
 import { ScreenTab } from './ScreenTab'
+import { HomeTab } from './HomeTab'
 import { SharingTab } from './SharingTab'
 import { WeatherTab } from './WeatherTab'
 import { useEventColor } from '../../components/eventColor'
@@ -26,6 +27,7 @@ const TABS = [
   'screen',
   'weather',
   'sharing',
+  'home',
   'devices',
   'api',
 ] as const
@@ -41,6 +43,7 @@ const TAB_LABELS: Record<Tab, string> = {
   screen: 'Screen',
   weather: 'Weather',
   sharing: 'Sharing',
+  home: 'Home',
   devices: 'Devices',
   api: 'API',
 }
@@ -73,6 +76,7 @@ export function SettingsPage() {
         {tab === 'screen' && <ScreenTab />}
         {tab === 'weather' && <WeatherTab />}
         {tab === 'sharing' && <SharingTab />}
+        {tab === 'home' && <HomeTab />}
         {tab === 'devices' && <DevicesTab />}
         {tab === 'api' && <ApiTab />}
       </div>
