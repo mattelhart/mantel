@@ -141,8 +141,11 @@ export function App() {
           Offline, last synced {lastSyncedLabel(syncedAt)}
         </div>
       )}
-      <Screensaver />
     </div>
+    {/* Outside the shifted shell on purpose: a transformed ancestor becomes the
+        containing block for position: fixed, so the saver would slide with the
+        burn-in nudge and leave bare strips along two edges. */}
+    <Screensaver />
     </EventColorProvider>
   )
 }
