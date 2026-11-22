@@ -199,7 +199,7 @@
 
 .home-tile__icon {
   grid-area: icon;
-  font-size: 1.6rem;
+  font-size: 2rem;
 }
 
 .home-tile__name {
@@ -661,22 +661,53 @@ html[data-tv='true'] .home__editbar .btn:focus {
   }
 }
 
-/* ---- Icons: SVG glyphs in currentColor, so off is gray and a lit bulb is warm. ---- */
+/* ---- Icons: duotone SVGs (outline + soft fill). Off is grey; on uses a per-type accent. ---- */
 
 .home-tile__icon,
 .home-scene .home-icon,
 .home-scene-edit .home-icon {
   color: var(--text-dim);
+  --icon-stroke: var(--icon-off-stroke);
+  --icon-fill: var(--icon-off-fill);
 }
 
 .home-tile__icon .home-icon,
 .home-scene .home-icon,
 .home-scene-edit .home-icon,
 .home-icon--photo {
-  width: 1.6rem;
-  height: 1.6rem;
+  /* 30px on the phone, 32px on the wall. */
+  width: 1.875rem;
+  height: 1.875rem;
   display: block;
   flex: 0 0 auto;
+  overflow: visible;
+}
+
+html[data-scale='wall'] .home-tile__icon .home-icon,
+html[data-scale='wall'] .home-scene .home-icon,
+html[data-scale='wall'] .home-scene-edit .home-icon,
+html[data-scale='wall'] .home-icon--photo {
+  width: 2rem;
+  height: 2rem;
+}
+
+.home-icon__fill {
+  fill: var(--icon-fill);
+  stroke: none;
+  opacity: var(--icon-fill-opacity, 1);
+}
+
+.home-icon__stroke {
+  fill: none;
+  stroke: var(--icon-stroke);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-icon__solid {
+  fill: var(--icon-stroke);
+  stroke: none;
 }
 
 .home-icon--photo img {
@@ -690,12 +721,77 @@ html[data-tv='true'] .home__editbar .btn:focus {
 }
 
 .home-tile[data-on='true'][data-domain='light'] .home-tile__icon {
-  color: var(--icon-light-on);
+  color: var(--icon-light);
+  --icon-stroke: var(--icon-light);
+  --icon-fill: var(--icon-light-fill);
+}
+
+.home-tile[data-on='true'][data-domain='fan'] .home-tile__icon {
+  color: var(--icon-fan);
+  --icon-stroke: var(--icon-fan);
+  --icon-fill: var(--icon-fan-fill);
+}
+
+.home-tile[data-on='true'][data-domain='switch'] .home-tile__icon,
+.home-tile[data-on='true'][data-domain='input_boolean'] .home-tile__icon {
+  color: var(--icon-switch);
+  --icon-stroke: var(--icon-switch);
+  --icon-fill: var(--icon-switch-fill);
+}
+
+.home-tile[data-on='true'][data-domain='media_player'] .home-tile__icon {
+  color: var(--icon-tv);
+  --icon-stroke: var(--icon-tv);
+  --icon-fill: var(--icon-tv-fill);
+}
+
+/* Locks, covers and sensors stay slate whether they are open or closed. */
+.home-tile[data-domain='lock'] .home-tile__icon,
+.home-tile[data-domain='cover'] .home-tile__icon,
+.home-tile[data-domain='binary_sensor'] .home-tile__icon,
+.home-tile[data-domain='sensor'] .home-tile__icon {
+  color: var(--icon-slate);
+  --icon-stroke: var(--icon-slate);
+  --icon-fill: var(--icon-slate-fill);
+}
+
+.home-tile[data-domain='climate'] .home-icon[data-tone='heat'] {
+  color: var(--icon-heat);
+  --icon-stroke: var(--icon-heat);
+  --icon-fill: var(--icon-heat-fill);
+}
+
+.home-tile[data-domain='climate'] .home-icon[data-tone='cool'] {
+  color: var(--icon-cool);
+  --icon-stroke: var(--icon-cool);
+  --icon-fill: var(--icon-cool-fill);
 }
 
 .home-scene .home-icon,
 .home-scene-edit .home-icon {
-  color: var(--text);
+  color: var(--icon-scene);
+  --icon-stroke: var(--icon-scene);
+  --icon-fill: var(--icon-scene-fill);
+}
+
+/* A running fan turns its blades. Cheap (one transform) and off when the user
+   prefers reduced motion, so the Pi wall is not a pinwheel. */
+.home-icon--spin .home-icon__blades {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: home-fan-spin 3.2s linear infinite;
+}
+
+@keyframes home-fan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-icon--spin .home-icon__blades {
+    animation: none;
+  }
 }
 
 /* ---- On-tile brightness / fan-speed slider: the fill is the old thin bar, full height. ---- */

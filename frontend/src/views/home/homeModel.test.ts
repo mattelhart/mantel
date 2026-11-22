@@ -374,6 +374,7 @@ suite('TV silhouettes', () => {
   it('picks a silhouette from the model, with a generic fallback', () => {
     expect(tvStyle('Samsung Electronics', 'UN55CU7000FXZA', 'UN55CU7000FXZA', 'tv')).toBe('flat')
     expect(tvStyle('Samsung Electronics', 'UN65CU7000FXZA', 'UN65CU7000FXZA', 'tv')).toBe('flat')
+    expect(tvStyle('Samsung', 'The Frame')).toBe('frame')
     expect(tvStyle('Samsung', 'The Frame', 'QN65LS03BAFXZA')).toBe('frame')
     expect(tvStyle('Samsung', 'LS03B')).toBe('frame')
     expect(tvStyle('Samsung', 'The Serif', 'QN55LS01B')).toBe('serif')

@@ -461,9 +461,9 @@ export function tvStyle(
   deviceClass?: string | null,
 ): TvStyle {
   const blob = `${manufacturer ?? ''} ${model ?? ''} ${modelId ?? ''}`.toLowerCase()
-  if (/the frame|ls03|ls03[a-z]|frame/.test(blob)) return 'frame'
-  if (/the serif|ls01|ls01[a-z]|serif/.test(blob)) return 'serif'
-  if (/the sero|ls05|ls05[a-z]|sero/.test(blob)) return 'sero'
+  if (/\bthe frame\b|\bls03\b|ls03[a-z]|\bframe\b/.test(blob)) return 'frame'
+  if (/\bthe serif\b|\bls01\b|ls01[a-z]|\bserif\b/.test(blob)) return 'serif'
+  if (/\bthe sero\b|\bls05\b|ls05[a-z]|\bsero\b/.test(blob)) return 'sero'
   // Crystal UHD / CU7000 / typical flat Samsung (and most other modern sets).
   if (
     /cu[0-9]{4}|crystal|qn[0-9]{2}|un[0-9]{2}|ue[0-9]{2}|au[0-9]{4}|bu[0-9]{4}|du[0-9]{4}/.test(blob) ||

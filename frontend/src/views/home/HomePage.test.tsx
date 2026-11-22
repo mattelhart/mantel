@@ -828,6 +828,29 @@ describe('Home tile text clears the ⋯ button', () => {
   })
 })
 
+
+describe('Home Control duotone icons', () => {
+  const homeCssNow = () => homeCss
+
+  it('device glyphs are 30px on the phone and 32px on the wall', () => {
+    expect(homeCssNow()).toMatch(/\.home-tile__icon \.home-icon,[^{]*\{[^}]*width: 1\.875rem;/)
+    expect(homeCssNow()).toMatch(/html\[data-scale='wall'\] \.home-tile__icon \.home-icon,[^{]*\{[^}]*width: 2rem;/)
+  })
+
+  it('on-state colors are per type, with a grey off fill, and a fan spin that respects reduced motion', () => {
+    expect(homeCssNow()).toMatch(/\[data-domain='light'\][^{]*\{[^}]*--icon-stroke: var\(--icon-light\)/)
+    expect(homeCssNow()).toMatch(/\[data-domain='fan'\][^{]*\{[^}]*--icon-stroke: var\(--icon-fan\)/)
+    expect(homeCssNow()).toMatch(/\[data-tone='heat'\][^{]*\{[^}]*--icon-stroke: var\(--icon-heat\)/)
+    expect(homeCssNow()).toMatch(/\[data-tone='cool'\][^{]*\{[^}]*--icon-stroke: var\(--icon-cool\)/)
+    expect(homeCssNow()).toMatch(/\[data-domain='switch'\][^{]*\{[^}]*--icon-stroke: var\(--icon-switch\)/)
+    expect(homeCssNow()).toMatch(/\[data-domain='media_player'\][^{]*\{[^}]*--icon-stroke: var\(--icon-tv\)/)
+    expect(homeCssNow()).toMatch(/\[data-domain='lock'\][^{]*\{[^}]*--icon-stroke: var\(--icon-slate\)/)
+    expect(homeCssNow()).toContain('--icon-fill: var(--icon-off-fill)')
+    expect(homeCssNow()).toContain('animation: home-fan-spin')
+    expect(homeCssNow()).toContain('prefers-reduced-motion: reduce')
+  })
+})
+
 describe('Home Control masonry', () => {
   let widthNow = 800
   const heights: Record<string, number> = {}

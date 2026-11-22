@@ -24,6 +24,26 @@
   --accent-soft: rgba(56, 189, 248, 0.15);
   /* A lit bulb on a Home tile. Warm amber, distinct from the cool accent. */
   --icon-light-on: #f0b429;
+  /* Duotone Home Control icons: outline + a soft fill in the same hue. */
+  --icon-light: var(--icon-light-on);
+  --icon-fan: #38bdf8;
+  --icon-heat: #f0883e;
+  --icon-cool: #5cb8ff;
+  --icon-switch: #34d399;
+  --icon-tv: #818cf8;
+  --icon-slate: #94a3b8;
+  --icon-scene: #e8b84a;
+  --icon-off-stroke: var(--text-dim);
+  --icon-fill-strength: 42%;
+  --icon-light-fill: color-mix(in srgb, var(--icon-light) var(--icon-fill-strength), transparent);
+  --icon-fan-fill: color-mix(in srgb, var(--icon-fan) var(--icon-fill-strength), transparent);
+  --icon-heat-fill: color-mix(in srgb, var(--icon-heat) var(--icon-fill-strength), transparent);
+  --icon-cool-fill: color-mix(in srgb, var(--icon-cool) var(--icon-fill-strength), transparent);
+  --icon-switch-fill: color-mix(in srgb, var(--icon-switch) var(--icon-fill-strength), transparent);
+  --icon-tv-fill: color-mix(in srgb, var(--icon-tv) var(--icon-fill-strength), transparent);
+  --icon-slate-fill: color-mix(in srgb, var(--icon-slate) var(--icon-fill-strength), transparent);
+  --icon-scene-fill: color-mix(in srgb, var(--icon-scene) var(--icon-fill-strength), transparent);
+  --icon-off-fill: color-mix(in srgb, var(--icon-off-stroke) 16%, transparent);
   --danger-soft: rgba(248, 113, 113, 0.15);
   --danger-faint: rgba(248, 113, 113, 0.12);
   /* Hour lines inside the time grid: quieter than --border so a day of events,
@@ -58,6 +78,15 @@
    dark themes' because hairlines wash out at a distance in bright light. */
 :root[data-theme='daylight'] {
   --icon-light-on: #c88708;
+  --icon-fan: #0369a1;
+  --icon-heat: #c2410c;
+  --icon-cool: #0369a1;
+  --icon-switch: #15803d;
+  --icon-tv: #4338ca;
+  --icon-slate: #475569;
+  --icon-scene: #a16207;
+  --icon-fill-strength: 34%;
+  --icon-off-fill: color-mix(in srgb, var(--text-dim) 12%, transparent);
   --bg: #f6f1e7;
   --bg-elev: #fcf9f2;
   --bg-elev-2: #e9e1d0;
@@ -82,6 +111,14 @@
    blue-black of Midnight, with amber standing in for the sky blue. */
 :root[data-theme='hearth'] {
   --icon-light-on: #ffc44d;
+  --icon-fan: #7dd3fc;
+  --icon-heat: #fb923c;
+  --icon-cool: #7dd3fc;
+  --icon-switch: #4ade80;
+  --icon-tv: #a5b4fc;
+  --icon-slate: #c4b3a0;
+  --icon-scene: #e8a24a;
+  --icon-fill-strength: 44%;
   --bg: #1c1613;
   --bg-elev: #2a211c;
   --bg-elev-2: #3a2e27;
@@ -110,6 +147,15 @@
    than --border on purpose — the events should be what you see from the doorway. */
 :root[data-theme='airy'] {
   --icon-light-on: #d4940a;
+  --icon-fan: #0284c7;
+  --icon-heat: #c2410c;
+  --icon-cool: #0369a1;
+  --icon-switch: #15803d;
+  --icon-tv: #4338ca;
+  --icon-slate: #475569;
+  --icon-scene: #b45309;
+  --icon-fill-strength: 34%;
+  --icon-off-fill: color-mix(in srgb, var(--text-dim) 12%, transparent);
   --bg: #ffffff;
   --bg-elev: #ffffff;
   --bg-elev-2: #e6e9ef;
