@@ -185,12 +185,14 @@ function AddWidgetDialog({
     <div className="modal" role="dialog" aria-modal="true" aria-label="Add a widget" {...guard.backdropProps}>
       <div className="modal__card">
         <h2 className="modal__title">Add a widget</h2>
-        {types.map((t) => (
-          <button key={t.type} className="picker" onClick={() => onPick(t)}>
-            <span className="picker__name">{t.name}</span>
-            <span className="picker__desc">{t.description}</span>
-          </button>
-        ))}
+        <div className="picker-list">
+          {types.map((t) => (
+            <button key={t.type} className="picker" onClick={() => onPick(t)}>
+              <span className="picker__name">{t.name}</span>
+              <span className="picker__desc">{t.description}</span>
+            </button>
+          ))}
+        </div>
         <div className="modal__actions">
           <div className="modal__spacer" />
           <button className="btn" onClick={guard.requestClose}>
