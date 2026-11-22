@@ -54,6 +54,7 @@ import dev.mantel.calendar.device.SecureTokenStore
 import dev.mantel.calendar.phone.notify.UpcomingNotifier
 import dev.mantel.calendar.phone.widget.AgendaWidget
 import io.ktor.client.engine.cio.CIO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -140,8 +141,13 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(PhoneState(theme = loadTheme()))
     val state: StateFlow<PhoneState> = _state
 
+    /** The start-up probe of the saved server. A pairing link must not race it: boot() would
+     *  otherwise finish later and put the screen (and the saved address) back to what it found. */
+    private var bootJob: Job? = null
+    private var linkJob: Job? = null
+
     init {
-        viewModelScope.launch { boot() }
+        bootJob = viewModelScope.launch { boot() }
         viewModelScope.launch {
             while (isActive) {
                 delay(60_000)
@@ -190,8 +196,19 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { pairNormalized(normalized) }
     }
 
-    fun openPairingLink(raw: String) {
+    /**
+     * Pair from a `mantel://pair` link: the in-app scanner, or the camera app opening it.
+     * [fromIntent] is true when Android delivered it. Android hands the same intent to a
+     * recreated activity (a rotation, a theme change, the process being restored), and
+     * the code is single-use, so a link that already paired this phone is ignored then,
+     * instead of failing with "already used" and dropping a paired phone back to the code screen.
+     */
+    fun openPairingLink(raw: String, fromIntent: Boolean = false) {
         val link = parsePairingLink(raw)
+        if (link != null && fromIntent) {
+            if (prefs.getString(PAIRED_LINK_KEY, null) == raw) return
+            if (linkJob?.isActive == true) return
+        }
         if (link == null) {
             if (pairCodeComplete(raw) && !origin.value.isNullOrBlank()) pair(raw)
             else _state.update { it.copy(message = "That QR isn't a Mantel pairing code.") }
@@ -201,7 +218,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(phase = Phase.Address, origin = link.base, message = PUBLIC_HTTP) }
             return
         }
-        viewModelScope.launch {
+        linkJob = viewModelScope.launch {
+            bootJob?.cancel()
             _state.update { it.copy(phase = Phase.Loading, message = null) }
             origin.value = link.base
             store.saveOrigin(link.base)
@@ -212,7 +230,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 return@launch
             }
-            pairNormalized(link.code)
+            if (pairNormalized(link.code)) prefs.edit().putString(PAIRED_LINK_KEY, raw).apply()
         }
     }
 
@@ -487,17 +505,20 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         return mine.ifEmpty { writable }
     }
 
-    private suspend fun pairNormalized(code: String) {
+    /** True when the phone is paired (the screen after that is whatever enter() decides). */
+    private suspend fun pairNormalized(code: String): Boolean {
         _state.update { it.copy(phase = Phase.Loading, message = null) }
-        try {
+        return try {
             val paired = client.pair(code, deviceName())
             token.value = paired.token
             store.saveToken(paired.token)
             enter()
+            true
         } catch (e: MantelException) {
             _state.update {
                 it.copy(phase = Phase.Pair, origin = origin.value, message = pairingFailureMessage(e.status, e.message))
             }
+            false
         }
     }
 
@@ -808,6 +829,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        /** The last `mantel://pair` link that paired this phone (see openPairingLink). */
+        const val PAIRED_LINK_KEY = "paired_link"
         const val OFFLINE_EDIT = "Offline. The calendar on the server was kept, and this change was not saved."
     }
 }

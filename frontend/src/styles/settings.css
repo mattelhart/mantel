@@ -595,8 +595,10 @@ code {
 }
 
 .pair__qr {
-  width: 180px;
-  height: 180px;
+  /* Big enough to scan from across a room off the wall, and never wider than the panel. */
+  width: 240px;
+  height: 240px;
+  max-width: 100%;
   background: #fff;
   padding: 8px;
   border-radius: 8px;

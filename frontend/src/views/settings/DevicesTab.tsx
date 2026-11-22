@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import { useEntityMutation } from '../../api/hooks'
+import { isLoopbackHost, qrDataUri } from './qr'
 import { timeAgo } from './timeAgo'
 
 interface Device {
@@ -83,9 +84,15 @@ export function DevicesTab() {
           {!expired && (
             <img
               className="pair__qr"
-              alt=""
-              src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(code.qr_svg)}`}
+              alt={`QR code for pairing ${code.code}`}
+              src={qrDataUri(code.qr_svg)}
             />
+          )}
+          {!expired && isLoopbackHost(window.location.hostname) && (
+            <p className="banner banner--warn">
+              This screen is open as {window.location.hostname}, which a phone cannot reach, so the QR will not
+              work. Open Mantel here by its network address (for example http://10.0.15.178:8080) and try again.
+            </p>
           )}
           <div className="pair__meta">
             {expired
