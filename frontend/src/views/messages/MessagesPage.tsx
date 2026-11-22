@@ -1,18 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { api, authedUrl } from '../../api/client'
 import { useSettings } from '../../api/hooks'
-import {
-  DOODLE_COLORS,
-  DOODLE_SIZES,
-  addPoint,
-  clearStrokes,
-  paint,
-  startStroke,
-  undoStroke,
-  type Stroke,
-} from '../games/doodle'
+import { DoodleSurface, type DoodleSurfaceHandle } from '../games/DoodleSurface'
+import { SendDoodlePicker } from './SendDoodlePicker'
 
 export interface FamilyMessage {
   id: number
@@ -68,33 +60,7 @@ export function MessagesPage() {
   const { data, isLoading } = useConversations()
   const { data: settings } = useSettings()
   const configured = data?.configured ?? settings?.server.twilio_configured ?? false
-
-  if (isLoading && !data) {
-    return (
-      <div className="messages">
-        <header className="messages__bar">
-          <h1 className="messages__title">Messages</h1>
-        </header>
-        <p className="hint">Loading messages…</p>
-      </div>
-    )
-  }
-
-  if (!configured) {
-    return (
-      <div className="messages">
-        <header className="messages__bar">
-          <h1 className="messages__title">Messages</h1>
-        </header>
-        <div className="messages__empty">
-          <p>Add your Twilio details in Settings to send notes and doodles to family phones.</p>
-          <Link to="/settings?tab=messages" className="btn btn--primary">
-            Open Messages settings
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  const [composing, setComposing] = useState(false)
 
   const conversations = data?.conversations ?? []
 
@@ -102,26 +68,47 @@ export function MessagesPage() {
     <div className="messages">
       <header className="messages__bar">
         <h1 className="messages__title">Messages</h1>
+        <button
+          type="button"
+          className="btn btn--primary messages__send-doodle"
+          onClick={() => setComposing(true)}
+        >
+          Send doodle
+        </button>
       </header>
-      {conversations.length === 0 && (
-        <p className="hint">
-          Add a phone number to a family member in Settings → Family, then you can text them from
-          here.
-        </p>
-      )}
-      <div className="messages__list">
-        {conversations.map((item) => (
-          <Link key={item.id} to={`/messages/${item.id}`} className="messages__person">
-            <span className="messages__avatar" style={{ background: item.color }}>
-              {item.avatar_emoji || initial(item.name)}
-            </span>
-            <span className="messages__meta">
-              <span className="messages__name">{item.name}</span>
-              <span className="messages__preview">{preview(item)}</span>
-            </span>
+      {isLoading && !data ? (
+        <p className="hint">Loading messages…</p>
+      ) : !configured ? (
+        <div className="messages__empty">
+          <p>Add your Twilio details in Settings to send notes and doodles to family phones.</p>
+          <Link to="/settings?tab=messages" className="btn btn--primary">
+            Open Messages settings
           </Link>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <>
+          {conversations.length === 0 && (
+            <p className="hint">
+              Add a phone number to a family member in Settings → Family, then you can text them from
+              here.
+            </p>
+          )}
+          <div className="messages__list">
+            {conversations.map((item) => (
+              <Link key={item.id} to={`/messages/${item.id}`} className="messages__person">
+                <span className="messages__avatar" style={{ background: item.color }}>
+                  {item.avatar_emoji || initial(item.name)}
+                </span>
+                <span className="messages__meta">
+                  <span className="messages__name">{item.name}</span>
+                  <span className="messages__preview">{preview(item)}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+      {composing && <ListDoodleFlow onClose={() => setComposing(false)} />}
     </div>
   )
 }
@@ -214,6 +201,14 @@ export function MessageThreadPage() {
               />
             )}
             {message.body && <div className="messages__text">{message.body}</div>}
+            {message.direction === 'in' && message.media_url && (
+              <Link
+                className="messages__open-doodle"
+                to={doodleHref(message.media_url, data.user_id)}
+              >
+                Open in Doodles
+              </Link>
+            )}
             <div className="messages__status">
               {formatTime(message.created_at)}
               {message.direction === 'out' ? ` · ${statusLabel(message.status)}` : ''}
@@ -281,6 +276,45 @@ export function MessageThreadPage() {
   )
 }
 
+function ListDoodleFlow({ onClose }: { onClose: () => void }) {
+  const surfaceRef = useRef<DoodleSurfaceHandle>(null)
+  const [empty, setEmpty] = useState(true)
+  const [png, setPng] = useState<string | null>(null)
+  const onEmptyChange = useCallback((value: boolean) => setEmpty(value), [])
+
+  if (png) {
+    return (
+      <SendDoodlePicker png={png} onBack={() => setPng(null)} onFinished={onClose} />
+    )
+  }
+
+  return (
+    <div className="messages__doodle" role="dialog" aria-label="Draw a doodle">
+      <header className="messages__bar">
+        <button type="button" className="messages__back" onClick={onClose}>
+          <span aria-hidden>◀</span> Back
+        </button>
+        <h1 className="messages__title">Doodle</h1>
+      </header>
+      <DoodleSurface ref={surfaceRef} onEmptyChange={onEmptyChange}>
+        <div className="messages__actions">
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={empty}
+            onClick={() => {
+              const data = surfaceRef.current?.exportPng() ?? ''
+              if (data) setPng(data)
+            }}
+          >
+            Send to…
+          </button>
+        </div>
+      </DoodleSurface>
+    </div>
+  )
+}
+
 function DoodleComposer({
   busy,
   onBack,
@@ -290,65 +324,9 @@ function DoodleComposer({
   onBack: () => void
   onSend: (png: string) => void
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const strokesRef = useRef<Stroke[]>([])
-  const [strokes, setStrokes] = useState<Stroke[]>([])
-  const [color, setColor] = useState<string>(DOODLE_COLORS[0])
-  const [size, setSize] = useState<(typeof DOODLE_SIZES)[number]>(DOODLE_SIZES[1])
-  const drawing = useRef(false)
-  strokesRef.current = strokes
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect()
-      const dpr = window.devicePixelRatio || 1
-      canvas.width = Math.max(1, Math.round(rect.width * dpr))
-      canvas.height = Math.max(1, Math.round(rect.height * dpr))
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      paint(ctx, strokesRef.current, rect.width, rect.height)
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    const Observer = typeof ResizeObserver === 'undefined' ? undefined : ResizeObserver
-    const observer = Observer ? new Observer(resize) : null
-    observer?.observe(canvas)
-    return () => {
-      window.removeEventListener('resize', resize)
-      observer?.disconnect()
-    }
-  }, [])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const rect = canvas.getBoundingClientRect()
-    paint(ctx, strokes, rect.width, rect.height)
-  }, [strokes])
-
-  function pointFrom(event: ReactPointerEvent<HTMLCanvasElement>) {
-    const rect = event.currentTarget.getBoundingClientRect()
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top }
-  }
-
-  function exportPng(): string {
-    const source = canvasRef.current
-    if (!source) return ''
-    const out = document.createElement('canvas')
-    out.width = source.width
-    out.height = source.height
-    const ctx = out.getContext('2d')
-    if (!ctx) return ''
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, out.width, out.height)
-    ctx.drawImage(source, 0, 0)
-    return out.toDataURL('image/png')
-  }
+  const surfaceRef = useRef<DoodleSurfaceHandle>(null)
+  const [empty, setEmpty] = useState(true)
+  const onEmptyChange = useCallback((value: boolean) => setEmpty(value), [])
 
   return (
     <div className="messages__doodle" role="dialog" aria-label="Draw a doodle">
@@ -358,77 +336,29 @@ function DoodleComposer({
         </button>
         <h1 className="messages__title">Doodle</h1>
       </header>
-      <div className="doodle">
-        <div className="doodle__tools">
-          <div className="doodle__colors" role="group" aria-label="Colour">
-            {DOODLE_COLORS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className="doodle__swatch"
-                data-on={color === value}
-                aria-label={`Colour ${value}`}
-                style={{ background: value }}
-                onClick={() => setColor(value)}
-              />
-            ))}
-          </div>
-          <div className="doodle__sizes" role="group" aria-label="Brush size">
-            {DOODLE_SIZES.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className="doodle__size"
-                data-on={size === value}
-                aria-label={`Brush size ${value}`}
-                onClick={() => setSize(value)}
-              >
-                <span style={{ width: value, height: value }} />
-              </button>
-            ))}
-          </div>
-          <button type="button" className="doodle__action" onClick={() => setStrokes((s) => undoStroke(s))}>
-            Undo
-          </button>
-          <button type="button" className="doodle__action" onClick={() => setStrokes(clearStrokes())}>
-            Clear
-          </button>
-        </div>
-        <canvas
-          ref={canvasRef}
-          className="doodle__canvas"
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId)
-            drawing.current = true
-            const point = pointFrom(event)
-            setStrokes((current) => startStroke(current, color, size, point))
-          }}
-          onPointerMove={(event) => {
-            if (!drawing.current) return
-            const point = pointFrom(event)
-            setStrokes((current) => addPoint(current, point))
-          }}
-          onPointerUp={(event) => {
-            drawing.current = false
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              event.currentTarget.releasePointerCapture(event.pointerId)
-            }
-          }}
-          onPointerCancel={(event) => {
-            drawing.current = false
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              event.currentTarget.releasePointerCapture(event.pointerId)
-            }
-          }}
-        />
+      <DoodleSurface ref={surfaceRef} onEmptyChange={onEmptyChange}>
         <div className="messages__actions">
-          <button type="button" className="btn btn--primary" disabled={busy || strokes.length === 0} onClick={() => onSend(exportPng())}>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={busy || empty}
+            onClick={() => {
+              const png = surfaceRef.current?.exportPng() ?? ''
+              if (png) onSend(png)
+            }}
+          >
             {busy ? 'Sending…' : 'Send doodle'}
           </button>
         </div>
-      </div>
+      </DoodleSurface>
     </div>
   )
+}
+
+function doodleHref(mediaUrl: string, userId: number | null): string {
+  const params = new URLSearchParams({ media: mediaUrl })
+  if (userId) params.set('replyTo', String(userId))
+  return `/games/doodle?${params.toString()}`
 }
 
 function initial(name: string): string {

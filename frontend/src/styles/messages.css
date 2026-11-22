@@ -258,3 +258,246 @@ html[data-theme='airy'] .messages__title {
   min-width: 12rem;
   flex: 1 1 12rem;
 }
+
+.messages__send-doodle {
+  flex: none;
+  min-height: 56px;
+  min-width: 160px;
+  padding: 0 20px;
+  border-radius: 18px;
+  font-weight: 800;
+}
+
+.messages__open-doodle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  margin: 4px 0 2px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+/* Recipient picker used from the Messages list and from the Doodle pad. */
+.doodle-send {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 18px 16px;
+  background: var(--bg);
+}
+
+.doodle-send__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex: none;
+  min-width: 0;
+}
+
+.doodle-send__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-xl);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doodle-send__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-height: 56px;
+  min-width: 120px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.doodle-send__back:focus-visible,
+.doodle-send__person:focus-visible,
+.messages__send-doodle:focus-visible,
+.messages__open-doodle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.doodle-send__empty,
+.doodle-send__done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  max-width: 36rem;
+  font-size: var(--font-md);
+  line-height: 1.4;
+}
+
+.doodle-send__threads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.doodle-send__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  padding-bottom: 8px;
+}
+
+.doodle-send__person {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--bg-elev);
+  box-shadow: 0 10px 28px rgba(28, 36, 48, 0.06);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  touch-action: manipulation;
+}
+
+.doodle-send__person[aria-pressed='true'] {
+  box-shadow: 0 0 0 3px var(--accent), 0 10px 28px rgba(28, 36, 48, 0.06);
+}
+
+.doodle-send__person:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.doodle-send__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.doodle-send__meta {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doodle-send__name {
+  font-size: var(--font-lg);
+  font-weight: 800;
+}
+
+.doodle-send__hint {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+}
+
+.doodle-send__check {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.doodle-send__compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  padding-top: 8px;
+}
+
+.doodle-send__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.doodle-send__caption input {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 500;
+}
+
+.doodle-send__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.doodle-send__actions .btn {
+  min-height: 56px;
+  min-width: 140px;
+  border-radius: 18px;
+  font-weight: 800;
+}
+
+html[data-theme='airy'] .doodle-send__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+@media (max-height: 700px) {
+  .doodle-send__person {
+    min-height: 72px;
+    padding: 10px 14px;
+  }
+
+  .doodle-send__avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .doodle-send__caption input,
+  .doodle-send__back,
+  .doodle-send__actions .btn,
+  .messages__send-doodle {
+    min-height: 52px;
+  }
+}

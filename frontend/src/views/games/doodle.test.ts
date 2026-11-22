@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addPoint, clearStrokes, startStroke, undoStroke } from './doodle'
+import { addPoint, clearStrokes, containRect, startStroke, undoStroke } from './doodle'
 
 describe('doodle pad', () => {
   it('records a stroke, ignores a duplicate point, and undoes the last stroke', () => {
@@ -22,5 +22,11 @@ describe('doodle pad', () => {
     expect(undoStroke([])).toEqual([])
     expect(clearStrokes()).toEqual([])
     expect(addPoint([], { x: 1, y: 1 })).toEqual([])
+  })
+
+  it('letterboxes an image inside a box without stretching', () => {
+    expect(containRect(200, 100, 200, 200)).toEqual({ x: 0, y: 50, width: 200, height: 100 })
+    expect(containRect(100, 200, 200, 200)).toEqual({ x: 50, y: 0, width: 100, height: 200 })
+    expect(containRect(0, 0, 100, 80)).toEqual({ x: 0, y: 0, width: 100, height: 80 })
   })
 })

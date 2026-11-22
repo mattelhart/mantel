@@ -320,6 +320,7 @@ textarea:focus-visible {
 
 .shell__main {
   grid-area: main;
+  position: relative;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   /* A grid item's automatic minimum size is its content, so this needs saying too

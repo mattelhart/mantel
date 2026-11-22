@@ -51,7 +51,7 @@ export const GAMES: GameInfo[] = [
   {
     id: 'doodle',
     name: 'Doodle pad',
-    blurb: 'A scratch pad: colours, brush size, undo and clear.',
+    blurb: 'A scratch pad you can send to a family member\'s phone.',
     kind: 'native',
     swipe: true,
     accent: '#c4b5fd',

@@ -212,6 +212,14 @@
   opacity: 1;
 }
 
+.doodle-page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+
 .doodle {
   flex: 1;
   min-height: 0;
@@ -281,4 +289,13 @@ html[data-theme='airy'] .camview__title {
   font-family: Georgia, 'Times New Roman', serif;
   font-weight: 500;
   letter-spacing: -0.025em;
+}
+
+.doodle__action--send {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.doodle__action--send:disabled {
+  opacity: 0.5;
 }
