@@ -7,8 +7,21 @@
   flex-direction: column;
   gap: 16px;
   padding: 4px 2px 24px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   overflow-y: auto;
+  /* clip, not hidden or auto: a slightly overflowing focus ring must not create a
+     horizontal scroller that can be nudged (D-pad focus, a swipe) and cut off the
+     left of the page. */
+  overflow-x: clip;
+}
+
+/* Edit mode draws 2px dashed frames, 36px Hide pills, and (on the wall) a 4px
+   focus ring with a 3px offset. The 2px side padding above is not enough, so
+   those strokes sat on the clip edge of .home and .shell__main. */
+.home[data-editing] {
+  padding: 8px 14px 24px;
 }
 
 .home__bar {
@@ -607,6 +620,28 @@ html[data-tv='true'] .home__edit:focus,
 html[data-tv='true'] .home__editbar .btn:focus {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* .home itself is often taller than main, so main is the scroller — clip it too. */
+.shell__main:has(.home[data-editing]) {
+  overflow-x: clip;
+}
+
+.home-scene-edit,
+.home-masonry__cell,
+.home-room--edit {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.home-scene-edit__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-edit__chip {
+  /* Global buttons are --touch wide; a nowrap Hide + arrows row must be allowed to shrink. */
+  min-width: 0;
 }
 
 /* On a phone the Done / Cancel / Reset row gets a line of its own under the title. */
