@@ -1,0 +1,19 @@
+[Unit]
+Description=Mantel UDM Pro monitor (3.5 inch SPI display)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mantel
+# Keep the user's default groups (mantel, video, input) so it can
+# read /etc/mantel-udm/unifi.key (0640 root:mantel) and /dev/fb1.
+ExecStart=/usr/bin/python3 -u /opt/mantel-udm/udm_monitor.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=UDM_KEY_PATH=/etc/mantel-udm/unifi.key
+Environment=UDM_FB=/dev/fb1
+
+[Install]
+WantedBy=multi-user.target
