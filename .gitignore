@@ -42,3 +42,9 @@ apps/tizen-tv/signature1.xml
 # They are duplicates, never source.
 *-MikeBookPro Probably*
 *Probably.md
+
+# iPhone app. The checked-in .xcodeproj is source; user data and build products are not.
+apps/ios/**/xcuserdata/
+apps/ios/**/DerivedData/
+apps/ios/build/
+apps/ios/*.xcworkspace
