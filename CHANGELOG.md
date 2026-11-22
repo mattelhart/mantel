@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+- **Bigger side menu on the wall and TVs.** In landscape (the Pi kiosk, `?tv=1`, the Android TV app) the side-menu labels are about 20% larger and the icons grow with them. The phone's bottom bar is unchanged.
+
 - **Phone app fixes.** System Back now returns to the Home tab before leaving the app; text fields stay above the keyboard; the family home buttons wrap instead of squeezing "Pair TV"; rotating keeps the page you were on; landscape content stays clear of the camera cutout. The TV app is now labelled **Mantel TV** so it can't be mistaken for the phone app.
 
 - **Phone app: pair a TV and set up home control.** Settings → Pair a TV shows a one-time code (and a QR) so a paired phone can pair a TV. Settings → Home control takes the Home Assistant address and token (masked, saved on the server, never echoed back), tests the connection, and opens a Lights page. The wall's Devices tab gains a Pair a TV button.
