@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+- **Messages on the phone app.** The Android phone app now has a Messages tab and a home tile. It lists the family, hides unknown numbers, and uses the same send, quick-reply, and one-tap Draw flow as the wall. People without a phone number stay visible with a grown-up prompt and no send controls. Status comes from the conversations API, so it works with Signal or Twilio.
+
 - **Kid-friendly family messages.** The Messages page uses bigger photos, buttons and type so it is easy to use on the wall, including for kids. Each conversation has a large **Draw** button that opens a simple full-screen pad (chunky brush, big colours, eraser, undo, clear, Send, and an obvious Back or Cancel). Sending a note or a picture shows **Sent!**, and a failed send says so in plain language. Family members without a phone number stay visible with “Ask a grown-up to add a phone number” and no send controls. Unknown numbers stay hidden. Outgoing bubbles follow the current theme.
 
 - **Signal as a messaging provider.** Settings → Messages can use a self-hosted signal-cli REST API container instead of Twilio. Link it as a device by scanning a QR code from the phone (Signal → Settings → Linked devices). Notes and doodles go as Signal text and attachments, and replies are polled every few seconds into the same threads. Setup notes are in [docs/signal.md](docs/signal.md).

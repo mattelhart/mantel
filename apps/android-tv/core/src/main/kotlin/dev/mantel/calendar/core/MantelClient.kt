@@ -12,6 +12,7 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.readBytes
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -228,6 +229,40 @@ class MantelClient(
 
     suspend fun deny(redemptionId: Int): RedemptionInfo =
         post("/redemptions/$redemptionId/deny", buildJsonObject {})
+
+    suspend fun conversations(): ConversationsListing = get("/messages/conversations")
+
+    suspend fun conversation(id: String): Conversation = get("/messages/conversations/$id")
+
+    suspend fun sendMessage(userId: Int, body: String, mediaBase64: String? = null): ConversationMessage =
+        post(
+            "/messages",
+            buildJsonObject {
+                put("user_id", userId)
+                put("body", body)
+                if (!mediaBase64.isNullOrBlank()) put("media_base64", mediaBase64)
+            },
+        )
+
+    suspend fun messageMedia(id: Int): ByteArray {
+        val response = try {
+            http.get(url("/messages/$id/media")) { auth() }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw unreachable(e)
+        }
+        if (response.status.value !in 200..299) {
+            val text = runCatching { response.bodyAsText() }.getOrDefault("")
+            val envelope = runCatching { mantelJson.decodeFromString<ErrorEnvelope>(text) }.getOrNull()
+            throw MantelException(
+                envelope?.error?.code ?: "error",
+                envelope?.error?.message ?: "The calendar could not do that",
+                response.status.value,
+            )
+        }
+        return response.readBytes()
+    }
+
 
     /**
      * Blocks until the stream ends. Callers reconnect with [reconnectDelayMs]

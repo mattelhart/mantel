@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.filled.Today
@@ -217,7 +218,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                 bottomBar = {
                     if (stack.isEmpty()) {
                         NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                            listOf(PhoneTab.Home, PhoneTab.Today, PhoneTab.Chores, PhoneTab.Lists).forEach { item ->
+                            listOf(PhoneTab.Home, PhoneTab.Today, PhoneTab.Chores, PhoneTab.Lists, PhoneTab.Messages).forEach { item ->
                                 NavigationBarItem(
                                     selected = tab == item || (item == PhoneTab.Today && tab in listOf(PhoneTab.Week, PhoneTab.Month)),
                                     onClick = {
@@ -262,6 +263,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                                 PhoneTab.Month -> MonthScreen(state, vm) { stack = stack + it }
                                 PhoneTab.Chores -> ChoresScreen(state, vm) { stack = stack + it }
                                 PhoneTab.Lists -> ListsScreen(state, vm) { stack = stack + it }
+                                PhoneTab.Messages -> MessagesScreen(state, vm) { stack = stack + it }
                             }
                         } else {
                             when (page) {
@@ -278,6 +280,8 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                                 Page.PairTv -> PairTvScreen(vm)
                                 Page.HomeControl -> HomeControlScreen(vm, onSetup = { stack = stack.dropLast(1) + Page.Settings })
                                 Page.Settings -> SettingsScreen(state, vm, open = { stack = stack + it })
+                                is Page.Thread -> MessageThreadScreen(page.id, state, vm, openDraw = { stack = stack + Page.Draw(page.id) })
+                                is Page.Draw -> DrawMessageScreen(page.conversationId, state, vm) { stack = stack.dropLast(1) }
                             }
                         }
                     }
@@ -300,6 +304,8 @@ private fun titleFor(tab: PhoneTab, page: Page?): String = when (page) {
     Page.PairTv -> "Pair a TV"
     Page.HomeControl -> "Home control"
     Page.Settings -> "Settings"
+    is Page.Thread -> "Messages"
+    is Page.Draw -> "Draw a picture"
     null -> if (tab == PhoneTab.Home) "Family calendar" else tab.label()
 }
 
@@ -310,6 +316,7 @@ private fun PhoneTab.label(): String = when (this) {
     PhoneTab.Month -> "Month"
     PhoneTab.Chores -> "Chores"
     PhoneTab.Lists -> "Lists"
+    PhoneTab.Messages -> "Messages"
 }
 
 private fun PhoneTab.icon(): ImageVector = when (this) {
@@ -319,6 +326,7 @@ private fun PhoneTab.icon(): ImageVector = when (this) {
     PhoneTab.Month -> Icons.Filled.CalendarMonth
     PhoneTab.Chores -> Icons.Filled.CheckCircle
     PhoneTab.Lists -> Icons.Filled.Checklist
+    PhoneTab.Messages -> Icons.AutoMirrored.Filled.Chat
 }
 
 @Composable

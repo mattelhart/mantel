@@ -6,6 +6,10 @@ import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mantel.calendar.core.CalEvent
+import dev.mantel.calendar.core.messageMediaId
+import dev.mantel.calendar.core.friendlySendError
+import dev.mantel.calendar.core.ConversationsListing
+import dev.mantel.calendar.core.Conversation
 import dev.mantel.calendar.core.CalInfo
 import dev.mantel.calendar.core.ChoreDefinition
 import dev.mantel.calendar.core.ChoreBoard
@@ -77,7 +81,7 @@ enum class Phase { Loading, Address, Pair, Ready }
 
 enum class ThemeChoice { System, Light, Dark }
 
-enum class PhoneTab { Home, Today, Week, Month, Chores, Lists }
+enum class PhoneTab { Home, Today, Week, Month, Chores, Lists, Messages }
 
 data class PhoneState(
     val phase: Phase = Phase.Loading,
@@ -91,6 +95,8 @@ data class PhoneState(
     val events: List<CalEvent> = emptyList(),
     val lists: List<SharedList> = emptyList(),
     val board: ChoreBoard? = null,
+    val conversations: ConversationsListing = ConversationsListing(),
+    val threads: Map<String, Conversation> = emptyMap(),
     val anchor: LocalDate = LocalDate.now(),
     val choreDay: LocalDate = LocalDate.now(),
     val offlineDetail: String = "",
@@ -140,6 +146,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(PhoneState(theme = loadTheme()))
     val state: StateFlow<PhoneState> = _state
+    private val _media = MutableStateFlow<Map<Int, ByteArray>>(emptyMap())
+    val media: StateFlow<Map<Int, ByteArray>> = _media
 
     /** The start-up probe of the saved server. A pairing link must not race it: boot() would
      *  otherwise finish later and put the screen (and the saved address) back to what it found. */
@@ -155,6 +163,59 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch { listen() }
+    }
+
+
+    fun openThread(id: String) {
+        viewModelScope.launch {
+            try {
+                val thread = client.conversation(id)
+                _state.update { it.copy(threads = it.threads + (id to thread), offline = false) }
+                thread.messages.forEach { message ->
+                    val mediaId = messageMediaId(message.mediaUrl) ?: return@forEach
+                    loadMessageMedia(mediaId)
+                }
+            } catch (e: MantelException) {
+                if (e.status == 404) return@launch
+                onRefreshFailed(e)
+            }
+        }
+    }
+
+    fun loadMessageMedia(id: Int) {
+        if (_media.value.containsKey(id)) return
+        viewModelScope.launch {
+            try {
+                val bytes = client.messageMedia(id)
+                _media.update { it + (id to bytes) }
+            } catch (_: Exception) {
+                /* The picture stays hidden if it cannot be fetched. */
+            }
+        }
+    }
+
+    fun sendMessage(userId: Int, body: String, mediaBase64: String? = null, result: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                client.sendMessage(userId, body, mediaBase64)
+                val listing = client.conversations()
+                val updated = _state.value.threads.mapValues { (id, current) ->
+                    runCatching { client.conversation(id) }.getOrDefault(current)
+                }
+                _state.update {
+                    it.copy(conversations = listing, threads = updated, offline = false)
+                }
+                updated.values.forEach { thread ->
+                    thread.messages.forEach { message ->
+                        val mediaId = messageMediaId(message.mediaUrl) ?: return@forEach
+                        loadMessageMedia(mediaId)
+                    }
+                }
+                result(null)
+            } catch (e: MantelException) {
+                result(friendlySendError(e.message))
+            }
+        }
     }
 
     fun refresh() {
@@ -599,6 +660,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             val events = client.events(start.toString(), end.toString())
             val lists = client.lists()
             val board = client.choreBoard(choreOn.toString())
+            val conversations = client.conversations()
             val at = Instant.now().toString()
             lastSynced = at
             _state.update {
@@ -609,6 +671,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                     events = events,
                     lists = lists,
                     board = board,
+                    conversations = conversations,
                     offline = false,
                     offlineDetail = "",
                     syncedDetail = syncedLabel(at, zone),
@@ -618,7 +681,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
             screenCache.save(
-                ScreenCache(at, settings, users, calendars, _state.value.events, lists, _state.value.board),
+                ScreenCache(at, settings, users, calendars, _state.value.events, lists, _state.value.board, conversations),
             )
             publish()
         } catch (e: MantelException) {
@@ -641,6 +704,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             var events = current.events
             var lists = current.lists
             var board = current.board
+            var conversations = current.conversations
+            var threads = current.threads
             if ("settings" in topics) settings = client.settings()
             if ("users" in topics) users = client.users()
             if ("calendars" in topics || "accounts" in topics) calendars = client.calendars()
@@ -651,6 +716,12 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             }
             if ("lists" in topics) lists = client.lists()
             if ("chores" in topics || "rewards" in topics) board = client.choreBoard(current.choreDay.toString())
+            if ("messages" in topics) {
+                conversations = client.conversations()
+                threads = threads.mapValues { (id, currentThread) ->
+                    runCatching { client.conversation(id) }.getOrDefault(currentThread)
+                }
+            }
             val at = Instant.now().toString()
             lastSynced = at
             val zone = zoneOrUtc(settings.homeTimezone)
@@ -662,12 +733,14 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                     events = events,
                     lists = lists,
                     board = board,
+                    conversations = conversations,
+                    threads = threads,
                     offline = false,
                     offlineDetail = "",
                     syncedDetail = syncedLabel(at, zone),
                 )
             }
-            screenCache.save(ScreenCache(at, settings, users, calendars, events, lists, board))
+            screenCache.save(ScreenCache(at, settings, users, calendars, events, lists, board, conversations))
             publish()
         } catch (e: MantelException) {
             onRefreshFailed(e)
@@ -681,7 +754,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), offline = false) }
             return
         }
-        val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty()
+        val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty() || _state.value.conversations.conversations.isNotEmpty()
         if (!haveMemory) {
             val cached = screenCache.load()
             if (cached != null) showCached(cached, resetDay = _state.value.phase != Phase.Ready)
@@ -706,6 +779,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 events = cached.events,
                 lists = cached.lists,
                 board = cached.board,
+                conversations = cached.conversations,
                 anchor = if (resetDay) savedAnchor(today) else it.anchor,
                 choreDay = if (resetDay) chore else it.choreDay,
                 offline = true,
