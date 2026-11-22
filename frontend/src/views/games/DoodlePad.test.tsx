@@ -108,7 +108,7 @@ describe('Doodle pad send', () => {
     expect(document.body.textContent).toContain('Austin')
     expect(document.body.textContent).toContain('Brooklyn')
     expect(document.body.textContent).toContain('Sam')
-    expect(document.body.textContent).toContain('No phone saved')
+    expect(document.body.textContent).toContain('Ask a grown-up to add a phone number')
 
     const sam = Array.from(document.querySelectorAll<HTMLButtonElement>('.doodle-send__person')).find(
       (btn) => btn.textContent?.includes('Sam'),
@@ -125,7 +125,7 @@ describe('Doodle pad send', () => {
 
     expect(sent).toEqual([{ user_id: 1, body: 'For you', media_base64: PNG }])
     expect(document.body.textContent).toContain('Sent to Austin')
-    expect(document.querySelector('.doodle-send__thread')?.textContent).toContain('Open thread')
+    expect(document.querySelector('.doodle-send__thread')?.textContent).toContain('See messages')
     expect(document.querySelector('.doodle-send__back')?.textContent).toMatch(/Done/)
   })
 
@@ -148,8 +148,8 @@ describe('Doodle pad send', () => {
       { user_id: 3, body: '', media_base64: PNG },
     ])
     expect(document.body.textContent).toContain('Sent to Austin and Brooklyn')
-    expect(document.querySelector('a.doodle-send__thread[href="/messages/user-1"]')?.textContent).toContain("Open Austin's thread")
-    expect(document.querySelector('a.doodle-send__thread[href="/messages/user-3"]')?.textContent).toContain("Open Brooklyn's thread")
+    expect(document.querySelector('a.doodle-send__thread[href="/messages/user-1"]')?.textContent).toContain("See Austin's messages")
+    expect(document.querySelector('a.doodle-send__thread[href="/messages/user-3"]')?.textContent).toContain("See Brooklyn's messages")
   })
 
   it('keeps the Send to… button when Twilio is missing and points to Settings', async () => {
@@ -160,7 +160,7 @@ describe('Doodle pad send', () => {
     await settle()
     click(byText('Send to…')!)
     await settle()
-    expect(document.body.textContent).toContain('Add your Twilio or Signal details in Settings')
+    expect(document.body.textContent).toContain('Ask a grown-up to turn on Messages in Settings')
     const link = document.querySelector('a[href="/settings?tab=messages"]')
     expect(link?.textContent).toContain('Open Messages settings')
     click(document.querySelector('.doodle-send__back')!)

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { api, authedUrl } from '../../api/client'
 import { useSettings } from '../../api/hooks'
@@ -40,6 +40,16 @@ export interface ConversationsResponse {
 }
 
 const KEY = ['messages'] as const
+const SENT_MS = 3200
+
+export function friendlySendError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  if (/phone number/i.test(raw)) return 'Ask a grown-up to add a phone number first.'
+  if (/Twilio or Signal|not configured|Settings/i.test(raw)) {
+    return 'Ask a grown-up to finish Messages settings, then try again.'
+  }
+  return "Couldn't send that. Try again in a moment."
+}
 
 function useConversations() {
   return useQuery({
@@ -73,14 +83,14 @@ export function MessagesPage() {
           className="btn btn--primary messages__send-doodle"
           onClick={() => setComposing(true)}
         >
-          Send doodle
+          Draw a picture
         </button>
       </header>
       {isLoading && !data ? (
         <p className="hint">Loading messages…</p>
       ) : !configured ? (
         <div className="messages__empty">
-          <p>Add your Twilio or Signal details in Settings to send notes and doodles to family phones.</p>
+          <p>Ask a grown-up to turn on Messages in Settings so you can send notes and pictures.</p>
           <Link to="/settings?tab=messages" className="btn btn--primary">
             Open Messages settings
           </Link>
@@ -88,14 +98,16 @@ export function MessagesPage() {
       ) : (
         <>
           {conversations.length === 0 && (
-            <p className="hint">
-              Add a phone number to a family member in Settings → Family, then you can text them from
-              here.
-            </p>
+            <p className="hint">Ask a grown-up to add your family in Settings, then you can send messages.</p>
           )}
           <div className="messages__list">
             {conversations.map((item) => (
-              <Link key={item.id} to={`/messages/${item.id}`} className="messages__person">
+              <Link
+                key={item.id}
+                to={`/messages/${item.id}`}
+                className="messages__person"
+                data-can-send={item.phone ? 'true' : 'false'}
+              >
                 <span className="messages__avatar" style={{ background: item.color }}>
                   {item.avatar_emoji || initial(item.name)}
                 </span>
@@ -120,13 +132,27 @@ export function MessageThreadPage() {
   const qc = useQueryClient()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [justSent, setJustSent] = useState(false)
   const [drawing, setDrawing] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLTextAreaElement>(null)
+  const sentTimer = useRef<number | null>(null)
 
   const data = thread.data
   const configured = listing.data?.configured ?? false
   const quick = listing.data?.quick_replies ?? ["Dinner's ready", 'Call me', "On my way?"]
+
+  const celebrateSent = useCallback(() => {
+    setJustSent(true)
+    if (sentTimer.current) window.clearTimeout(sentTimer.current)
+    sentTimer.current = window.setTimeout(() => setJustSent(false), SENT_MS)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (sentTimer.current) window.clearTimeout(sentTimer.current)
+    }
+  }, [])
 
   const send = useMutation({
     mutationFn: (payload: { user_id: number; body: string; media_base64?: string }) =>
@@ -135,9 +161,10 @@ export function MessageThreadPage() {
       setText('')
       setError(null)
       setDrawing(false)
+      celebrateSent()
       await qc.invalidateQueries({ queryKey: KEY })
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(friendlySendError(err)),
   })
 
   useEffect(() => {
@@ -172,20 +199,24 @@ export function MessageThreadPage() {
   }
 
   return (
-    <div className="messages messages--thread">
+    <div className="messages messages--thread" style={{ '--person-color': data.color } as CSSProperties}>
       <header className="messages__bar">
         <Link to="/messages" className="messages__back">
           <span aria-hidden>◀</span> Back
         </Link>
+        <span className="messages__avatar messages__avatar--header" style={{ background: data.color }}>
+          {data.avatar_emoji || initial(data.name)}
+        </span>
         <div className="messages__who">
           <h1 className="messages__title">{data.name}</h1>
-          {data.phone && <span className="messages__number">{data.phone}</span>}
         </div>
       </header>
 
       <div className="messages__thread" role="log" aria-live="polite">
         {(data.messages ?? []).length === 0 && (
-          <p className="hint">No messages yet. Send a note or a doodle.</p>
+          <p className="hint">
+            {canSend ? 'No messages yet. Send a note or draw a picture.' : 'No messages yet.'}
+          </p>
         )}
         {(data.messages ?? []).map((message) => (
           <div
@@ -201,12 +232,12 @@ export function MessageThreadPage() {
               />
             )}
             {message.body && <div className="messages__text">{message.body}</div>}
-            {message.direction === 'in' && message.media_url && (
+            {message.direction === 'in' && message.media_url && canSend && (
               <Link
                 className="messages__open-doodle"
                 to={doodleHref(message.media_url, data.user_id)}
               >
-                Open in Doodles
+                Draw on this
               </Link>
             )}
             <div className="messages__status">
@@ -243,32 +274,43 @@ export function MessageThreadPage() {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          {justSent && !error && (
+            <p className="messages__toast" role="status">
+              Sent!
+            </p>
+          )}
           {error && (
             <p className="banner banner--warn" role="alert">
               {error}
             </p>
           )}
           <div className="messages__actions">
-            <button type="button" className="btn" onClick={() => setDrawing(true)}>
-              Doodle
+            <button type="button" className="btn messages__draw" onClick={() => setDrawing(true)}>
+              Draw
             </button>
             <button type="submit" className="btn btn--primary" disabled={send.isPending || !text.trim()}>
-              {send.isPending ? 'Sending…' : 'Send'}
+              {send.isPending && !drawing ? 'Sending…' : 'Send'}
             </button>
           </div>
         </form>
       ) : (
-        <p className="hint messages__readonly">
-          {data.unknown
-            ? "This number isn't saved on a family member, so the wall won't send a reply."
-            : 'Add a phone number for this person in Settings to send a message.'}
-        </p>
+        <div className="messages__need-phone">
+          <p>
+            {data.unknown
+              ? "This isn't someone in the family, so you can't send a message."
+              : `Ask a grown-up to add a phone number so you can send messages to ${data.name}.`}
+          </p>
+        </div>
       )}
 
       {drawing && data.user_id && (
         <DoodleComposer
           busy={send.isPending}
-          onBack={() => setDrawing(false)}
+          error={error}
+          onBack={() => {
+            setDrawing(false)
+            setError(null)
+          }}
           onSend={(png) => submit(text, png)}
         />
       )}
@@ -289,15 +331,18 @@ function ListDoodleFlow({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="messages__doodle" role="dialog" aria-label="Draw a doodle">
+    <div className="messages__doodle" role="dialog" aria-label="Draw a picture">
       <header className="messages__bar">
         <button type="button" className="messages__back" onClick={onClose}>
           <span aria-hidden>◀</span> Back
         </button>
-        <h1 className="messages__title">Doodle</h1>
+        <h1 className="messages__title">Draw a picture</h1>
       </header>
-      <DoodleSurface ref={surfaceRef} onEmptyChange={onEmptyChange}>
+      <DoodleSurface ref={surfaceRef} simpleTools onEmptyChange={onEmptyChange}>
         <div className="messages__actions">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
           <button
             type="button"
             className="btn btn--primary"
@@ -307,7 +352,7 @@ function ListDoodleFlow({ onClose }: { onClose: () => void }) {
               if (data) setPng(data)
             }}
           >
-            Send to…
+            Send
           </button>
         </div>
       </DoodleSurface>
@@ -317,10 +362,12 @@ function ListDoodleFlow({ onClose }: { onClose: () => void }) {
 
 function DoodleComposer({
   busy,
+  error,
   onBack,
   onSend,
 }: {
   busy: boolean
+  error: string | null
   onBack: () => void
   onSend: (png: string) => void
 }) {
@@ -329,15 +376,23 @@ function DoodleComposer({
   const onEmptyChange = useCallback((value: boolean) => setEmpty(value), [])
 
   return (
-    <div className="messages__doodle" role="dialog" aria-label="Draw a doodle">
+    <div className="messages__doodle" role="dialog" aria-label="Draw a picture">
       <header className="messages__bar">
         <button type="button" className="messages__back" onClick={onBack}>
           <span aria-hidden>◀</span> Back
         </button>
-        <h1 className="messages__title">Doodle</h1>
+        <h1 className="messages__title">Draw a picture</h1>
       </header>
-      <DoodleSurface ref={surfaceRef} onEmptyChange={onEmptyChange}>
+      <DoodleSurface ref={surfaceRef} simpleTools onEmptyChange={onEmptyChange}>
+        {error && (
+          <p className="banner banner--warn" role="alert">
+            {error}
+          </p>
+        )}
         <div className="messages__actions">
+          <button type="button" className="btn" onClick={onBack}>
+            Cancel
+          </button>
           <button
             type="button"
             className="btn btn--primary"
@@ -347,7 +402,7 @@ function DoodleComposer({
               if (png) onSend(png)
             }}
           >
-            {busy ? 'Sending…' : 'Send doodle'}
+            {busy ? 'Sending…' : 'Send'}
           </button>
         </div>
       </DoodleSurface>
@@ -367,10 +422,12 @@ function initial(name: string): string {
 
 function preview(item: Conversation): string {
   const last = item.last_message
-  if (!last) return item.phone || 'No messages yet'
-  if (last.body) return last.body
-  if (last.media_url) return last.direction === 'out' ? 'You sent a drawing' : 'Sent a picture'
-  return item.phone || ''
+  if (last) {
+    if (last.body) return last.body
+    if (last.media_url) return last.direction === 'out' ? 'You sent a drawing' : 'Sent a picture'
+  }
+  if (!item.phone) return 'Ask a grown-up to add a phone number'
+  return 'No messages yet'
 }
 
 function statusLabel(status: string): string {

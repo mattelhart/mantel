@@ -159,6 +159,25 @@ def test_send_rejected_when_unconfigured(client):
     assert "Twilio" in r.json()["error"]["message"]
 
 
+def test_conversations_list_includes_family_without_a_phone(client):
+    _person(client, name="Austin", phone=AUSTIN)
+    _person(client, name="Sam", phone=None)
+    listing = client.get("/api/messages/conversations").json()
+    names = {c["name"]: c for c in listing["conversations"]}
+    assert set(names) == {"Austin", "Sam"}
+    assert names["Austin"]["phone"] == AUSTIN
+    assert names["Austin"]["can_send"] is False
+    assert names["Sam"]["phone"] is None
+    assert names["Sam"]["can_send"] is False
+    assert not any(c["unknown"] for c in listing["conversations"])
+
+    _configure(client)
+    listing = client.get("/api/messages/conversations").json()
+    names = {c["name"]: c for c in listing["conversations"]}
+    assert names["Austin"]["can_send"] is True
+    assert names["Sam"]["can_send"] is False
+
+
 def test_send_sms_is_mocked_and_stores_a_message(client, monkeypatch):
     _configure(client)
     person = _person(client)

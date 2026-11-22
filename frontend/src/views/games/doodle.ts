@@ -7,6 +7,7 @@ export interface Stroke {
   color: string
   size: number
   points: Point[]
+  erase?: boolean
 }
 
 export const DOODLE_COLORS = [
@@ -22,8 +23,18 @@ export const DOODLE_COLORS = [
 
 export const DOODLE_SIZES = [6, 12, 22, 36] as const
 
-export function startStroke(strokes: Stroke[], color: string, size: number, point: Point): Stroke[] {
-  return [...strokes, { color, size, points: [point] }]
+/** A thick brush that is easy to draw with on a touchscreen. */
+export const DOODLE_CHUNKY_SIZE: (typeof DOODLE_SIZES)[number] = 22
+
+
+export function startStroke(
+  strokes: Stroke[],
+  color: string,
+  size: number,
+  point: Point,
+  erase = false,
+): Stroke[] {
+  return [...strokes, { color, size, points: [point], erase }]
 }
 
 export function addPoint(strokes: Stroke[], point: Point): Stroke[] {
@@ -72,6 +83,47 @@ function imageSize(image: CanvasImageSource): { width: number; height: number } 
   return { width: 0, height: 0 }
 }
 
+function paintStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
+  if (stroke.points.length === 0) return
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = stroke.erase ? '#000000' : stroke.color
+  ctx.fillStyle = stroke.erase ? '#000000' : stroke.color
+  ctx.lineWidth = stroke.size
+  ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over'
+  const first = stroke.points[0]
+  if (stroke.points.length === 1) {
+    ctx.beginPath()
+    ctx.arc(first.x, first.y, stroke.size / 2, 0, Math.PI * 2)
+    ctx.fill()
+    return
+  }
+  ctx.beginPath()
+  ctx.moveTo(first.x, first.y)
+  for (let i = 1; i < stroke.points.length; i += 1) {
+    ctx.lineTo(stroke.points[i].x, stroke.points[i].y)
+  }
+  ctx.stroke()
+}
+
+function paintInk(ctx: CanvasRenderingContext2D, strokes: Stroke[]) {
+  for (const stroke of strokes) {
+    paintStroke(ctx, stroke)
+  }
+  ctx.globalCompositeOperation = 'source-over'
+}
+
+function makeInkLayer(width: number, height: number, strokes: Stroke[]): CanvasImageSource | null {
+  if (typeof document === 'undefined') return null
+  const ink = document.createElement('canvas')
+  ink.width = Math.max(1, Math.ceil(width))
+  ink.height = Math.max(1, Math.ceil(height))
+  const inkCtx = ink.getContext('2d')
+  if (!inkCtx) return null
+  paintInk(inkCtx, strokes)
+  return ink
+}
+
 /** Redraw an optional background and every stroke onto a 2D canvas. */
 export function paint(
   ctx: CanvasRenderingContext2D,
@@ -86,26 +138,11 @@ export function paint(
     const box = containRect(size.width, size.height, width, height)
     ctx.drawImage(background, box.x, box.y, box.width, box.height)
   }
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  for (const stroke of strokes) {
-    if (stroke.points.length === 0) continue
-    ctx.strokeStyle = stroke.color
-    ctx.fillStyle = stroke.color
-    ctx.lineWidth = stroke.size
-    const first = stroke.points[0]
-    if (stroke.points.length === 1) {
-      ctx.beginPath()
-      ctx.arc(first.x, first.y, stroke.size / 2, 0, Math.PI * 2)
-      ctx.fill()
-      continue
-    }
-    ctx.beginPath()
-    ctx.moveTo(first.x, first.y)
-    for (let i = 1; i < stroke.points.length; i += 1) {
-      ctx.lineTo(stroke.points[i].x, stroke.points[i].y)
-    }
-    ctx.stroke()
+  const ink = makeInkLayer(width, height, strokes)
+  if (ink) {
+    ctx.drawImage(ink, 0, 0, width, height)
+  } else {
+    paintInk(ctx, strokes)
   }
 }
 

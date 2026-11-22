@@ -13,6 +13,7 @@ describe('doodle pad', () => {
     ])
     expect(strokes[0].color).toBe('#c0392b')
     expect(strokes[0].size).toBe(12)
+    expect(strokes[0].erase).toBe(false)
 
     strokes = startStroke(strokes, '#2980b9', 6, { x: 8, y: 8 })
     expect(strokes).toHaveLength(2)
@@ -22,6 +23,15 @@ describe('doodle pad', () => {
     expect(undoStroke([])).toEqual([])
     expect(clearStrokes()).toEqual([])
     expect(addPoint([], { x: 1, y: 1 })).toEqual([])
+  })
+
+  it('records an eraser stroke separately from ink', () => {
+    let strokes = startStroke([], '#1c2430', 22, { x: 2, y: 2 })
+    strokes = startStroke(strokes, '#1c2430', 22, { x: 8, y: 8 }, true)
+    expect(strokes).toHaveLength(2)
+    expect(strokes[0].erase).toBe(false)
+    expect(strokes[1].erase).toBe(true)
+    expect(strokes[1].points).toEqual([{ x: 8, y: 8 }])
   })
 
   it('letterboxes an image inside a box without stretching', () => {

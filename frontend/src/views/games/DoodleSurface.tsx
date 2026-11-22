@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { authedUrl } from '../../api/client'
 import {
+  DOODLE_CHUNKY_SIZE,
   DOODLE_COLORS,
   DOODLE_SIZES,
   addPoint,
@@ -32,15 +33,18 @@ export const DoodleSurface = forwardRef<
     extraTools?: ReactNode
     children?: ReactNode
     onEmptyChange?: (empty: boolean) => void
+    /** Hide brush-size buttons and use a chunky brush. Better for a quick drawing from Messages. */
+    simpleTools?: boolean
   }
->(function DoodleSurface({ backgroundSrc, extraTools, children, onEmptyChange }, ref) {
+>(function DoodleSurface({ backgroundSrc, extraTools, children, onEmptyChange, simpleTools = false }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const strokesRef = useRef<Stroke[]>([])
   const backgroundRef = useRef<CanvasImageSource | null>(null)
   const [strokes, setStrokes] = useState<Stroke[]>([])
   const [background, setBackground] = useState<HTMLImageElement | null>(null)
   const [color, setColor] = useState<string>(DOODLE_COLORS[0])
-  const [size, setSize] = useState<(typeof DOODLE_SIZES)[number]>(DOODLE_SIZES[1])
+  const [size, setSize] = useState<(typeof DOODLE_SIZES)[number]>(DOODLE_CHUNKY_SIZE)
+  const [eraser, setEraser] = useState(false)
   const drawing = useRef(false)
   strokesRef.current = strokes
   backgroundRef.current = background
@@ -121,7 +125,8 @@ export const DoodleSurface = forwardRef<
     event.currentTarget.setPointerCapture?.(event.pointerId)
     drawing.current = true
     const point = pointFrom(event)
-    setStrokes((current) => startStroke(current, color, size, point))
+    const brush = simpleTools ? DOODLE_CHUNKY_SIZE : size
+    setStrokes((current) => startStroke(current, color, brush, point, eraser))
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
@@ -137,8 +142,13 @@ export const DoodleSurface = forwardRef<
     }
   }
 
+  function pickColor(value: string) {
+    setColor(value)
+    setEraser(false)
+  }
+
   return (
-    <div className="doodle">
+    <div className={simpleTools ? 'doodle doodle--simple' : 'doodle'}>
       <div className="doodle__tools">
         <div className="doodle__colors" role="group" aria-label="Colour">
           {DOODLE_COLORS.map((value) => (
@@ -146,27 +156,38 @@ export const DoodleSurface = forwardRef<
               key={value}
               type="button"
               className="doodle__swatch"
-              data-on={color === value}
+              data-on={!eraser && color === value}
               aria-label={`Colour ${value}`}
               style={{ background: value }}
-              onClick={() => setColor(value)}
+              onClick={() => pickColor(value)}
             />
           ))}
         </div>
-        <div className="doodle__sizes" role="group" aria-label="Brush size">
-          {DOODLE_SIZES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className="doodle__size"
-              data-on={size === value}
-              aria-label={`Brush size ${value}`}
-              onClick={() => setSize(value)}
-            >
-              <span style={{ width: value, height: value }} />
-            </button>
-          ))}
-        </div>
+        {!simpleTools && (
+          <div className="doodle__sizes" role="group" aria-label="Brush size">
+            {DOODLE_SIZES.map((value) => (
+              <button
+                key={value}
+                type="button"
+                className="doodle__size"
+                data-on={size === value}
+                aria-label={`Brush size ${value}`}
+                onClick={() => setSize(value)}
+              >
+                <span style={{ width: value, height: value }} />
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          className="doodle__action doodle__action--eraser"
+          data-on={eraser}
+          aria-pressed={eraser}
+          onClick={() => setEraser((on) => !on)}
+        >
+          Eraser
+        </button>
         <button type="button" className="doodle__action" onClick={() => setStrokes((s) => undoStroke(s))}>
           Undo
         </button>

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -106,22 +106,15 @@ def _last_message(db: Session, phone: str | None, user_id: int | None) -> Family
     "/conversations",
     summary="List message threads",
     description=(
-        "One thread per family member who has a phone number. Messages from numbers "
-        "that don't belong to a family member are hidden."
+        "One thread per family member. Messages from numbers that don't belong "
+        "to a family member are hidden."
     ),
 )
 def list_conversations(db: Session = Depends(get_db)) -> dict:
     cfg_ok = sms.configured(db)
     people = list(db.scalars(select(User).order_by(User.sort_order, User.id)))
     threads: list[dict] = []
-    used_phones: set[str] = set()
     for user in people:
-        if not user.phone and not db.scalar(
-            select(func.count()).select_from(FamilyMessage).where(FamilyMessage.user_id == user.id)
-        ):
-            continue
-        if user.phone:
-            used_phones.add(user.phone)
         last = _last_message(db, user.phone, user.id)
         threads.append(
             {
@@ -132,6 +125,7 @@ def list_conversations(db: Session = Depends(get_db)) -> dict:
                 "color": user.color,
                 "avatar_emoji": user.avatar_emoji,
                 "unknown": False,
+                "can_send": bool(user.phone and cfg_ok),
                 "last_message": _message_out(last) if last else None,
             }
         )

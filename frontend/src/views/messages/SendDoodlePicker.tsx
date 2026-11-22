@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useSettings, useUsers } from '../../api/hooks'
 import type { User } from '../../api/types'
+import { friendlySendError } from './MessagesPage'
 
 export interface SendResult {
   user: User
@@ -68,10 +69,10 @@ export function SendDoodlePicker({
   const send = useMutation({
     mutationFn: async () => {
       if (!configured) {
-        throw new Error('Add your Twilio or Signal details in Settings')
+        throw new Error('Ask a grown-up to finish Messages settings, then try again.')
       }
       if (chosen.length === 0) {
-        throw new Error('Choose someone with a phone number.')
+        throw new Error('Pick someone with a phone number.')
       }
       const body = caption.trim()
       const out: SendResult[] = []
@@ -87,7 +88,7 @@ export function SendDoodlePicker({
           out.push({
             user,
             ok: false,
-            error: err instanceof Error ? err.message : 'Could not send',
+            error: friendlySendError(err),
           })
         }
       }
@@ -98,7 +99,7 @@ export function SendDoodlePicker({
       setResults(out)
       await qc.invalidateQueries({ queryKey: ['messages'] })
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => setError(friendlySendError(err)),
   })
 
   function toggle(user: User) {
@@ -121,12 +122,12 @@ export function SendDoodlePicker({
         <button type="button" className="doodle-send__back" onClick={results ? done : onBack}>
           <span aria-hidden>◀</span> {results ? 'Done' : 'Back'}
         </button>
-        <h1 className="doodle-send__title">{results ? 'Sent' : 'Send to…'}</h1>
+        <h1 className="doodle-send__title">{results ? 'Sent!' : 'Who should get this?'}</h1>
       </header>
 
       {!configured ? (
         <div className="doodle-send__empty">
-          <p>Add your Twilio or Signal details in Settings to send a drawing to a family phone.</p>
+          <p>Ask a grown-up to turn on Messages in Settings so you can send a picture.</p>
           <Link to="/settings?tab=messages" className="btn btn--primary">
             Open Messages settings
           </Link>
@@ -144,7 +145,7 @@ export function SendDoodlePicker({
               to={`/messages/user-${succeeded[0].user.id}`}
               className="btn btn--primary doodle-send__thread"
             >
-              Open thread
+              See messages
             </Link>
           )}
           {succeeded.length > 1 && (
@@ -155,7 +156,7 @@ export function SendDoodlePicker({
                   to={`/messages/user-${item.user.id}`}
                   className="btn btn--primary doodle-send__thread"
                 >
-                  Open {item.user.name}&apos;s thread
+                  See {item.user.name}&apos;s messages
                 </Link>
               ))}
             </div>
@@ -165,10 +166,10 @@ export function SendDoodlePicker({
         <>
           {isLoading && <p className="hint">Loading family…</p>}
           {!isLoading && people.length === 0 && (
-            <p className="hint">Add a family member in Settings, then you can text them a drawing.</p>
+            <p className="hint">Ask a grown-up to add your family in Settings, then you can send a picture.</p>
           )}
           {!isLoading && people.length > 0 && sendable.length === 0 && (
-            <p className="hint">Add a phone number in Settings → Family so someone can receive a drawing.</p>
+            <p className="hint">Ask a grown-up to add a phone number so someone can get a picture.</p>
           )}
           <div className="doodle-send__list">
             {people.map((person) => {
@@ -178,7 +179,7 @@ export function SendDoodlePicker({
                 <button
                   key={person.id}
                   type="button"
-                  className="doodle-send__person"
+                  className={ready ? 'doodle-send__person' : 'doodle-send__person doodle-send__person--no-phone'}
                   disabled={!ready}
                   aria-pressed={ready ? on : undefined}
                   onClick={() => toggle(person)}
@@ -188,7 +189,7 @@ export function SendDoodlePicker({
                   </span>
                   <span className="doodle-send__meta">
                     <span className="doodle-send__name">{person.name}</span>
-                    <span className="doodle-send__hint">{ready ? person.phone : 'No phone saved'}</span>
+                    <span className="doodle-send__hint">{ready ? 'Tap to pick' : 'Ask a grown-up to add a phone number'}</span>
                   </span>
                   {ready && on ? <span className="doodle-send__check" aria-hidden>✓</span> : null}
                 </button>
@@ -203,11 +204,11 @@ export function SendDoodlePicker({
             }}
           >
             <label className="doodle-send__caption">
-              <span>Caption (optional)</span>
+              <span>Write a note (optional)</span>
               <input
                 type="text"
                 maxLength={CAPTION_MAX}
-                placeholder="Add a short note"
+                placeholder="A short note"
                 value={caption}
                 onChange={(event) => setCaption(event.target.value)}
               />
