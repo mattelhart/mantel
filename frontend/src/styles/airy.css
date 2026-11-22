@@ -806,37 +806,43 @@ html[data-theme='airy'] .shell__nav {
    the 8px gap or 10px side padding or the ring will clip or overlap again. */
 @media (orientation: landscape) and (min-width: 700px) {
   html[data-theme='airy'] .shell__nav {
-    gap: 8px;
-    padding: 10px 10px;
+    /* Every item must fit the screen height without scrolling: the buttons
+       share the rail evenly and icons/labels shrink with the viewport height,
+       capped at the sizes that read well from across the room. */
+    gap: clamp(2px, 0.6vh, 8px);
+    padding: clamp(6px, 1vh, 10px) 10px;
     align-items: stretch;
     min-height: 0;
-    /* Rings sit inside the button (offset -4px), so the rail can scroll when
-       Games and Cameras join the existing items on a short wall display. */
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   html[data-theme='airy'] .navbtn {
-    min-height: 56px;
-    padding: 6px 6px;
-    gap: 4px;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 104px;
+    padding: 2px 4px;
+    gap: clamp(1px, 0.4vh, 4px);
     overflow: visible;
     /* A fractional scale on press slightly blurs the type on a Pi panel. */
     transform: none;
   }
 
   html[data-theme='airy'] .navbtn__icon {
-    width: 40px;
-    height: 40px;
+    width: clamp(22px, 3.7vh, 40px);
+    height: clamp(22px, 3.7vh, 40px);
+    flex: none;
   }
 
   html[data-theme='airy'] .navbtn__label {
-    /* 0.95rem -> 1.125rem, about 18% larger, still fits the 136px wall rail. */
-    font-size: 1.125rem;
+    /* Large for across-the-room reading, but sized so 'Calendar' fits the
+       124px rail on one line; it shrinks on short screens with the icons. */
+    font-size: clamp(0.8rem, 1.75vh, 1.05rem);
     font-weight: 800;
     line-height: 1.15;
     max-width: 100%;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: center;
     /* body uses antialiased (grayscale), which looks soft at this size on Linux. */
     -webkit-font-smoothing: subpixel-antialiased;

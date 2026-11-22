@@ -32,7 +32,6 @@ const NAV = [
   { to: '/games', label: 'Games' },
   { to: '/cameras', label: 'Cameras' },
   { to: '/meals', label: 'Meals' },
-  { to: '/show-on-tv', label: 'Show on TV' },
   { to: '/chores', label: 'Chores' },
   { to: '/settings', label: 'Settings' },
 ]
