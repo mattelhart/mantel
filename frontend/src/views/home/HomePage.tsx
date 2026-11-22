@@ -16,8 +16,10 @@ import {
   STATUS_HELP,
   classifyPointerMove,
   describe,
+  describeSensor,
   editView,
   isLevelSlider,
+  isRoomSensor,
   layoutHome,
   levelFromX,
   moveDevice,
@@ -27,6 +29,7 @@ import {
   nudgeLevel,
   pruneLayout,
   roomSummary,
+  sortRoomSensors,
   setDeviceOrder,
   setRoomOrder,
   setSceneOrder,
@@ -325,6 +328,38 @@ export function HomePage() {
   )
 }
 
+/** Tick once a minute so "Motion 12 min ago" stays honest without a live event. */
+function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), intervalMs)
+    return () => window.clearInterval(id)
+  }, [intervalMs])
+  return now
+}
+
+/** A compact, non-interactive status line. Spans, not buttons: no hover, no press, no focus. */
+export function RoomSensorStrip({ sensors }: { sensors: HomeEntity[] }) {
+  const now = useNow()
+  const chips = sortRoomSensors(sensors).map((e) => describeSensor(e, now))
+  if (chips.length === 0) return null
+  return (
+    <ul className="home-room__sensors" aria-label="Room sensors">
+      {chips.map((chip) => (
+        <li
+          key={chip.id}
+          className="home-sensor"
+          data-active={chip.active || undefined}
+          aria-label={chip.label}
+        >
+          {chip.dot && <span className="home-sensor__dot" aria-hidden="true" />}
+          {chip.text}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function RoomCard({
   title,
   summary,
@@ -342,17 +377,22 @@ function RoomCard({
   onOpen: (id: string) => void
   onLock: (v: { id: string; action: 'lock' | 'unlock' }) => void
 }) {
+  const controls = entities.filter((e) => !isRoomSensor(e))
+  const sensors = entities.filter(isRoomSensor)
   return (
     <section className={wide ? 'home-room home-room--wide' : 'home-room'} aria-label={title}>
       <header className="home-room__head">
         <h2 className="home-room__title">{title}</h2>
         {summary && <span className="home-room__sum">{summary}</span>}
       </header>
-      <div className="home-room__tiles">
-        {entities.map((e) => (
-          <Tile key={e.entity_id} entity={e} run={run} onOpen={onOpen} onLock={onLock} />
-        ))}
-      </div>
+      {sensors.length > 0 && <RoomSensorStrip sensors={sensors} />}
+      {controls.length > 0 && (
+        <div className="home-room__tiles">
+          {controls.map((e) => (
+            <Tile key={e.entity_id} entity={e} run={run} onOpen={onOpen} onLock={onLock} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }

@@ -155,6 +155,65 @@
   gap: 10px;
 }
 
+/* Read-only room sensors: a flat status line, never a tile. No hover, press or
+   focus styles, and pointer-events: none so a swipe or D-pad cannot land on them. */
+.home-room__sensors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.home-room__sensors:last-child {
+  margin-bottom: 0;
+}
+
+.home-sensor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.home-sensor__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.45;
+  flex: 0 0 auto;
+}
+
+.home-sensor[data-active='true'] .home-sensor__dot {
+  background: var(--icon-switch);
+  opacity: 1;
+}
+
+.home-room__sensors--edit {
+  margin-top: 10px;
+}
+
+.home-sensor--edit {
+  pointer-events: auto;
+  gap: 8px;
+}
+
+.home-sensor--edit[data-hidden='true'] {
+  opacity: 0.5;
+}
+
 .home-tile {
   position: relative;
   display: flex;

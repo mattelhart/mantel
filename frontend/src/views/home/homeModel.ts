@@ -24,6 +24,11 @@ export interface HomeEntity {
   device_class?: string | null
   /** HA's entity_picture, if it provided one. The access token is never included. */
   entity_picture?: string | null
+  /** Read-only room status (motion, occupancy, temperature, humidity). Not a tile. */
+  readonly?: boolean
+  kind?: 'sensor'
+  last_changed?: string | null
+  unit_of_measurement?: string | null
 }
 
 export interface HomeRoom {
@@ -47,6 +52,8 @@ export interface HomeStatePatch {
   on: boolean | null
   level: number | null
   attrs: Record<string, unknown>
+  last_changed?: string | null
+  unit_of_measurement?: string | null
 }
 
 export type HomeFrame =
@@ -127,6 +134,7 @@ export function describe(e: HomeEntity): string {
     case 'script':
       return ''
     default:
+      if (isRoomSensor(e)) return describeSensor(e).text
       return e.on ? 'On' : 'Off'
   }
 }
@@ -260,7 +268,11 @@ export function layoutHome(
     .filter((room) => room.entities.length > 0)
   const rooms = orderBy(shown, (r) => r.key, prefs.rooms).filter((r) => !switchedOff.has(r.key))
   const byId = new Map(all.map((e) => [e.entity_id, e]))
-  const pinned = favorites.flatMap((id) => (byId.has(id) && !gone.has(id) ? [byId.get(id)!] : []))
+  // Sensors are status, not favorites: even if an old list still names one, leave it out.
+  const pinned = favorites.flatMap((id) => {
+    const e = byId.get(id)
+    return e && !gone.has(id) && !isRoomSensor(e) ? [e] : []
+  })
   return {
     favorites: pinned,
     rooms,
@@ -397,7 +409,12 @@ export function pruneLayout(data: HomeData, prefs: HomeLayoutPrefs): HomeLayoutP
 }
 
 export function roomSummary(room: HomeRoom): string {
-  const on = room.entities.filter((e) => e.on && e.available && e.domain !== 'lock' && e.domain !== 'climate').length
+  const countable = room.entities.filter(
+    (e) => !isRoomSensor(e) && e.domain !== 'lock' && e.domain !== 'climate',
+  )
+  // A thermostat or a sensors-only room has nothing that is meaningfully "on" or "off".
+  if (countable.length === 0) return ''
+  const on = countable.filter((e) => e.on && e.available).length
   return on === 0 ? 'All off' : `${on} on`
 }
 
@@ -447,6 +464,87 @@ export type PointerIntent = 'pending' | 'slide' | 'scroll'
 export function classifyPointerMove(dx: number, dy: number, slop = SLIDER_TAP_PX): PointerIntent {
   if (Math.hypot(dx, dy) < slop) return 'pending'
   return Math.abs(dx) > Math.abs(dy) ? 'slide' : 'scroll'
+}
+
+// ----------------------------------------------------------------------- room sensors
+
+/** Motion, occupancy, temperature and humidity chips — never tiles. */
+export function isRoomSensor(e: Pick<HomeEntity, 'readonly' | 'kind' | 'domain'>): boolean {
+  return e.readonly === true || e.kind === 'sensor' || e.domain === 'sensor' || e.domain === 'binary_sensor'
+}
+
+const SENSOR_CHIP_ORDER = ['motion', 'occupancy', 'presence', 'temperature', 'humidity', 'carbon_dioxide']
+
+export function sortRoomSensors(entities: HomeEntity[]): HomeEntity[] {
+  const rank = new Map(SENSOR_CHIP_ORDER.map((c, i) => [c, i]))
+  return [...entities].sort((a, b) => {
+    const da = rank.get(a.device_class ?? '') ?? 99
+    const db = rank.get(b.device_class ?? '') ?? 99
+    if (da !== db) return da - db
+    return a.name.localeCompare(b.name)
+  })
+}
+
+/** "12 min ago" for a last_changed timestamp. Null if the stamp is missing or unreadable.
+ *  Under a minute is "<1 min ago" so an off motion chip never says "just now". */
+export function sensorAgo(iso: string | null | undefined, now: number = Date.now()): string | null {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return null
+  const ms = Math.max(0, now - then)
+  if (ms < 60_000) return '<1 min ago'
+  const mins = Math.round(ms / 60_000)
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.round(mins / 60)
+  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`
+}
+
+const BINARY_WORDS: Record<string, { now: string; ago: (when: string) => string; none: string; noun: string }> = {
+  motion: { now: 'Motion now', ago: (when) => `Motion ${when}`, none: 'No motion', noun: 'Motion' },
+  occupancy: { now: 'Occupied now', ago: (when) => `Occupied ${when}`, none: 'Empty', noun: 'Occupancy' },
+  presence: { now: 'Present now', ago: (when) => `Present ${when}`, none: 'Away', noun: 'Presence' },
+}
+
+export interface SensorChip {
+  id: string
+  text: string
+  /** Screen-reader label, includes the sensor name. */
+  label: string
+  /** Currently detecting motion/occupancy/presence. */
+  active: boolean
+  /** Show the small status dot (binary sensors). */
+  dot: boolean
+}
+
+export function describeSensor(e: HomeEntity, now: number = Date.now()): SensorChip {
+  const name = e.name
+  const cls = e.device_class ?? ''
+  const words = BINARY_WORDS[cls]
+  if (!e.available) {
+    const text = words ? `${words.noun} unavailable` : 'Unavailable'
+    return { id: e.entity_id, text, label: `${name}: unavailable`, active: false, dot: Boolean(words) }
+  }
+  if (words) {
+    if (e.state === 'on') {
+      return { id: e.entity_id, text: words.now, label: `${name}: ${words.now}`, active: true, dot: true }
+    }
+    const ago = sensorAgo(e.last_changed, now)
+    const text = ago ? words.ago(ago) : words.none
+    return { id: e.entity_id, text, label: `${name}: ${text}`, active: false, dot: true }
+  }
+  const n = Number(e.state)
+  if (!Number.isFinite(n)) {
+    return { id: e.entity_id, text: '—', label: `${name}: unavailable`, active: false, dot: false }
+  }
+  let text: string
+  if (cls === 'temperature') text = `${Math.round(n)}°`
+  else if (cls === 'humidity') text = `${Math.round(n)}%`
+  else if (cls === 'carbon_dioxide') text = `${Math.round(n)} ${e.unit_of_measurement?.trim() || 'ppm'}`
+  else {
+    const unit = e.unit_of_measurement ? ` ${e.unit_of_measurement}` : ''
+    text = `${Number.isInteger(n) ? n : Math.round(n * 10) / 10}${unit}`
+  }
+  return { id: e.entity_id, text, label: `${name}: ${text}`, active: false, dot: false }
 }
 
 // ----------------------------------------------------------------------- TV silhouettes

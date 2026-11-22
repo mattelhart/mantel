@@ -2,7 +2,7 @@ import type { HTMLAttributes } from 'react'
 import { DragGhost } from './DragGhost'
 import { MasonryGrid } from './MasonryGrid'
 import { DeviceIcon } from './homeIcons'
-import { describe, type EditItem, type EditRoom, type EditView } from './homeModel'
+import { describe, describeSensor, isRoomSensor, type EditItem, type EditRoom, type EditView } from './homeModel'
 import { sortByOrder } from './dragSort'
 import { useDragSort } from './useDragSort'
 
@@ -120,15 +120,17 @@ function EditRoomCard({
   drag?: DragProps
   state?: 'source' | 'ghost'
 }) {
-  const ids = room.items.map((i) => i.entity.entity_id)
+  const devices = room.items.filter((i) => !isRoomSensor(i.entity))
+  const sensors = room.items.filter((i) => isRoomSensor(i.entity))
+  const ids = devices.map((i) => i.entity.entity_id)
   const sort = useDragSort({
     group: `devices:${room.key}`,
     ids,
     onCommit: (next) => on.setDeviceOrder(room.key, next),
     disabled: state === 'ghost',
   })
-  const items = sortByOrder(room.items, (i) => i.entity.entity_id, sort.order)
-  const ghostItem = sort.ghost ? room.items.find((i) => i.entity.entity_id === sort.ghost?.id) : null
+  const items = sortByOrder(devices, (i) => i.entity.entity_id, sort.order)
+  const ghostItem = sort.ghost ? devices.find((i) => i.entity.entity_id === sort.ghost?.id) : null
   return (
     <section
       className={`home-room home-room--edit home-draggable${room.wide ? ' home-room--wide' : ''}`}
@@ -163,24 +165,53 @@ function EditRoomCard({
         </button>
         <Arrows name={room.name} first={index === 0} last={index === count - 1} onMove={(d) => on.moveRoom(room.key, d)} />
       </div>
-      <div className="home-room__tiles">
-        {items.map((item) => {
-          const id = item.entity.entity_id
-          const i = ids.indexOf(id)
-          return (
-            <EditTile
-              key={id}
-              item={item}
-              first={i === 0}
-              last={i === ids.length - 1}
-              onMove={(d) => on.moveDevice(room.key, id, d)}
-              onToggle={() => on.toggleDevice(id)}
-              drag={state === 'ghost' ? undefined : sort.itemProps(id)}
-              state={sort.dragId === id ? 'source' : undefined}
-            />
-          )
-        })}
-      </div>
+      {items.length > 0 && (
+        <div className="home-room__tiles">
+          {items.map((item) => {
+            const id = item.entity.entity_id
+            const i = ids.indexOf(id)
+            return (
+              <EditTile
+                key={id}
+                item={item}
+                first={i === 0}
+                last={i === ids.length - 1}
+                onMove={(d) => on.moveDevice(room.key, id, d)}
+                onToggle={() => on.toggleDevice(id)}
+                drag={state === 'ghost' ? undefined : sort.itemProps(id)}
+                state={sort.dragId === id ? 'source' : undefined}
+              />
+            )
+          })}
+        </div>
+      )}
+      {sensors.length > 0 && (
+        <ul className="home-room__sensors home-room__sensors--edit" aria-label="Room sensors">
+          {sensors.map((item) => {
+            const chip = describeSensor(item.entity)
+            return (
+              <li
+                key={item.entity.entity_id}
+                className="home-sensor home-sensor--edit"
+                data-hidden={item.hidden}
+                data-active={chip.active || undefined}
+              >
+                {chip.dot && <span className="home-sensor__dot" aria-hidden="true" />}
+                <span>{item.hidden ? `${item.entity.name} · Hidden` : chip.text}</span>
+                <button
+                  type="button"
+                  className="home-edit__chip"
+                  aria-pressed={item.hidden}
+                  aria-label={`${item.hidden ? 'Show' : 'Hide'} ${item.entity.name}`}
+                  onClick={() => on.toggleDevice(item.entity.entity_id)}
+                >
+                  {item.hidden ? 'Show' : 'Hide'}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
       <DragGhost ghost={sort.ghost} ghostRef={sort.ghostRef}>
         {ghostItem && <EditTile item={ghostItem} first={false} last={false} onMove={() => {}} onToggle={() => {}} state="ghost" />}
       </DragGhost>
