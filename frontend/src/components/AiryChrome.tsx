@@ -89,6 +89,7 @@ const NAV = [
   { to: '/dashboard', label: 'Today', icon: 'today' },
   { to: '/chores', label: 'Chores', icon: 'chores' },
   { to: '/lists', label: 'Lists', icon: 'lists' },
+  { to: '/messages', label: 'Messages', icon: 'messages' },
   { to: '/home', label: 'Home', icon: 'home' },
   { to: '/photos', label: 'Photos', icon: 'photos' },
   { to: '/games', label: 'Games', icon: 'games' },
@@ -160,6 +161,13 @@ function paths(name: string): ReactNode {
           <circle cx="5" cy="7" r="1.2" fill="currentColor" stroke="none" />
           <circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none" />
           <circle cx="5" cy="17" r="1.2" fill="currentColor" stroke="none" />
+        </>
+      )
+    case 'messages':
+      return (
+        <>
+          <path d="M4.5 6.5h11A2 2 0 0 1 17.5 8.5v6A2 2 0 0 1 15.5 16.5H10l-3.5 3v-3H6.5A2 2 0 0 1 4.5 14.5v-6A2 2 0 0 1 6.5 6.5z" />
+          <path d="M17 8.2h1.5A2 2 0 0 1 20.5 10.2v5.2A2 2 0 0 1 18.5 17.4h-.7l-2 1.8v-1.8" />
         </>
       )
     case 'photos':

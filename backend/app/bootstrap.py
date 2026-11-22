@@ -62,6 +62,12 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "google_client_id": "",
     "google_client_secret": "",
     "public_base_url": "",
+    # Family messaging via Twilio SMS/MMS. SID and auth token are sealed like
+    # ha_token and never returned by the API. The From number is the toll-free
+    # number on the account.
+    "twilio_account_sid": "",
+    "twilio_auth_token": "",
+    "twilio_from_number": "",
 }
 
 

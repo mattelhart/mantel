@@ -6,7 +6,7 @@ from ..bootstrap import DEFAULT_SETTINGS, THEMES
 from ..config import get_settings
 from ..db import get_db
 from ..models import AppSetting
-from ..services import google_config, ha_home, home_layout, homeassistant
+from ..services import google_config, ha_home, home_layout, homeassistant, twilio_messages
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -30,7 +30,12 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
     # Home Assistant token can never be read back out.
     values[google_config.CLIENT_SECRET_KEY] = ""
     values["ha_token"] = ""
+    values["twilio_account_sid"] = ""
+    values["twilio_auth_token"] = ""
+    for key in twilio_messages.INTERNAL_KEYS:
+        values.pop(key, None)
 
+    twilio = twilio_messages.load_config(db)
     return {
         **values,
         "server": {
@@ -38,6 +43,9 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
             "google_configured": cfg.configured,
             "google_client_secret_set": bool(cfg.client_secret),
             "ha_token_set": bool(stored.get("ha_token")),
+            "twilio_account_sid_set": bool(stored.get("twilio_account_sid")),
+            "twilio_auth_token_set": bool(stored.get("twilio_auth_token")),
+            "twilio_configured": twilio.configured,
             "google_redirect_uri": cfg.redirect_uri,
             "sync_enabled": s.sync_enabled,
             "sync_interval_seconds": s.sync_interval_seconds,
@@ -75,6 +83,28 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
 
     # Same rule for the Home Assistant token, plus: `null` clears it. Sealed before it is stored.
     ha_changed = any(k in payload for k in ("ha_base_url", "ha_token"))
+    twilio_changed = any(
+        k in payload for k in ("twilio_account_sid", "twilio_auth_token", "twilio_from_number")
+    )
+    for key in ("twilio_account_sid", "twilio_auth_token"):
+        if key not in payload:
+            continue
+        secret = payload.pop(key)
+        if secret is None:
+            payload[key] = ""
+        elif not isinstance(secret, str):
+            raise HTTPException(400, f"{key} must be text")
+        elif secret.strip():
+            payload[key] = ha_home.seal_token(secret.strip())
+    if "twilio_from_number" in payload:
+        raw = str(payload["twilio_from_number"] or "").strip()
+        if not raw:
+            payload["twilio_from_number"] = ""
+        else:
+            number = twilio_messages.normalize_e164(raw)
+            if not twilio_messages.valid_e164(number):
+                raise HTTPException(400, "The Twilio From number must look like +18005551212")
+            payload["twilio_from_number"] = number
     if "ha_token" in payload:
         token = payload.pop("ha_token")
         if token is None:
@@ -117,6 +147,10 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
     if ha_changed:
         # An open Home screen is on a socket made with the old URL and token.
         ha_home.stream.reconnect()
+    if twilio_changed:
+        # A first setup should not import years of old texts from the number.
+        twilio_messages.mark_poll_since_now(db)
+        db.commit()
     return get_app_settings(db)
 
 

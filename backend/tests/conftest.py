@@ -15,6 +15,8 @@ os.environ["UPDATE_CHECK_ENABLED"] = "false"
 # The default AUTH_MODE trusts private addresses and rejects everything else.
 # The test client is neither, so the suite would 401. Auth cases opt back in.
 os.environ["AUTH_MODE"] = "off"
+# The Twilio poller must not fire mid-test.
+os.environ["TWILIO_POLL_SECONDS"] = "3600"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

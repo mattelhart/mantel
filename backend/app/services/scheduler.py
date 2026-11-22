@@ -4,7 +4,7 @@ import logging
 
 from ..config import get_settings
 from ..db import SessionLocal
-from . import sync_engine, update_check
+from . import sync_engine, twilio_messages, update_check
 from .pullsignal import register_pull_signal
 from .pushqueue import register_push_signal
 
@@ -77,6 +77,23 @@ def _push_once() -> int:
         return sync_engine.push_pending(db)
 
 
+async def _messages_loop() -> None:
+    """Pull inbound SMS/MMS and delivery status when Twilio is configured.
+
+    No webhook is used, so the wall can stay off the public internet. The
+    interval is short enough to feel nearly live. When Twilio is not set up
+    the tick is a cheap no-op.
+    """
+    while True:
+        # Sleep first so a freshly started process (and the test suite) does
+        # not touch the database in a thread the moment the API comes up.
+        await asyncio.sleep(twilio_messages.poll_interval_seconds())
+        try:
+            await asyncio.to_thread(twilio_messages.poll_once)
+        except Exception:
+            log.exception("Scheduled Twilio poll failed")
+
+
 def start(loop: asyncio.AbstractEventLoop) -> list[asyncio.Task]:
     # Separate from the sync flag: pausing calendar sync says nothing about wanting to
     # hear about a new release.
@@ -85,6 +102,7 @@ def start(loop: asyncio.AbstractEventLoop) -> list[asyncio.Task]:
         tasks.append(asyncio.create_task(_update_check_loop()))
     else:
         log.info("Update check is disabled (UPDATE_CHECK_ENABLED=false)")
+    tasks.append(asyncio.create_task(_messages_loop()))
     if not get_settings().sync_enabled:
         log.info("Google sync is disabled (SYNC_ENABLED=false)")
         return tasks

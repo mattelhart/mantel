@@ -18,6 +18,7 @@ export const TOPIC_QUERY_KEYS: Record<string, string[][]> = {
   rewards: [['chores']],
   widgets: [['widgets']],
   photos: [['photos']],
+  messages: [['messages']],
 }
 
 export const FALLBACK_ROOTS = [
@@ -31,6 +32,7 @@ export const FALLBACK_ROOTS = [
   'chores',
   'widgets',
   'photos',
+  'messages',
 ]
 
 /** 1s, 2s, 4s… capped at 30s, plus a little jitter so a restarted server is

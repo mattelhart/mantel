@@ -1,0 +1,260 @@
+/* Family messages: list, thread, and the doodle overlay. */
+
+.messages {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 18px 16px;
+}
+
+.messages__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.messages__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-xl);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 52px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-weight: 800;
+  text-decoration: none;
+  border: 0;
+  font: inherit;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.messages__back:focus-visible,
+.messages__person:focus-visible,
+.messages__chip:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.messages__who {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages__number {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.messages__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 32rem;
+  font-size: var(--font-md);
+  line-height: 1.4;
+}
+
+.messages__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  padding-bottom: 12px;
+}
+
+.messages__person {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 88px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--bg-elev);
+  box-shadow: 0 10px 28px rgba(28, 36, 48, 0.06);
+  color: var(--text);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.messages__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.messages__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.messages__name {
+  font-size: var(--font-lg);
+  font-weight: 800;
+}
+
+.messages__preview {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages--thread .messages__thread {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+
+.messages__bubble {
+  max-width: min(72%, 640px);
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--bg-elev);
+  box-shadow: 0 8px 20px rgba(28, 36, 48, 0.06);
+}
+
+.messages__bubble[data-dir='out'] {
+  align-self: flex-end;
+  background: #e8f0fe;
+}
+
+.messages__bubble[data-dir='in'] {
+  align-self: flex-start;
+}
+
+.messages__text {
+  font-size: var(--font-md);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.messages__pic {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 16px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.messages__status {
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+}
+
+.messages__compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  flex: none;
+}
+
+.messages__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.messages__chip {
+  min-height: 48px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  touch-action: manipulation;
+  box-shadow: 0 2px 8px rgba(28, 36, 48, 0.06);
+}
+
+.messages__input {
+  width: 100%;
+  min-height: 96px;
+  resize: none;
+  font: inherit;
+  font-size: var(--font-md);
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+}
+
+.messages__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.messages__readonly {
+  margin-top: auto;
+}
+
+.messages__doodle {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px 16px;
+  background: var(--bg);
+  min-height: 0;
+}
+
+.messages__doodle .doodle {
+  flex: 1;
+  min-height: 0;
+}
+
+html[data-theme='airy'] .messages__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+/* The people tab phone field sits beside the name on a wide wall, under it on a phone. */
+.row__phone {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+}
