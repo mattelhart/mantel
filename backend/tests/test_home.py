@@ -137,6 +137,41 @@ def test_a_tv_is_a_tile_with_its_volume_source_and_what_it_can_do():
         "source": "HDMI1",
         "sources": ["HDMI1", "HDMI2", "Netflix"],
     }
+    assert tv["manufacturer"] == "Samsung Electronics"
+    assert tv["model"] == "UN55CU7000FXZA"
+    assert tv["model_id"] == "UN55CU7000FXZA"
+    assert tv["device_class"] == "tv"
+    assert "entity_picture" not in tv
+
+
+def test_a_tv_picture_is_passed_through_when_ha_has_one():
+    states = [
+        {
+            "entity_id": "media_player.frame",
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Frame",
+                "supported_features": 0,
+                "entity_picture": "https://example.invalid/frame.jpg",
+                "device_class": "tv",
+            },
+        }
+    ]
+    tv = ha_home.build_snapshot(states, [], [], [])["rooms"][0]["entities"][0]
+    assert tv["entity_picture"] == "https://example.invalid/frame.jpg"
+    assert tv["device_class"] == "tv"
+
+
+def test_a_non_url_entity_picture_is_dropped():
+    states = [
+        {
+            "entity_id": "media_player.x",
+            "state": "off",
+            "attributes": {"friendly_name": "X", "entity_picture": "javascript:alert(1)"},
+        }
+    ]
+    tv = ha_home.build_snapshot(states, [], [], [])["rooms"][0]["entities"][0]
+    assert "entity_picture" not in tv
 
 
 @pytest.mark.parametrize(

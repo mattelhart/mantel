@@ -17,6 +17,13 @@ export interface HomeEntity {
   level: number | null
   adjustable: boolean
   attrs: Record<string, unknown>
+  /** From HA's device registry, when known. Used to pick a TV silhouette. */
+  manufacturer?: string | null
+  model?: string | null
+  model_id?: string | null
+  device_class?: string | null
+  /** HA's entity_picture, if it provided one. The access token is never included. */
+  entity_picture?: string | null
 }
 
 export interface HomeRoom {
@@ -389,4 +396,83 @@ export const STATUS_HELP: Record<string, string> = {
   unreachable: "Mantel can't reach Home Assistant.",
   invalid_token: 'Home Assistant rejected the access token.',
   error: 'Home Assistant had a problem.',
+}
+
+// ----------------------------------------------------------------------- tile slider (lights and fans)
+
+/** Movement under this (in CSS pixels) is still a tap, not a drag. */
+export const SLIDER_TAP_PX = 8
+/** Arrow keys change brightness or speed by this much. */
+export const SLIDER_STEP = 10
+/** How often a drag is sent to Home Assistant before the finger lifts, in ms. */
+export const SLIDER_THROTTLE_MS = 300
+
+/** A dimmable light or a fan with a percentage speed: the tile itself is the slider. */
+export function isLevelSlider(e: HomeEntity): boolean {
+  return e.adjustable && (e.domain === 'light' || e.domain === 'fan')
+}
+
+/** Map a pointer's X position across the tile to 0–100. */
+export function levelFromX(x: number, left: number, width: number): number {
+  if (width <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round(((x - left) / width) * 100)))
+}
+
+/** The level the tile should show: the in-progress drag, or the live value, or 0 when off. */
+export function shownLevel(e: HomeEntity, draft: number | null): number {
+  if (draft !== null) return draft
+  return e.on && e.level !== null ? e.level : 0
+}
+
+/** Arrow-key adjustment. An off light starts at 0, so the first Right lands on 10%. */
+export function nudgeLevel(level: number | null, on: boolean | null, delta: number): number {
+  const base = on && level !== null ? level : 0
+  return Math.max(0, Math.min(100, Math.round(base + delta)))
+}
+
+export type PointerIntent = 'pending' | 'slide' | 'scroll'
+
+/** Decide whether a move is still a tap, a horizontal slide, or a vertical page scroll.
+ *  Horizontal must strictly dominate before the tile claims the gesture. */
+export function classifyPointerMove(dx: number, dy: number, slop = SLIDER_TAP_PX): PointerIntent {
+  if (Math.hypot(dx, dy) < slop) return 'pending'
+  return Math.abs(dx) > Math.abs(dy) ? 'slide' : 'scroll'
+}
+
+// ----------------------------------------------------------------------- TV silhouettes
+
+export type TvStyle = 'frame' | 'serif' | 'sero' | 'flat' | 'generic'
+
+/** Pick a TV silhouette from the manufacturer/model (or a generic set if we don't know it). */
+export function tvStyle(
+  manufacturer?: string | null,
+  model?: string | null,
+  modelId?: string | null,
+  deviceClass?: string | null,
+): TvStyle {
+  const blob = `${manufacturer ?? ''} ${model ?? ''} ${modelId ?? ''}`.toLowerCase()
+  if (/the frame|ls03|ls03[a-z]|frame/.test(blob)) return 'frame'
+  if (/the serif|ls01|ls01[a-z]|serif/.test(blob)) return 'serif'
+  if (/the sero|ls05|ls05[a-z]|sero/.test(blob)) return 'sero'
+  // Crystal UHD / CU7000 / typical flat Samsung (and most other modern sets).
+  if (
+    /cu[0-9]{4}|crystal|qn[0-9]{2}|un[0-9]{2}|ue[0-9]{2}|au[0-9]{4}|bu[0-9]{4}|du[0-9]{4}/.test(blob) ||
+    deviceClass === 'tv'
+  ) {
+    return 'flat'
+  }
+  return 'generic'
+}
+
+/** Only a real http(s) image is safe to show in the browser; a relative HA path would
+ *  need the access token, which stays on the server. */
+export function publicEntityPicture(url?: string | null): string | null {
+  if (!url || url.length > 500) return null
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    return url
+  } catch {
+    return null
+  }
 }

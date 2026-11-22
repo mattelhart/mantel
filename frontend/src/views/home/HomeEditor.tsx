@@ -1,3 +1,4 @@
+import { DeviceIcon } from './homeIcons'
 import { describe, type EditItem, type EditRoom, type EditView } from './homeModel'
 
 /** Everything Edit mode can do, as plain callbacks, so the page owns the draft. Moves are
@@ -12,7 +13,6 @@ export interface EditHandlers {
   moveScene: (id: string, delta: -1 | 1) => void
 }
 
-type Icons = Record<string, string>
 
 function Arrows({
   name,
@@ -39,14 +39,12 @@ function Arrows({
 
 function EditTile({
   item,
-  icons,
   first,
   last,
   onMove,
   onToggle,
 }: {
   item: EditItem
-  icons: Icons
   first: boolean
   last: boolean
   onMove: (delta: -1 | 1) => void
@@ -56,7 +54,7 @@ function EditTile({
   return (
     <div className="home-tile home-tile--edit" data-hidden={item.hidden}>
       <div className="home-tile__main home-tile__main--edit">
-        <span className="home-tile__icon" aria-hidden>{icons[entity.domain] ?? '•'}</span>
+        <span className="home-tile__icon"><DeviceIcon entity={entity} /></span>
         <span className="home-tile__name">{entity.name}</span>
         <span className="home-tile__state">{item.hidden ? 'Hidden' : describe(entity)}</span>
       </div>
@@ -80,13 +78,11 @@ function EditRoomCard({
   room,
   index,
   count,
-  icons,
   on,
 }: {
   room: EditRoom
   index: number
   count: number
-  icons: Icons
   on: EditHandlers
 }) {
   return (
@@ -125,7 +121,6 @@ function EditRoomCard({
           <EditTile
             key={item.entity.entity_id}
             item={item}
-            icons={icons}
             first={i === 0}
             last={i === room.items.length - 1}
             onMove={(d) => on.moveDevice(room.key, item.entity.entity_id, d)}
@@ -138,7 +133,7 @@ function EditRoomCard({
 }
 
 /** The page body while arranging: scene chips, then every room with its controls. */
-export function HomeEditor({ view, icons, on }: { view: EditView; icons: Icons; on: EditHandlers }) {
+export function HomeEditor({ view, on }: { view: EditView; on: EditHandlers }) {
   return (
     <>
       {view.scenes.length > 0 && (
@@ -146,7 +141,7 @@ export function HomeEditor({ view, icons, on }: { view: EditView; icons: Icons; 
           {view.scenes.map((item, i) => (
             <div key={item.entity.entity_id} className="home-scene-edit" data-hidden={item.hidden}>
               <span className="home-scene-edit__name">
-                <span aria-hidden>{icons[item.entity.domain]}</span> {item.entity.name}
+                <DeviceIcon entity={item.entity} /> {item.entity.name}
                 {item.hidden && <span className="home-scene-edit__flag"> · Hidden</span>}
               </span>
               <Arrows
@@ -170,7 +165,7 @@ export function HomeEditor({ view, icons, on }: { view: EditView; icons: Icons; 
       )}
       <div className="home__rooms">
         {view.rooms.map((room, i) => (
-          <EditRoomCard key={room.key} room={room} index={i} count={view.rooms.length} icons={icons} on={on} />
+          <EditRoomCard key={room.key} room={room} index={i} count={view.rooms.length} on={on} />
         ))}
       </div>
     </>

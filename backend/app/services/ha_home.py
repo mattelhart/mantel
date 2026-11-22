@@ -242,6 +242,48 @@ def _adjustable(domain: str, attrs: dict) -> bool:
     return domain == "climate"
 
 
+def _clip(value: Any, limit: int = 80) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        if text and len(text) < 200:
+            return text[:limit]
+    return None
+
+
+def _identity(reg: dict | None, devices_by_id: dict, attrs: dict) -> dict:
+    """Manufacturer, model and class, for a TV icon that looks like the set it controls.
+
+    These come from the device registry first, then the entity's own attributes. A picture
+    is included only when HA provided one; the token never is.
+    """
+    dev = devices_by_id.get((reg or {}).get("device_id")) or {}
+    out: dict[str, Any] = {}
+    manufacturer = _clip(dev.get("manufacturer") or attrs.get("manufacturer"))
+    model = _clip(dev.get("model") or dev.get("model_id") or attrs.get("model"))
+    model_id = _clip(dev.get("model_id"))
+    device_class = _clip(
+        (reg or {}).get("device_class")
+        or (reg or {}).get("original_device_class")
+        or attrs.get("device_class")
+    )
+    if manufacturer:
+        out["manufacturer"] = manufacturer
+    if model:
+        out["model"] = model
+    if model_id:
+        out["model_id"] = model_id
+    if device_class:
+        out["device_class"] = device_class
+    picture = attrs.get("entity_picture")
+    if (
+        isinstance(picture, str)
+        and picture.startswith(("http://", "https://", "/"))
+        and len(picture) < 500
+    ):
+        out["entity_picture"] = picture
+    return out
+
+
 def _tidy_name(name: str, area: str | None) -> str:
     """ "Living Room Floor Lamp" inside the Living Room card is just "Floor Lamp"."""
     if area and name.lower().startswith(area.lower() + " "):
@@ -258,6 +300,7 @@ def build_snapshot(
     area_names = {a["area_id"]: a.get("name") or a["area_id"] for a in areas}
     device_area = {d["id"]: d.get("area_id") for d in devices}
     device_names = {d["id"]: d.get("name_by_user") or d.get("name") for d in devices}
+    devices_by_id = {d["id"]: d for d in devices}
     registry = {e["entity_id"]: e for e in entities}
 
     rooms: dict[str | None, list[dict]] = {}
@@ -293,6 +336,7 @@ def build_snapshot(
             "name": _tidy_name(str(name), area_names.get(area_id)),
             "area_id": area_id,
             "adjustable": _adjustable(domain, attrs),
+            **_identity(reg, devices_by_id, attrs),
         }
         if domain == "climate":
             item["attrs"].update(

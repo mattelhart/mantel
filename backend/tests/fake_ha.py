@@ -90,6 +90,7 @@ def default_states() -> list[dict]:
                 "is_volume_muted": False,
                 "source": "HDMI1",
                 "source_list": ["HDMI1", "HDMI2", "Netflix"],
+                "device_class": "tv",
             },
         },
         {
@@ -122,14 +123,30 @@ AREAS = [
     {"area_id": "kitchen", "name": "Kitchen"},
     {"area_id": "bedroom", "name": "Bedroom"},
 ]
-DEVICES = [{"id": "dev_den", "name": "Den Shade", "area_id": "living_room", "name_by_user": None}]
+DEVICES = [
+    {"id": "dev_den", "name": "Den Shade", "area_id": "living_room", "name_by_user": None},
+    {
+        "id": "dev_tv",
+        "name": "Living Room TV",
+        "area_id": "living_room",
+        "name_by_user": None,
+        "manufacturer": "Samsung Electronics",
+        "model": "UN55CU7000FXZA",
+        "model_id": "UN55CU7000FXZA",
+    },
+]
 ENTITIES = [
     {"entity_id": "light.living_room_lamp", "area_id": "living_room", "device_id": None},
     {"entity_id": "light.kitchen_pendant", "area_id": "kitchen", "device_id": None},
     {"entity_id": "light.old_bulb", "area_id": "kitchen", "disabled_by": "user"},
     {"entity_id": "light.bridge_identify", "entity_category": "config"},
     {"entity_id": "fan.bedroom_fan", "area_id": "bedroom"},
-    {"entity_id": "media_player.living_room_tv", "area_id": "living_room"},
+    {
+        "entity_id": "media_player.living_room_tv",
+        "area_id": "living_room",
+        "device_id": "dev_tv",
+        "original_device_class": "tv",
+    },
     # Area comes from the device, as it does for most Caseta entities.
     {"entity_id": "cover.den_shade", "device_id": "dev_den", "area_id": None},
 ]

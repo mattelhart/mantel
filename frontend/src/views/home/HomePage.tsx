@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { sendHomeAction, useHome, useHomeLive } from '../../api/home'
@@ -7,18 +7,26 @@ import { useSettings } from '../../api/hooks'
 import type { AppSettings } from '../../api/types'
 import { swallowTapThrough, useDismissGuard } from '../../components/dismissGuard'
 import { HomeEditor } from './HomeEditor'
+import { DeviceIcon } from './homeIcons'
 import {
   DEFAULT_PREFS,
+  SLIDER_STEP,
+  SLIDER_THROTTLE_MS,
   STATUS_HELP,
+  classifyPointerMove,
   describe,
   editView,
+  isLevelSlider,
   layoutHome,
+  levelFromX,
   moveDevice,
   moveRoom,
   moveScene,
   normalizePrefs,
+  nudgeLevel,
   pruneLayout,
   roomSummary,
+  shownLevel,
   tapResult,
   toggleHidden,
   toggleRoomHidden,
@@ -26,22 +34,11 @@ import {
   type HomeEntity,
   type HomeLayoutPrefs,
   type HomeStatus,
+  type PointerIntent,
 } from './homeModel'
 
 const LONG_PRESS_MS = 500
 const LONG_PRESS_SLOP_PX = 12
-
-const ICONS: Record<string, string> = {
-  light: '💡',
-  fan: '🌀',
-  switch: '🔌',
-  input_boolean: '🔘',
-  cover: '🪟',
-  climate: '🌡️',
-  media_player: '📺',
-  scene: '✨',
-  script: '▶️',
-}
 
 type Run = (entity: HomeEntity, action: string, value?: number | string, confirm?: boolean) => Promise<boolean>
 
@@ -215,6 +212,7 @@ export function HomePage() {
             <button
               key={scene.entity_id}
               className="home-scene"
+              aria-label={scene.name}
               data-done={done === scene.entity_id}
               disabled={!scene.available}
               onClick={async () => {
@@ -224,7 +222,7 @@ export function HomePage() {
                 }
               }}
             >
-              <span aria-hidden>{ICONS[scene.domain]}</span> {scene.name}
+              <DeviceIcon entity={scene} /> {scene.name}
               {done === scene.entity_id && <span className="home-scene__ok"> ✓</span>}
             </button>
           ))}
@@ -241,7 +239,6 @@ export function HomePage() {
       {view && draft && (
         <HomeEditor
           view={view}
-          icons={ICONS}
           on={{
             moveRoom: (key, delta) => change({ prefs: moveRoom(data, draft.hidden, draft.prefs, key, delta) }),
             toggleRoom: (key) => change({ prefs: toggleRoomHidden(draft.prefs, key) }),
@@ -340,8 +337,10 @@ function RoomCard({
   )
 }
 
-/** A tap does the obvious thing. Press-and-hold, or the small button beside it (which is
- *  how a remote reaches it), opens the controls. */
+/** A tap does the obvious thing. On a dimmable light or a speed-adjustable fan, a
+ *  horizontal drag across the tile sets the level; a vertical move still scrolls the
+ *  page. Press-and-hold, or the small button beside it (which is how a remote reaches
+ *  it), opens the controls. */
 function Tile({
   entity,
   run,
@@ -353,26 +352,46 @@ function Tile({
   onOpen: (id: string) => void
   onLock: (v: { id: string; action: 'lock' | 'unlock' }) => void
 }) {
+  const slider = isLevelSlider(entity)
   const timer = useRef<number | null>(null)
-  const start = useRef<{ x: number; y: number } | null>(null)
+  const start = useRef<{ x: number; y: number; left: number; width: number } | null>(null)
+  const intent = useRef<PointerIntent>('pending')
   const held = useRef(false)
+  const skipClick = useRef(false)
+  const lastSent = useRef<number | null>(null)
+  const lastSentAt = useRef(0)
+  const draftRef = useRef<number | null>(null)
+  const [draft, setDraft] = useState<number | null>(null)
+  draftRef.current = draft
 
-  const cancel = () => {
+  const clearTimer = () => {
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = null
-    start.current = null
   }
-  useEffect(() => cancel, [])
+  useEffect(() => clearTimer, [])
+
+  const sendLevel = (value: number, force = false) => {
+    if (!force && value === lastSent.current) return
+    lastSent.current = value
+    lastSentAt.current = Date.now()
+    void run(entity, 'set_level', value)
+  }
 
   const down = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 && event.pointerType === 'mouse') return
     held.current = false
-    start.current = { x: event.clientX, y: event.clientY }
+    skipClick.current = false
+    intent.current = 'pending'
+    lastSent.current = shownLevel(entity, null)
+    lastSentAt.current = 0
+    const rect = event.currentTarget.getBoundingClientRect()
+    start.current = { x: event.clientX, y: event.clientY, left: rect.left, width: rect.width }
     timer.current = window.setTimeout(() => {
+      if (intent.current !== 'pending') return
       held.current = true
+      skipClick.current = true
       timer.current = null
       onOpen(entity.entity_id)
-      // The sheet now sits under the held finger. Lifting it would "tap" the dimmed area
-      // and close the sheet straight away, so eat the click that comes with the release.
       const release = () => {
         window.removeEventListener('pointerup', release, true)
         window.removeEventListener('pointercancel', release, true)
@@ -382,14 +401,88 @@ function Tile({
       window.addEventListener('pointercancel', release, true)
     }, LONG_PRESS_MS)
   }
+
   const move = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const from = start.current
-    if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > LONG_PRESS_SLOP_PX) cancel()
+    if (!from || held.current) return
+    const dx = event.clientX - from.x
+    const dy = event.clientY - from.y
+    if (intent.current === 'pending') {
+      const next = slider ? classifyPointerMove(dx, dy) : classifyPointerMove(dx, dy, LONG_PRESS_SLOP_PX)
+      if (next === 'pending') return
+      clearTimer()
+      intent.current = next
+      if (next === 'scroll' || !slider) {
+        skipClick.current = next === 'scroll'
+        return
+      }
+      // Horizontal drag has taken over: the tile claims this pointer so a finger
+      // leaving the card mid-slide still updates the level.
+      skipClick.current = true
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        /* jsdom and a few older browsers have no capture; the slide still works
+           while the pointer stays on the tile. */
+      }
+    }
+    if (intent.current !== 'slide' || !slider) return
+    event.preventDefault()
+    const value = levelFromX(event.clientX, from.left, from.width)
+    setDraft(value)
+    if (lastSentAt.current && Date.now() - lastSentAt.current >= SLIDER_THROTTLE_MS) {
+      sendLevel(value)
+    } else if (!lastSentAt.current) {
+      lastSentAt.current = Date.now()
+    }
+  }
+
+  const up = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    clearTimer()
+    const from = start.current
+    start.current = null
+    const was = intent.current
+    intent.current = 'pending'
+    try {
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      /* ignore */
+    }
+    if (was === 'slide' && slider) {
+      const value = draftRef.current ?? (from ? levelFromX(event.clientX, from.left, from.width) : shownLevel(entity, null))
+      sendLevel(value, true)
+      setDraft(null)
+    }
+  }
+
+  const cancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    clearTimer()
+    start.current = null
+    intent.current = 'pending'
+    try {
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      /* ignore */
+    }
+    setDraft(null)
+  }
+
+  const leave = () => {
+    // Don't kill a slide, but a long-press should not fire after the finger leaves.
+    if (intent.current !== 'slide') clearTimer()
   }
 
   const tap = () => {
     if (held.current) {
       held.current = false
+      return
+    }
+    if (skipClick.current) {
+      skipClick.current = false
       return
     }
     const result = tapResult(entity)
@@ -398,30 +491,68 @@ function Tile({
     else void run(entity, result.action)
   }
 
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!slider || !entity.available) return
+    const delta =
+      event.key === 'ArrowRight' || event.key === 'ArrowUp'
+        ? SLIDER_STEP
+        : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+          ? -SLIDER_STEP
+          : event.key === 'Home'
+            ? -100
+            : event.key === 'End'
+              ? 100
+              : 0
+    if (!delta && event.key !== 'Home') return
+    event.preventDefault()
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? 100 : nudgeLevel(entity.level, entity.on, delta)
+    if (next === shownLevel(entity, null)) return
+    void run(entity, 'set_level', next)
+  }
+
   // A TV's level is its volume: a bar on the tile would read like "how on" it is.
-  const level =
-    entity.adjustable && entity.on && entity.level !== null && entity.domain !== 'media_player' ? entity.level : null
+  const level = slider ? shownLevel(entity, draft) : entity.adjustable && entity.on && entity.level !== null && entity.domain !== 'media_player' ? entity.level : null
+  const sliding = draft !== null
   return (
-    <div className="home-tile" data-on={!!entity.on} data-unavailable={!entity.available}>
+    <div
+      className="home-tile"
+      data-on={!!entity.on}
+      data-unavailable={!entity.available}
+      data-domain={entity.domain}
+      data-slider={slider || undefined}
+      data-sliding={sliding || undefined}
+      style={slider ? ({ '--level': level } as CSSProperties) : undefined}
+    >
       <button
         type="button"
         className="home-tile__main"
-        aria-pressed={entity.domain === 'lock' || entity.domain === 'climate' ? undefined : !!entity.on}
+        role={slider ? 'slider' : undefined}
+        aria-valuemin={slider ? 0 : undefined}
+        aria-valuemax={slider ? 100 : undefined}
+        aria-valuenow={slider ? level ?? 0 : undefined}
+        aria-valuetext={slider ? `${level ?? 0}%` : undefined}
+        aria-orientation={slider ? 'horizontal' : undefined}
+        aria-label={slider ? entity.name : undefined}
+        aria-pressed={slider || entity.domain === 'lock' || entity.domain === 'climate' ? undefined : !!entity.on}
         disabled={!entity.available}
         onPointerDown={down}
         onPointerMove={move}
-        onPointerUp={cancel}
+        onPointerUp={up}
         onPointerCancel={cancel}
-        onPointerLeave={cancel}
+        onPointerLeave={leave}
+        onKeyDown={onKeyDown}
         onContextMenu={(event) => event.preventDefault()}
         onClick={tap}
       >
-        <span className="home-tile__icon" aria-hidden>
-          {entity.domain === 'lock' ? (entity.on ? '🔓' : '🔒') : (ICONS[entity.domain] ?? '•')}
+        {slider && <span className="home-tile__fill" aria-hidden />}
+        <span className="home-tile__icon">
+          <DeviceIcon entity={entity} />
         </span>
         <span className="home-tile__name">{entity.name}</span>
-        <span className="home-tile__state">{describe(entity)}</span>
-        {level !== null && (
+        <span className="home-tile__state" data-drag={sliding || undefined}>
+          {sliding ? `${draft}%` : describe(entity)}
+        </span>
+        {!slider && level !== null && (
           <span className="home-tile__bar" aria-hidden>
             <span style={{ width: `${level}%` }} />
           </span>

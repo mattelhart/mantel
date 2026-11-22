@@ -2,22 +2,29 @@ import { describe as suite, expect, it } from 'vitest'
 import {
   DEFAULT_PREFS,
   applyState,
+  classifyPointerMove,
   describe,
   editView,
+  isLevelSlider,
   layoutHome,
+  levelFromX,
   moveDevice,
   moveItem,
   moveRoom,
   moveScene,
   normalizePrefs,
+  nudgeLevel,
   orderBy,
   parseHomeFrames,
   predict,
   pruneLayout,
+  publicEntityPicture,
   roomSummary,
+  shownLevel,
   tapResult,
   toggleRoomHidden,
   toggleRoomWide,
+  tvStyle,
   type HomeData,
   type HomeEntity,
 } from './homeModel'
@@ -304,5 +311,82 @@ suite('arranging the page', () => {
     const list = [{ id: 'a' }, { id: 'b' }]
     expect(orderBy(list, (x) => x.id, [])).toBe(list)
     expect(orderBy(list, (x) => x.id, undefined)).toBe(list)
+  })
+})
+
+suite('tile slider', () => {
+  it('is only for dimmable lights and fans with a speed', () => {
+    expect(isLevelSlider(ent({}))).toBe(true)
+    expect(isLevelSlider(ent({ adjustable: false }))).toBe(false)
+    expect(isLevelSlider(ent({ domain: 'fan', adjustable: true }))).toBe(true)
+    expect(isLevelSlider(ent({ domain: 'fan', adjustable: false }))).toBe(false)
+    expect(isLevelSlider(ent({ domain: 'switch', adjustable: false }))).toBe(false)
+    expect(isLevelSlider(ent({ domain: 'cover', adjustable: true }))).toBe(false)
+    expect(isLevelSlider(ent({ domain: 'media_player', adjustable: true }))).toBe(false)
+  })
+
+  it('maps a pointer across the tile to 0–100 and clamps the edges', () => {
+    expect(levelFromX(0, 0, 200)).toBe(0)
+    expect(levelFromX(200, 0, 200)).toBe(100)
+    expect(levelFromX(100, 0, 200)).toBe(50)
+    expect(levelFromX(50, 0, 200)).toBe(25)
+    expect(levelFromX(-20, 0, 200)).toBe(0)
+    expect(levelFromX(260, 0, 200)).toBe(100)
+    expect(levelFromX(80, 20, 200)).toBe(30)
+    expect(levelFromX(50, 0, 0)).toBe(0)
+  })
+
+  it('shows the drag value, then the live level, then 0 when the device is off', () => {
+    expect(shownLevel(ent({ level: 40 }), 72)).toBe(72)
+    expect(shownLevel(ent({ level: 40, on: true }), null)).toBe(40)
+    expect(shownLevel(ent({ level: 40, on: false }), null)).toBe(0)
+    expect(shownLevel(ent({ level: null, on: true }), null)).toBe(0)
+  })
+
+  it('nudge by 10% starts from 0 when the light is off, and stops at the ends', () => {
+    expect(nudgeLevel(0, false, 10)).toBe(10)
+    expect(nudgeLevel(50, true, 10)).toBe(60)
+    expect(nudgeLevel(50, true, -10)).toBe(40)
+    expect(nudgeLevel(95, true, 10)).toBe(100)
+    expect(nudgeLevel(5, true, -10)).toBe(0)
+    expect(nudgeLevel(null, false, -10)).toBe(0)
+  })
+
+  it('classifies a move as a tap, a horizontal slide, or a vertical scroll', () => {
+    expect(classifyPointerMove(0, 0)).toBe('pending')
+    expect(classifyPointerMove(7, 0)).toBe('pending')
+    expect(classifyPointerMove(5, 5)).toBe('pending')
+    expect(classifyPointerMove(8, 0)).toBe('slide')
+    expect(classifyPointerMove(20, 5)).toBe('slide')
+    expect(classifyPointerMove(0, 8)).toBe('scroll')
+    expect(classifyPointerMove(5, 20)).toBe('scroll')
+    // A tie does not claim the gesture, so the page can still scroll.
+    expect(classifyPointerMove(10, 10)).toBe('scroll')
+    expect(classifyPointerMove(10, -10)).toBe('scroll')
+    expect(classifyPointerMove(-12, 4)).toBe('slide')
+  })
+})
+
+suite('TV silhouettes', () => {
+  it('picks a silhouette from the model, with a generic fallback', () => {
+    expect(tvStyle('Samsung Electronics', 'UN55CU7000FXZA', 'UN55CU7000FXZA', 'tv')).toBe('flat')
+    expect(tvStyle('Samsung Electronics', 'UN65CU7000FXZA', 'UN65CU7000FXZA', 'tv')).toBe('flat')
+    expect(tvStyle('Samsung', 'The Frame', 'QN65LS03BAFXZA')).toBe('frame')
+    expect(tvStyle('Samsung', 'LS03B')).toBe('frame')
+    expect(tvStyle('Samsung', 'The Serif', 'QN55LS01B')).toBe('serif')
+    expect(tvStyle('Samsung', 'The Sero', 'QN43LS05B')).toBe('sero')
+    expect(tvStyle('Samsung', undefined, undefined, 'tv')).toBe('flat')
+    expect(tvStyle('Sony', 'XR-65X90L', undefined, 'tv')).toBe('flat')
+    expect(tvStyle(undefined, undefined, undefined, undefined)).toBe('generic')
+    expect(tvStyle('Sonos', 'Beam')).toBe('generic')
+  })
+
+  it('only treats a real http(s) image as a public picture', () => {
+    expect(publicEntityPicture('https://example.invalid/tv.jpg')).toBe('https://example.invalid/tv.jpg')
+    expect(publicEntityPicture('http://ha.local/local/tv.png')).toBe('http://ha.local/local/tv.png')
+    expect(publicEntityPicture('/api/media_player_proxy/media_player.tv')).toBe(null)
+    expect(publicEntityPicture('javascript:alert(1)')).toBe(null)
+    expect(publicEntityPicture(null)).toBe(null)
+    expect(publicEntityPicture('')).toBe(null)
   })
 })

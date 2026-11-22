@@ -487,3 +487,87 @@ html[data-tv='true'] .home__editbar .btn:focus {
     flex: 1 1 auto;
   }
 }
+
+/* ---- Icons: SVG glyphs in currentColor, so off is gray and a lit bulb is warm. ---- */
+
+.home-tile__icon,
+.home-scene .home-icon,
+.home-scene-edit .home-icon {
+  color: var(--text-dim);
+}
+
+.home-tile__icon .home-icon,
+.home-scene .home-icon,
+.home-scene-edit .home-icon,
+.home-icon--photo {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.home-icon--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.home-tile[data-on='true'] .home-tile__icon {
+  color: var(--text);
+}
+
+.home-tile[data-on='true'][data-domain='light'] .home-tile__icon {
+  color: var(--icon-light-on);
+}
+
+.home-scene .home-icon,
+.home-scene-edit .home-icon {
+  color: var(--text);
+}
+
+/* ---- On-tile brightness / fan-speed slider: the fill is the old thin bar, full height. ---- */
+
+.home-tile[data-slider='true'] .home-tile__main {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+  /* The unfilled side stays the tile background; the fill paints the level. */
+  background: var(--bg);
+}
+
+.home-tile[data-slider='true'][data-on='true'] .home-tile__main {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.home-tile__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--level, 0) * 1%);
+  background: var(--accent-soft);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-tile[data-slider='true'] .home-tile__icon,
+.home-tile[data-slider='true'] .home-tile__name,
+.home-tile[data-slider='true'] .home-tile__state {
+  position: relative;
+  z-index: 1;
+}
+
+.home-tile__state[data-drag='true'] {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.home-tile[data-sliding='true'] .home-tile__main:active {
+  transform: none;
+}
+
+.home-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

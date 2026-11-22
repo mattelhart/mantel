@@ -132,7 +132,7 @@ describe('Home page', () => {
     expect(document.querySelector('.home-room__title')?.textContent).toBe('Den')
     expect(tile('Lamp').textContent).toContain('50%')
     expect(tile('Front Door').textContent).toContain('Locked')
-    expect(byText('✨ Movie Night')).toBeTruthy()
+    expect(byText('Movie Night')).toBeTruthy()
   })
 
   it('tapping a light turns it off at once and tells Home Assistant', async () => {
@@ -143,13 +143,13 @@ describe('Home page', () => {
     expect(world.posts).toEqual([
       { url: '/api/home/entities/light.lamp/action', body: { action: 'turn_off', confirm: false } },
     ])
-    expect(tile('Lamp').getAttribute('aria-pressed')).toBe('false')
+    expect(tile('Lamp').closest('.home-tile')?.getAttribute('data-on')).toBe('false')
   })
 
   it('a scene is one tap', async () => {
     renderPage()
     await settle()
-    click(byText('✨ Movie Night')!)
+    click(byText('Movie Night')!)
     await settle()
     expect(world.posts[0]).toMatchObject({ url: '/api/home/entities/scene.movie/action', body: { action: 'activate' } })
   })
@@ -242,7 +242,7 @@ describe('Home page', () => {
       'event: state\ndata: {"entity_id":"light.lamp","state":"off","available":true,"on":false,"level":0,"attrs":{}}\n\n',
     )
     expect(tile('Lamp').textContent).toContain('Off')
-    expect(tile('Lamp').getAttribute('aria-pressed')).toBe('false')
+    expect(tile('Lamp').closest('.home-tile')?.getAttribute('data-on')).toBe('false')
   })
 
   it('says so when Home Assistant refuses, and puts the tile back', async () => {
@@ -287,6 +287,10 @@ const tvEntity = (over: Partial<HomeEntity> = {}) =>
     level: 25,
     adjustable: true,
     attrs: { can_power: true, can_volume_step: true, can_mute: true, can_source: true, source: 'HDMI1', sources: ['HDMI1', 'Netflix'], muted: false },
+    manufacturer: 'Samsung Electronics',
+    model: 'UN55CU7000FXZA',
+    model_id: 'UN55CU7000FXZA',
+    device_class: 'tv',
     ...over,
   })
 
@@ -324,8 +328,7 @@ describe('Home page TVs', () => {
     renderPage()
     await settle()
     expect(tile('TV').textContent).toContain('HDMI1')
-    expect(tile('TV').textContent).toContain('📺')
-    click(tile('TV'))
+        click(tile('TV'))
     await settle()
     expect(world.posts).toEqual([
       { url: '/api/home/entities/media_player.den_tv/action', body: { action: 'turn_off', confirm: false } },
@@ -354,7 +357,8 @@ describe('Home page TVs', () => {
     // The volume slider is there too, and the TV tile shows no brightness-style bar for it.
     expect(sheet.querySelector('input[type=range]')).toBeTruthy()
     expect(tile('TV').querySelector('.home-tile__bar')).toBeNull()
-    expect(tile('Basement Lamp').querySelector('.home-tile__bar')).toBeTruthy()
+    expect(tile('TV').querySelector('.home-tile__fill')).toBeNull()
+    expect(tile('Basement Lamp').querySelector('.home-tile__fill')).toBeTruthy()
   })
 
   it('a TV that is off shows only the power button', async () => {
@@ -486,7 +490,7 @@ describe('Home page edit mode', () => {
     await settle()
     expect((lastPatch().home_layout as { scenes: string[] }).scenes).toEqual(['scene.b', 'scene.a'])
     expect(lastPatch().home_hidden).toEqual(['scene.b'])
-    expect(sceneNames()).toEqual(['✨ Away'])
+    expect(sceneNames()).toEqual(['Away'])
   })
 
   it('Cancel throws every change away and saves nothing', async () => {
@@ -521,7 +525,7 @@ describe('Home page edit mode', () => {
       home_hidden: [],
     })
     expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
-    expect(sceneNames()).toEqual(['✨ Away', '✨ Home'])
+    expect(sceneNames()).toEqual(['Away', 'Home'])
   })
 
   it('shows a layout somebody saved on another screen', async () => {
@@ -559,5 +563,185 @@ describe('Home page edit mode', () => {
     renderPage()
     await settle()
     expect(byText('✎ Edit')).toBeUndefined()
+  })
+})
+
+const rect = (el: HTMLElement, width = 200) => {
+  vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+    x: 0, y: 0, left: 0, top: 0, right: width, bottom: 80, width, height: 80, toJSON: () => ({}),
+  })
+}
+
+const pointer = (el: HTMLElement, type: string, x: number, y = 10) => {
+  act(() => {
+    el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, clientX: x, clientY: y, button: 0, pointerType: 'touch' }))
+  })
+}
+
+describe('Home page on-tile slider', () => {
+  beforeEach(() => {
+    install()
+  })
+  afterEach(async () => {
+    unmount()
+    vi.unstubAllGlobals()
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  it('a dimmable light is a slider showing its level, an on/off switch is not', async () => {
+    world.home.rooms[0].entities.push(
+      ent({ entity_id: 'switch.plug', domain: 'switch', name: 'Plug', adjustable: false, level: null, on: false, state: 'off' }),
+    )
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    expect(lamp.getAttribute('role')).toBe('slider')
+    expect(lamp.getAttribute('aria-valuenow')).toBe('50')
+    expect(lamp.getAttribute('aria-valuemin')).toBe('0')
+    expect(lamp.getAttribute('aria-valuemax')).toBe('100')
+    expect(lamp.getAttribute('aria-valuetext')).toBe('50%')
+    expect(lamp.closest('.home-tile')?.getAttribute('data-slider')).toBe('true')
+    expect(lamp.closest('.home-tile')?.querySelector('.home-tile__fill')).toBeTruthy()
+    expect(lamp.querySelector('[data-icon=light]')).toBeTruthy()
+    expect(tile('Plug').getAttribute('role')).toBeNull()
+    expect(tile('Plug').closest('.home-tile')?.getAttribute('data-slider')).toBeNull()
+    expect(tile('Front Door').getAttribute('role')).toBeNull()
+  })
+
+  it('an off light keeps a gray (off) tile, an on light is marked on', async () => {
+    world.home.rooms[0].entities[0] = ent({ on: false, state: 'off', level: 0, name: 'Lamp' })
+    renderPage()
+    await settle()
+    expect(tile('Lamp').closest('.home-tile')?.getAttribute('data-on')).toBe('false')
+    expect(tile('Lamp').closest('.home-tile')?.getAttribute('data-domain')).toBe('light')
+    world.home.rooms[0].entities[0] = ent({ on: true, state: 'on', level: 80 })
+    // Re-render via a live update so the icon on-state flips.
+    await push('event: state\ndata: {"entity_id":"light.lamp","state":"on","available":true,"on":true,"level":80,"attrs":{}}\n\n')
+    expect(tile('Lamp').closest('.home-tile')?.getAttribute('data-on')).toBe('true')
+  })
+
+  it('a short tap still toggles the light, without sending a level', async () => {
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    rect(lamp)
+    pointer(lamp, 'pointerdown', 100)
+    pointer(lamp, 'pointermove', 104) // under the 8px tap slop
+    pointer(lamp, 'pointerup', 104)
+    click(lamp)
+    await settle()
+    expect(world.posts).toEqual([
+      { url: '/api/home/entities/light.lamp/action', body: { action: 'turn_off', confirm: false } },
+    ])
+  })
+
+  it('dragging horizontally sets the level from the pointer, fills the tile, and sends on release', async () => {
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    rect(lamp, 200)
+    pointer(lamp, 'pointerdown', 100)
+    pointer(lamp, 'pointermove', 160)
+    await settle()
+    expect(lamp.getAttribute('aria-valuenow')).toBe('80')
+    expect(lamp.querySelector('.home-tile__state')?.textContent).toBe('80%')
+    expect(lamp.closest('.home-tile')?.getAttribute('data-sliding')).toBe('true')
+    expect((lamp.closest('.home-tile') as HTMLElement).style.getPropertyValue('--level')).toBe('80')
+    expect(world.posts).toEqual([]) // not until release (or a 300ms throttle)
+    pointer(lamp, 'pointerup', 160)
+    await settle()
+    expect(world.posts).toEqual([
+      { url: '/api/home/entities/light.lamp/action', body: { action: 'set_level', value: 80, confirm: false } },
+    ])
+    expect(lamp.closest('.home-tile')?.getAttribute('data-sliding')).toBeNull()
+    expect(lamp.getAttribute('aria-valuenow')).toBe('80')
+  })
+
+  it('a vertical move scrolls instead of changing the level or toggling', async () => {
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    rect(lamp)
+    pointer(lamp, 'pointerdown', 100, 10)
+    pointer(lamp, 'pointermove', 104, 50)
+    pointer(lamp, 'pointerup', 104, 50)
+    click(lamp)
+    await settle()
+    expect(world.posts).toEqual([])
+    expect(lamp.getAttribute('aria-valuenow')).toBe('50')
+    expect(lamp.getAttribute('aria-pressed') ?? lamp.closest('.home-tile')?.getAttribute('data-on')).toBeTruthy()
+    expect(tile('Lamp').closest('.home-tile')?.getAttribute('data-on')).toBe('true')
+  })
+
+  it('arrow keys adjust a dimmable light by 10%', async () => {
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    act(() => {
+      lamp.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    })
+    await settle()
+    expect(world.posts).toEqual([
+      { url: '/api/home/entities/light.lamp/action', body: { action: 'set_level', value: 60, confirm: false } },
+    ])
+    expect(lamp.getAttribute('aria-valuenow')).toBe('60')
+    act(() => {
+      lamp.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    })
+    await settle()
+    expect(world.posts[1]).toEqual({
+      url: '/api/home/entities/light.lamp/action',
+      body: { action: 'set_level', value: 50, confirm: false },
+    })
+  })
+
+  it('a long press still opens the sheet, and does not set a level', async () => {
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    rect(lamp)
+    pointer(lamp, 'pointerdown', 100)
+    await wait(560)
+    pointer(lamp, 'pointerup', 100)
+    await settle()
+    expect(document.querySelector('[role=dialog]')).toBeTruthy()
+    expect(world.posts).toEqual([])
+  })
+
+  it('a failed level change is rolled back and explained', async () => {
+    renderPage()
+    await settle()
+    const lamp = tile('Lamp')
+    rect(lamp, 200)
+    const original = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    original.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ error: { code: 'error', message: 'Home Assistant answered 400.' } }), { status: 502 }),
+    )
+    pointer(lamp, 'pointerdown', 100)
+    pointer(lamp, 'pointermove', 180)
+    pointer(lamp, 'pointerup', 180)
+    await settle()
+    expect(document.querySelector('[role=alert]')?.textContent).toContain('Home Assistant answered 400.')
+    // The query is invalidated after a failure, so the tile returns to the last snapshot (50%).
+    expect(tile('Lamp').getAttribute('aria-valuenow')).toBe('50')
+  })
+
+  it('Edit mode does not expose sliders, so a drag cannot change a device', async () => {
+    renderPage()
+    await settle()
+    click(byText('✎ Edit')!)
+    await settle()
+    expect(document.querySelector('[role=slider]')).toBeNull()
+    expect(document.querySelector('.home-tile__fill')).toBeNull()
+  })
+
+  it('a Samsung CU7000 TV gets the thin-bezel flat silhouette', async () => {
+    world.home = houseWithRooms()
+    renderPage()
+    await settle()
+    expect(tile('TV').querySelector('[data-icon=tv-flat]')).toBeTruthy()
+    expect(tile('TV').closest('.home-tile')?.getAttribute('data-domain')).toBe('media_player')
+    expect(tile('TV').getAttribute('role')).toBeNull()
   })
 })
