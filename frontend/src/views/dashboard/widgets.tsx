@@ -6,7 +6,7 @@ import { useEntityMutation, useEvents, useUsers, useWeather } from '../../api/ho
 import { useEventColor } from '../../components/eventColor'
 import { checkChore, checkListItem } from '../../offline/actions'
 import type { SharedList } from '../../api/types'
-import type { CalendarEvent, ChoreBoard } from '../../api/types'
+import type { CalendarEvent, ChoreBoard, PersonBoard } from '../../api/types'
 import { pickList } from './pickList'
 import { overlapsDay } from '../calendar/overlap'
 
@@ -84,7 +84,6 @@ function UpcomingEvents({ config, onOpenEvent, onNewEvent }: WidgetProps) {
 function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
   const fill = useEventColor()
   const { data: users = [] } = useUsers()
-  const today = new Date()
   const dayStart = startOfToday()
   const only = people(config)
   const { data: events = [] } = useEvents(dayStart, addDays(dayStart, 1), only)
@@ -95,7 +94,7 @@ function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
   return (
     <>
       <div className="widget__head">
-        <h3>{format(today, 'EEEE, MMMM d')}</h3>
+        <h3>Today&apos;s Schedule</h3>
         <button className="iconbtn iconbtn--primary" onClick={() => onNewEvent(nextHour())}>
           +
         </button>
@@ -498,59 +497,101 @@ function ChoresWidget({ config }: WidgetProps) {
     queryKey: ['chores', 'board', 'today'],
     queryFn: () => api.get<ChoreBoard>('/chores/board'),
   })
+  const { data: users = [] } = useUsers()
   const qc = useQueryClient()
-  const only = people(config)
-  const shown = (data?.people ?? []).filter((p) => only.length === 0 || only.includes(p.user_id))
+  const columns = alignChoreColumns(users, data?.people ?? [], people(config))
 
   return (
     <div className="chores-mini">
       <div className="widget__head">
         <h3>Chores</h3>
       </div>
-      {shown.length === 0 && <p className="widget__empty">No chores today.</p>}
-      {shown.map((person) => (
-        <div key={person.user_id} className="chores-mini__person">
-          <strong>
-            <span>
-              <span className="chores__swatch" style={{ background: person.color }} /> {person.name}
-            </span>
-            <span>{person.stars}★</span>
-          </strong>
-          {person.chores.length === 0 && <p className="widget__empty">Nothing due.</p>}
-          <ul className="listcard__items">
-            {person.chores.map((chore) => {
-              const checked = chore.completion?.status === 'done' || chore.completion?.status === 'pending'
-              return (
-                <li key={chore.chore_id} className="listitem" data-checked={checked}>
-                  <button
-                    className="listitem__check"
-                    aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
-                    onClick={() =>
-                      data &&
-                      void checkChore(
-                        {
-                          choreId: chore.chore_id,
-                          userId: person.user_id,
-                          done: !checked,
-                          on: data.on,
-                        },
-                        qc,
-                      ).catch(() => undefined)
-                    }
-                  >
-                    {chore.completion?.status === 'done' ? '✓' : chore.completion?.status === 'pending' ? '…' : ''}
-                  </button>
-                  <span className="listitem__text">
-                    {chore.icon} {chore.title}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+      {columns.length === 0 && <p className="widget__empty">No chores today.</p>}
+      {columns.length > 0 && (
+        <div className="people chores-mini__people">
+          {columns.map((person) => (
+            <div key={person.id} className="people__col chores-mini__person">
+              <div className="people__name" style={{ borderColor: person.color }}>
+                <span>{person.name}</span>
+                <span className="chores-mini__stars">{person.stars}★</span>
+              </div>
+              {person.chores.length === 0 && <p className="widget__empty">Nothing due.</p>}
+              {person.chores.length > 0 && (
+                <ul className="listcard__items">
+                  {person.chores.map((chore) => {
+                    const checked =
+                      chore.completion?.status === 'done' || chore.completion?.status === 'pending'
+                    return (
+                      <li key={chore.chore_id} className="listitem" data-checked={checked}>
+                        <button
+                          className="listitem__check"
+                          aria-label={checked ? `Uncheck ${chore.title}` : `Check off ${chore.title}`}
+                          onClick={() =>
+                            data &&
+                            void checkChore(
+                              {
+                                choreId: chore.chore_id,
+                                userId: person.id,
+                                done: !checked,
+                                on: data.on,
+                              },
+                              qc,
+                            ).catch(() => undefined)
+                          }
+                        >
+                          {chore.completion?.status === 'done'
+                            ? '✓'
+                            : chore.completion?.status === 'pending'
+                              ? '…'
+                              : ''}
+                        </button>
+                        <span className="listitem__text">
+                          {chore.icon} {chore.title}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
+}
+
+/** Line the chore columns up with the "Today by person" schedule: same people,
+ *  same left-to-right order, even if the board payload arrives in another order. */
+export function alignChoreColumns(
+  users: { id: number; name: string; color: string }[],
+  board: PersonBoard[],
+  only: number[],
+) {
+  const wanted = (id: number) => only.length === 0 || only.includes(id)
+  const boardByUser = new Map(board.map((p) => [p.user_id, p]))
+  const source = users.filter((u) => wanted(u.id))
+  if (source.length > 0) {
+    return source.map((u) => {
+      const row = boardByUser.get(u.id)
+      return {
+        id: u.id,
+        name: u.name,
+        color: u.color,
+        stars: row?.stars ?? 0,
+        chores: row?.chores ?? [],
+      }
+    })
+  }
+  return board
+    .filter((p) => wanted(p.user_id))
+    .map((p) => ({
+      id: p.user_id,
+      name: p.name,
+      color: p.color,
+      stars: p.stars,
+      chores: p.chores,
+    }))
 }
 
 // -------------------------------- registry -----------------------------------
