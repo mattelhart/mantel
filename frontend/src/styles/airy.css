@@ -56,11 +56,11 @@ html[data-theme='airy'] .navbtn {
   padding: 8px 4px;
   border-radius: 18px;
   font-weight: 800;
-  color: var(--text-dim);
+  /* --text-dim read as a faint grey on the Pi; use the body ink. */
+  color: var(--text);
   transition:
     background 160ms ease,
-    color 160ms ease,
-    transform 120ms ease;
+    color 160ms ease;
 }
 
 html[data-theme='airy'] .navbtn__icon {
@@ -86,7 +86,7 @@ html[data-theme='airy'] .navbtn[aria-current='page'] {
 }
 
 html[data-theme='airy'] .navbtn:active {
-  transform: scale(0.96);
+  background: var(--bg-elev-2);
 }
 
 /* Nav rings sit inside the button so they are not clipped by the rail or
@@ -801,7 +801,9 @@ html[data-theme='airy'] .shell__nav {
 }
 
 /* Side menu (landscape: the wall Pi and TVs) reads from across the room, so its labels and
-   icons are about 20% larger than the phone's bottom bar. The phone layout is untouched. */
+   icons are larger than the phone's bottom bar. The phone layout is untouched.
+   Focus rings stay inside the button (outline-offset: -4px above); do not shrink
+   the 8px gap or 10px side padding or the ring will clip or overlap again. */
 @media (orientation: landscape) and (min-width: 700px) {
   html[data-theme='airy'] .shell__nav {
     gap: 8px;
@@ -811,20 +813,29 @@ html[data-theme='airy'] .shell__nav {
   }
 
   html[data-theme='airy'] .navbtn {
-    min-height: 64px;
+    min-height: 68px;
     gap: 4px;
     overflow: visible;
+    /* A fractional scale on press slightly blurs the type on a Pi panel. */
+    transform: none;
   }
 
   html[data-theme='airy'] .navbtn__icon {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
   }
 
   html[data-theme='airy'] .navbtn__label {
-    font-size: 0.95rem;
+    /* 0.95rem -> 1.125rem, about 18% larger, still fits the 136px wall rail. */
+    font-size: 1.125rem;
+    font-weight: 800;
+    line-height: 1.15;
     max-width: 100%;
     overflow-wrap: anywhere;
     text-align: center;
+    /* body uses antialiased (grayscale), which looks soft at this size on Linux. */
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
   }
 }

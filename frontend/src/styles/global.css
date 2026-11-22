@@ -395,15 +395,25 @@ textarea:focus-visible {
     flex: 0 0 auto;
     padding: 14px 6px;
     font-size: var(--font-xs);
+    font-weight: 700;
     white-space: normal;
     /* Allow the focus ring to paint; ellipsis is portrait-only. */
     overflow: visible;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
   }
 
   /* Draw the ring inside the button so it cannot escape the rail. */
   .shell__nav .navbtn:focus-visible {
     outline-offset: -3px;
   }
+}
+
+/* Daylight's --text-dim is a warm grey that fades on a sunlit wall; use the
+   body ink for the rail, same idea as Airy. Selected already uses --text. */
+:root[data-theme='daylight'] .navbtn {
+  color: var(--text);
 }
 
 /* ---- Version badge ---- */
