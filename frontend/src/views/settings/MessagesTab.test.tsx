@@ -17,10 +17,24 @@ beforeEach(() => {
     twilio_account_sid: '',
     twilio_auth_token: '',
     twilio_from_number: '+18005550100',
-    server: { twilio_account_sid_set: true, twilio_auth_token_set: true, twilio_configured: true },
+    message_provider: 'twilio',
+    signal_api_url: 'http://host.docker.internal:8081',
+    signal_account_number: '',
+    server: {
+      twilio_account_sid_set: true,
+      twilio_auth_token_set: true,
+      twilio_configured: true,
+      signal_configured: false,
+      messages_configured: true,
+      messages_provider: 'twilio',
+    },
   }
   patches = []
   tests = []
+  vi.stubGlobal('URL', Object.assign(URL, {
+    createObjectURL: () => 'blob:qr-test',
+    revokeObjectURL: () => undefined,
+  }))
   const json = (b: unknown) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } })
   vi.stubGlobal(
     'fetch',
@@ -31,13 +45,18 @@ beforeEach(() => {
         patches.push(body)
         settings = {
           ...settings,
+          ...body,
           twilio_from_number: body.twilio_from_number ?? settings.twilio_from_number,
           twilio_account_sid: '',
           twilio_auth_token: '',
           server: {
+            ...(settings.server as object),
             twilio_account_sid_set: body.twilio_account_sid === null ? false : true,
             twilio_auth_token_set: body.twilio_auth_token === null ? false : true,
             twilio_configured: body.twilio_account_sid === null || body.twilio_auth_token === null ? false : true,
+            signal_configured: Boolean((body.signal_account_number ?? settings.signal_account_number) && (body.signal_api_url ?? settings.signal_api_url)),
+            messages_provider: body.message_provider ?? settings.message_provider,
+            messages_configured: true,
           },
         }
         return json(settings)
@@ -47,6 +66,20 @@ beforeEach(() => {
       if (url === '/api/messages/test') {
         tests.push(init?.body)
         return json({ id: 9, user_id: 3, status: 'queued' })
+      }
+      if (url === '/api/messages/signal/status') {
+        return json({
+          reachable: true,
+          linked: Boolean(settings.signal_account_number),
+          accounts: settings.signal_account_number ? [{ number: settings.signal_account_number, aci: '' }] : [],
+          mode: 'normal',
+          error: null,
+          account_number: settings.signal_account_number || '',
+        })
+      }
+      if (url.startsWith('/api/messages/signal/qr')) {
+        const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])
+        return new Response(png, { headers: { 'Content-Type': 'image/png' } })
       }
       return json({})
     }),
@@ -99,5 +132,27 @@ describe('Messages settings', () => {
     await settle()
     expect(tests).toHaveLength(1)
     expect(document.body.textContent).toContain('Test sent')
+  })
+
+  it('switches to Signal settings and opens a QR link screen with Back', async () => {
+    await render()
+    expect(document.body.textContent).toContain('Twilio')
+    expect(document.body.textContent).toContain('Signal')
+    click(byText('Signal')!)
+    await settle()
+    expect(patches).toEqual([{ message_provider: 'signal' }])
+    expect(document.body.textContent).toContain('API address')
+    expect(document.body.textContent).toContain('Link to Signal')
+    click(byText('Link to Signal')!)
+    for (let i = 0; i < 12; i++) await act(async () => void (await new Promise((r) => setTimeout(r, 10))))
+    expect(document.querySelector('.signal-link')).toBeTruthy()
+    expect(document.body.textContent).toContain('On your phone: Signal → Settings → Linked devices → +, scan this')
+    expect(document.querySelector('img.signal-link__qr')).toBeTruthy()
+    expect(document.querySelector('.signal-link__back')?.textContent).toMatch(/Back/)
+    expect(document.querySelector('[data-testid=signal-link-state]')?.textContent).toContain('Waiting')
+    click(document.querySelector('.signal-link__back')!)
+    await settle()
+    expect(document.querySelector('.signal-link')).toBeNull()
+    expect(byText('Link to Signal')).toBeTruthy()
   })
 })

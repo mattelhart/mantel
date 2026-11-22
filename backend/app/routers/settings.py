@@ -6,7 +6,7 @@ from ..bootstrap import DEFAULT_SETTINGS, THEMES
 from ..config import get_settings
 from ..db import get_db
 from ..models import AppSetting
-from ..services import google_config, ha_home, home_layout, homeassistant, twilio_messages
+from ..services import google_config, ha_home, home_layout, homeassistant, messaging, signal_messages, twilio_messages
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -36,6 +36,7 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
         values.pop(key, None)
 
     twilio = twilio_messages.load_config(db)
+    signal = signal_messages.load_config(db)
     return {
         **values,
         "server": {
@@ -46,6 +47,9 @@ def get_app_settings(db: Session = Depends(get_db)) -> dict:
             "twilio_account_sid_set": bool(stored.get("twilio_account_sid")),
             "twilio_auth_token_set": bool(stored.get("twilio_auth_token")),
             "twilio_configured": twilio.configured,
+            "signal_configured": signal.configured,
+            "messages_configured": messaging.configured(db),
+            "messages_provider": messaging.provider_name(db),
             "google_redirect_uri": cfg.redirect_uri,
             "sync_enabled": s.sync_enabled,
             "sync_interval_seconds": s.sync_interval_seconds,
@@ -105,6 +109,29 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
             if not twilio_messages.valid_e164(number):
                 raise HTTPException(400, "The Twilio From number must look like +18005551212")
             payload["twilio_from_number"] = number
+    if "message_provider" in payload:
+        provider = str(payload["message_provider"] or "").strip().lower()
+        if provider not in messaging.PROVIDERS:
+            raise HTTPException(400, "Choose Twilio or Signal as the messaging provider.")
+        payload["message_provider"] = provider
+    if "signal_api_url" in payload:
+        raw = str(payload["signal_api_url"] or "").strip()
+        if not raw:
+            payload["signal_api_url"] = signal_messages.DEFAULT_API_URL
+        else:
+            try:
+                payload["signal_api_url"] = signal_messages.normalize_api_url(raw)
+            except signal_messages.SignalError as exc:
+                raise HTTPException(400, str(exc)) from exc
+    if "signal_account_number" in payload:
+        raw = str(payload["signal_account_number"] or "").strip()
+        if not raw:
+            payload["signal_account_number"] = ""
+        else:
+            number = twilio_messages.normalize_e164(raw)
+            if not twilio_messages.valid_e164(number):
+                raise HTTPException(400, "The Signal account number must look like +15551234567")
+            payload["signal_account_number"] = number
     if "ha_token" in payload:
         token = payload.pop("ha_token")
         if token is None:

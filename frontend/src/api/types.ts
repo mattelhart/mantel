@@ -276,6 +276,9 @@ export interface AppSettings {
   twilio_account_sid?: string
   twilio_auth_token?: string
   twilio_from_number?: string
+  message_provider?: 'twilio' | 'signal'
+  signal_api_url?: string
+  signal_account_number?: string
   server: {
     version: string
     google_configured: boolean
@@ -285,6 +288,9 @@ export interface AppSettings {
     twilio_account_sid_set?: boolean
     twilio_auth_token_set?: boolean
     twilio_configured?: boolean
+    signal_configured?: boolean
+    messages_configured?: boolean
+    messages_provider?: 'twilio' | 'signal'
     google_redirect_uri: string
     sync_enabled: boolean
     sync_interval_seconds: number

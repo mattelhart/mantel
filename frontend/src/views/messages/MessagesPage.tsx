@@ -59,7 +59,7 @@ function useThread(id: string | undefined) {
 export function MessagesPage() {
   const { data, isLoading } = useConversations()
   const { data: settings } = useSettings()
-  const configured = data?.configured ?? settings?.server.twilio_configured ?? false
+  const configured = data?.configured ?? settings?.server.messages_configured ?? settings?.server.twilio_configured ?? false
   const [composing, setComposing] = useState(false)
 
   const conversations = data?.conversations ?? []
@@ -80,7 +80,7 @@ export function MessagesPage() {
         <p className="hint">Loading messages…</p>
       ) : !configured ? (
         <div className="messages__empty">
-          <p>Add your Twilio details in Settings to send notes and doodles to family phones.</p>
+          <p>Add your Twilio or Signal details in Settings to send notes and doodles to family phones.</p>
           <Link to="/settings?tab=messages" className="btn btn--primary">
             Open Messages settings
           </Link>
@@ -384,6 +384,8 @@ function statusLabel(status: string): string {
       return 'Sent'
     case 'delivered':
       return 'Delivered'
+    case 'read':
+      return 'Read'
     case 'undelivered':
     case 'failed':
     case 'canceled':

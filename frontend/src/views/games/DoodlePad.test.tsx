@@ -160,7 +160,7 @@ describe('Doodle pad send', () => {
     await settle()
     click(byText('Send to…')!)
     await settle()
-    expect(document.body.textContent).toContain('Add your Twilio details in Settings')
+    expect(document.body.textContent).toContain('Add your Twilio or Signal details in Settings')
     const link = document.querySelector('a[href="/settings?tab=messages"]')
     expect(link?.textContent).toContain('Open Messages settings')
     click(document.querySelector('.doodle-send__back')!)

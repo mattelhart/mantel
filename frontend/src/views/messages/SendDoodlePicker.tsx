@@ -45,7 +45,7 @@ export function SendDoodlePicker({
 }) {
   const { data: users, isLoading } = useUsers()
   const { data: settings } = useSettings()
-  const configured = settings?.server.twilio_configured ?? false
+  const configured = settings?.server.messages_configured ?? settings?.server.twilio_configured ?? false
   const qc = useQueryClient()
   const people = users ?? []
   const [selected, setSelected] = useState<Set<number>>(() => new Set(initialSelected))
@@ -68,7 +68,7 @@ export function SendDoodlePicker({
   const send = useMutation({
     mutationFn: async () => {
       if (!configured) {
-        throw new Error('Add your Twilio details in Settings')
+        throw new Error('Add your Twilio or Signal details in Settings')
       }
       if (chosen.length === 0) {
         throw new Error('Choose someone with a phone number.')
@@ -126,7 +126,7 @@ export function SendDoodlePicker({
 
       {!configured ? (
         <div className="doodle-send__empty">
-          <p>Add your Twilio details in Settings to send a drawing to a family phone.</p>
+          <p>Add your Twilio or Signal details in Settings to send a drawing to a family phone.</p>
           <Link to="/settings?tab=messages" className="btn btn--primary">
             Open Messages settings
           </Link>

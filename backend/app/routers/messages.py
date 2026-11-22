@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import FamilyMessage, User
-from ..services import twilio_messages as sms
+from ..services import messaging as sms
+from ..services import signal_messages
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -159,7 +160,7 @@ def list_conversations(db: Session = Depends(get_db)) -> dict:
     )
     return {
         "configured": cfg_ok,
-        "from_number": sms.load_config(db).from_number if cfg_ok else "",
+        "from_number": sms.from_number(db) if cfg_ok else "",
         "quick_replies": QUICK_REPLIES,
         "conversations": threads + unknown_threads,
     }
@@ -243,6 +244,32 @@ def send_test(payload: TestPayload | None = None, db: Session = Depends(get_db))
     except sms.TwilioError as exc:
         raise _http(exc) from exc
     return _message_out(row)
+
+
+@router.get(
+    "/signal/status",
+    summary="Signal API reachability and link state",
+)
+def signal_status(db: Session = Depends(get_db)) -> dict:
+    info = signal_messages.status(db)
+    if info.get("linked") and info.get("accounts"):
+        info["account_number"] = signal_messages.remember_linked_number(db, info["accounts"])
+    else:
+        info["account_number"] = signal_messages.load_config(db).account_number
+    return info
+
+
+@router.get(
+    "/signal/qr",
+    summary="QR code for linking Mantel as a Signal device",
+    responses={200: {"content": {"image/png": {}}}},
+)
+def signal_qr(db: Session = Depends(get_db)):
+    try:
+        png = signal_messages.fetch_qr(db)
+    except signal_messages.SignalError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return Response(content=png, media_type="image/png")
 
 
 @router.get(
