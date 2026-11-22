@@ -7,6 +7,7 @@ import { useSettings } from '../../api/hooks'
 import type { AppSettings } from '../../api/types'
 import { swallowTapThrough, useDismissGuard } from '../../components/dismissGuard'
 import { HomeEditor } from './HomeEditor'
+import { MasonryGrid } from './MasonryGrid'
 import { DeviceIcon } from './homeIcons'
 import {
   DEFAULT_PREFS,
@@ -26,6 +27,9 @@ import {
   nudgeLevel,
   pruneLayout,
   roomSummary,
+  setDeviceOrder,
+  setRoomOrder,
+  setSceneOrder,
   shownLevel,
   tapResult,
   toggleHidden,
@@ -98,7 +102,7 @@ export function HomePage() {
     return (
       <div className="home">
         <p className="home__empty" role="alert">
-          Can't load Home.{' '}
+          Can't load Home Control.{' '}
           <button className="btn" onClick={() => void refetch()}>Try again</button>
         </p>
       </div>
@@ -114,7 +118,7 @@ export function HomePage() {
   if (data.status !== 'ok') {
     return (
       <div className="home">
-        <header className="home__bar"><h1 className="home__title">Home</h1></header>
+        <header className="home__bar"><h1 className="home__title">Home Control</h1></header>
         <div className="home__setup" role="status">
           <h2>{STATUS_HELP[data.status] ?? 'Home control is unavailable.'}</h2>
           <p>
@@ -163,7 +167,7 @@ export function HomePage() {
   return (
     <div className="home" data-editing={draft ? 'true' : undefined}>
       <header className="home__bar">
-        <h1 className="home__title">{draft ? 'Edit Home' : 'Home'}</h1>
+        <h1 className="home__title">{draft ? 'Edit Home Control' : 'Home Control'}</h1>
         {!draft && layout.hiddenCount > 0 && (
           <Link className="home__hidden" to="/settings?tab=home">{layout.hiddenCount} hidden</Link>
         )}
@@ -194,8 +198,9 @@ export function HomePage() {
 
       {draft && (
         <p className="home__banner" role="status">
-          Use ◀ ▶ to move rooms, devices and scenes, and Hide to take one off the Home page. Done saves it for every
-          screen in the house. Nothing changes until then.
+          Drag a room, device or scene by its ⠿ handle (or press and hold) to move it. Rooms fill in around each other.
+          The small ◀ ▶ buttons move one step, and Hide takes one off Home Control. Done saves it for every screen in
+          the house. Nothing changes until then.
         </p>
       )}
 
@@ -241,33 +246,48 @@ export function HomePage() {
           view={view}
           on={{
             moveRoom: (key, delta) => change({ prefs: moveRoom(data, draft.hidden, draft.prefs, key, delta) }),
+            setRoomOrder: (keys) => change({ prefs: setRoomOrder(draft.prefs, keys) }),
             toggleRoom: (key) => change({ prefs: toggleRoomHidden(draft.prefs, key) }),
             toggleWide: (key) => change({ prefs: toggleRoomWide(draft.prefs, key) }),
             moveDevice: (key, id, delta) => change({ prefs: moveDevice(data, draft.hidden, draft.prefs, key, id, delta) }),
+            setDeviceOrder: (key, ids) => change({ prefs: setDeviceOrder(draft.prefs, key, ids) }),
             toggleDevice: (id) => change({ hidden: toggleHidden(draft.hidden, id) }),
             moveScene: (id, delta) => change({ prefs: moveScene(data, draft.hidden, draft.prefs, id, delta) }),
+            setSceneOrder: (ids) => change({ prefs: setSceneOrder(draft.prefs, ids) }),
           }}
         />
       )}
 
       {!view && (
-        <div className="home__rooms">
-          {layout.favorites.length > 0 && (
-            <RoomCard title="Favorites" summary="" entities={layout.favorites} run={run} onOpen={setSheetId} onLock={setLockId} />
-          )}
-          {layout.rooms.map((room) => (
-            <RoomCard
-              key={room.area_id ?? 'other'}
-              title={room.name}
-              summary={roomSummary(room)}
-              entities={room.entities}
-              wide={room.wide}
-              run={run}
-              onOpen={setSheetId}
-              onLock={setLockId}
-            />
-          ))}
-        </div>
+        <MasonryGrid
+          entries={[
+            ...(layout.favorites.length > 0
+              ? [
+                  {
+                    key: 'favorites',
+                    node: (
+                      <RoomCard title="Favorites" summary="" entities={layout.favorites} run={run} onOpen={setSheetId} onLock={setLockId} />
+                    ),
+                  },
+                ]
+              : []),
+            ...layout.rooms.map((room) => ({
+              key: `room:${room.key}`,
+              wide: room.wide,
+              node: (
+                <RoomCard
+                  title={room.name}
+                  summary={roomSummary(room)}
+                  entities={room.entities}
+                  wide={room.wide}
+                  run={run}
+                  onOpen={setSheetId}
+                  onLock={setLockId}
+                />
+              ),
+            })),
+          ]}
+        />
       )}
 
       {sheet && (
@@ -548,7 +568,7 @@ function Tile({
         <span className="home-tile__icon">
           <DeviceIcon entity={entity} />
         </span>
-        <span className="home-tile__name">{entity.name}</span>
+        <span className="home-tile__name" title={entity.name}>{entity.name}</span>
         <span className="home-tile__state" data-drag={sliding || undefined}>
           {sliding ? `${draft}%` : describe(entity)}
         </span>

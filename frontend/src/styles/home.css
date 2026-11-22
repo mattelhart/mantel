@@ -99,8 +99,17 @@
 .home__rooms {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 16px;
+  /* MasonryGrid overrides the columns and the 4px implicit rows inline, and places every
+     room explicitly so short rooms slide up under short rooms. The row gap stays zero:
+     each room's gap is counted in its row span instead. */
+  column-gap: 16px;
+  row-gap: 0;
   align-items: start;
+}
+
+.home-masonry__cell {
+  align-self: start;
+  min-width: 0;
 }
 
 .home-room {
@@ -141,13 +150,13 @@
 .home-tile__main {
   flex: 1;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: 'icon name' 'icon state' 'bar bar';
-  column-gap: 10px;
+  column-gap: 8px;
   align-items: center;
   text-align: left;
   min-height: 76px;
-  padding: 10px 38px 10px 12px;
+  padding: 10px 8px 10px 12px;
   border-radius: calc(var(--radius) - 2px);
   border: 1px solid var(--border);
   background: var(--bg);
@@ -185,6 +194,11 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
+  /* Keep the name clear of the ⋯ button (or the drag handle in Edit mode) in the corner,
+     let a long one wrap onto a second line, and cut it with … after that. */
+  min-width: 0;
+  padding-right: 28px;
+  overflow-wrap: anywhere;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -214,11 +228,15 @@
 /* The way into the controls without a long press: a finger can use it too. */
 .home-tile__more {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 40px;
+  top: 2px;
+  right: 0;
+  width: 36px;
   height: 40px;
+  /* Buttons are --touch (56px on the wall) wide by default, which put this one's left
+     edge 16px further in than the name was told to stay clear of. */
+  min-width: 0;
   min-height: 40px;
+  padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -313,12 +331,6 @@ html[data-tv='true'] .home-tile__more:focus {
   outline-offset: 2px;
 }
 
-@media (max-width: 700px) {
-  .home__rooms {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* ---- Edit mode: arrange rooms, devices and scenes. Every control is a real button at
    least 44px tall, so a finger on the wall, a mouse and a D-pad all work. ---- */
 
@@ -352,10 +364,6 @@ html[data-tv='true'] .home-tile__more:focus {
   padding: 0 20px;
 }
 
-.home-room--wide {
-  grid-column: span 2;
-}
-
 .home-room--edit[data-hidden='true'] .home-room__tiles,
 .home-room--edit[data-hidden='true'] .home-room__title {
   opacity: 0.45;
@@ -375,40 +383,175 @@ html[data-tv='true'] .home-tile__more:focus {
   margin-bottom: 12px;
 }
 
-.home-edit__btn {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 10px;
+.home-edit__arrows {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* Secondary: the way to move one step without dragging (D-pad, keyboard, screen reader). */
+.home-edit__arrow {
+  width: 32px;
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
   touch-action: manipulation;
 }
 
-.home-edit__btn--text {
-  padding: 0 14px;
-  font-weight: 700;
+.home-edit__arrow:active {
+  background: var(--accent-soft);
 }
 
-.home-edit__btn[aria-pressed='true'] {
+.home-edit__arrow:disabled {
+  opacity: 0.25;
+}
+
+.home-edit__chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.home-edit__chip[aria-pressed='true'] {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--on-accent);
 }
 
-.home-edit__btn:disabled {
-  opacity: 0.35;
+/* The drag handle: this is where a finger or a mouse grabs a card. */
+.home-edit__grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  flex: 0 0 auto;
+}
+
+.home-room--edit .home-room__head {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-room--edit .home-room__sum {
+  margin-left: auto;
+}
+
+.home-room--edit .home-room__title {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .home-tile--edit {
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+}
+
+.home-tile--edit > .home-edit__grip {
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 
 .home-tile__main--edit {
-  cursor: default;
-  padding-right: 12px;
+  cursor: grab;
+}
+
+.home-tile--edit .home-edit__tools {
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .home-tile--edit[data-hidden='true'] .home-tile__main {
   opacity: 0.45;
   border-style: dashed;
+}
+
+/* Edit mode items are grabbed, so no text selection, no iOS callout, and a long press is
+   a drag rather than a context menu. Scrolling by touch on the body still works. */
+.home-draggable {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.home-room--edit {
+  cursor: grab;
+}
+
+/* Where the card was: a dashed hollow the floating copy will drop back into. */
+.home-draggable[data-drag-state='source'] {
+  position: relative;
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.home-draggable[data-drag-state='source'] > * {
+  visibility: hidden;
+}
+
+.home-tile--edit[data-drag-state='source'] {
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.home-scene-edit[data-drag-state='source'] {
+  border-radius: 999px;
+}
+
+/* The floating copy follows the pointer: on <body> so nothing clips it. */
+.home-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0.94;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius);
+  transform-origin: center;
+  will-change: transform;
+}
+
+.home-drag-ghost > .home-room,
+.home-drag-ghost > .home-tile,
+.home-drag-ghost > .home-scene-edit {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-elev);
+  border-style: solid;
+  border-color: var(--accent);
+  margin: 0;
+}
+
+body.home-dragging,
+body.home-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .home__scenes--edit {
@@ -420,7 +563,8 @@ html[data-tv='true'] .home-tile__more:focus {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px 6px 18px;
+  padding: 4px 8px 4px 6px;
+  cursor: grab;
   border-radius: 999px;
   border: 1px dashed var(--border);
   background: var(--bg-elev);
@@ -457,18 +601,12 @@ html[data-tv='true'] .home-tile__more:focus {
   color: var(--on-accent);
 }
 
-html[data-tv='true'] .home-edit__btn:focus,
+html[data-tv='true'] .home-edit__arrow:focus,
+html[data-tv='true'] .home-edit__chip:focus,
 html[data-tv='true'] .home__edit:focus,
 html[data-tv='true'] .home__editbar .btn:focus {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
-}
-
-/* Two columns do not fit a narrow screen, and a "wide" room must not push it sideways. */
-@media (max-width: 800px) {
-  .home-room--wide {
-    grid-column: auto;
-  }
 }
 
 /* On a phone the Done / Cancel / Reset row gets a line of its own under the title. */

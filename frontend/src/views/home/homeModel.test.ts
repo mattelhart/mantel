@@ -10,6 +10,9 @@ import {
   levelFromX,
   moveDevice,
   moveItem,
+  setDeviceOrder,
+  setRoomOrder,
+  setSceneOrder,
   moveRoom,
   moveScene,
   normalizePrefs,
@@ -388,5 +391,16 @@ suite('TV silhouettes', () => {
     expect(publicEntityPicture('javascript:alert(1)')).toBe(null)
     expect(publicEntityPicture(null)).toBe(null)
     expect(publicEntityPicture('')).toBe(null)
+  })
+})
+
+suite('drag and drop order setters', () => {
+  it('replace one group and leave the rest of the layout alone', () => {
+    const base = { ...DEFAULT_PREFS, wide_rooms: ['den'], devices: { den: ['a', 'b'] } }
+    expect(setRoomOrder(base, ['b', 'a'])).toEqual({ ...base, rooms: ['b', 'a'] })
+    expect(setSceneOrder(base, ['s2', 's1'])).toEqual({ ...base, scenes: ['s2', 's1'] })
+    expect(setDeviceOrder(base, 'kitchen', ['k2', 'k1'])).toEqual({ ...base, devices: { den: ['a', 'b'], kitchen: ['k2', 'k1'] } })
+    expect(setDeviceOrder(base, 'den', ['b', 'a']).devices.den).toEqual(['b', 'a'])
+    expect(base.devices).toEqual({ den: ['a', 'b'] }) // never mutates
   })
 })

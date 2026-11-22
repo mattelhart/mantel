@@ -69,7 +69,7 @@ async function readHomeStream(
   }
 }
 
-/** Follows Home Assistant while the Home page is open. Returns the connection status
+/** Follows Home Assistant while Home Control is open. Returns the connection status
  *  the server reports; 'connecting' until the first frame. */
 export function useHomeLive(): HomeStatus {
   const qc = useQueryClient()

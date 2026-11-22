@@ -4,8 +4,13 @@ import { act } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { byText, click, mount, tapPointer, unmount, type } from '../../components/testDom'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { HomePage } from './HomePage'
 import type { HomeData, HomeEntity } from './homeModel'
+
+// The real stylesheet, so a few rules that cannot be seen in jsdom are still pinned down.
+const homeCss = readFileSync(resolve(process.cwd(), 'src/styles/home.css'), 'utf8')
 
 const ent = (over: Partial<HomeEntity>): HomeEntity => ({
   entity_id: 'light.lamp',
@@ -308,7 +313,7 @@ const houseWithRooms = (): HomeData => ({
   ],
 })
 
-const titles = () => Array.from(document.querySelectorAll('.home-room__title')).map((n) => n.textContent)
+const titles = () => Array.from(document.querySelectorAll('.home .home-room__title')).map((n) => n.textContent)
 const sceneNames = () => Array.from(document.querySelectorAll('.home__scenes .home-scene')).map((n) => n.textContent?.trim())
 const tools = (label: string) => document.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!
 const lastPatch = () => world.patches[world.patches.length - 1]
@@ -396,7 +401,7 @@ describe('Home page edit mode', () => {
   it('Edit is a real button, and while editing a tap arranges instead of switching things', async () => {
     await enter()
     expect(document.querySelector('.home')?.getAttribute('data-editing')).toBe('true')
-    expect(document.querySelector('h1')?.textContent).toBe('Edit Home')
+    expect(document.querySelector('h1')?.textContent).toBe('Edit Home Control')
     expect(byText('Done')).toBeTruthy()
     expect(byText('Cancel')).toBeTruthy()
     expect(byText('Reset to default')).toBeTruthy()
@@ -743,5 +748,477 @@ describe('Home page on-tile slider', () => {
     expect(tile('TV').querySelector('[data-icon=tv-flat]')).toBeTruthy()
     expect(tile('TV').closest('.home-tile')?.getAttribute('data-domain')).toBe('media_player')
     expect(tile('TV').getAttribute('role')).toBeNull()
+  })
+})
+
+describe('Home Control title', () => {
+  beforeEach(() => install())
+  afterEach(async () => {
+    unmount()
+    vi.unstubAllGlobals()
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  it('the page is called Home Control, and Edit Home Control while arranging', async () => {
+    renderPage()
+    await settle()
+    expect(document.querySelector('h1')?.textContent).toBe('Home Control')
+    click(byText('✎ Edit')!)
+    await settle()
+    expect(document.querySelector('h1')?.textContent).toBe('Edit Home Control')
+    expect(document.body.textContent).toContain('Hide takes one off Home Control')
+    click(byText('Cancel')!)
+    await settle()
+    expect(document.querySelector('h1')?.textContent).toBe('Home Control')
+  })
+
+  it('the setup screen carries the same title', async () => {
+    world.home = { status: 'not_configured', message: '', rooms: [], actions: [] }
+    renderPage()
+    await settle()
+    expect(document.querySelector('h1')?.textContent).toBe('Home Control')
+  })
+})
+
+describe('Home tile text clears the ⋯ button', () => {
+  const block = (selector: string) => {
+    const at = homeCss.indexOf(`\n${selector} {`)
+    expect(at).toBeGreaterThan(-1)
+    return homeCss.slice(at, homeCss.indexOf('}', at))
+  }
+  const px = (css: string, prop: string) => Number(new RegExp(`${prop}:\\s*(\\d+)(?:px)?[;\\s]`).exec(css)?.[1])
+
+  it('the text column can shrink, wraps long names, and clamps at two lines', () => {
+    expect(block('.home-tile__main')).toContain('grid-template-columns: auto minmax(0, 1fr)')
+    const name = block('.home-tile__name')
+    expect(name).toContain('min-width: 0')
+    expect(name).toContain('overflow-wrap: anywhere')
+    expect(name).toContain('-webkit-line-clamp: 2')
+    expect(name).toContain('overflow: hidden')
+  })
+
+  it('the name reserves at least the width of the ⋯ button, which sits at the tile corner', () => {
+    const more = block('.home-tile__more')
+    // The global button rule makes every button at least --touch (56px on the wall) wide, which
+    // is what really pushed the ⋯ button's edge under the names. Say its width is its width.
+    expect(more).toContain('min-width: 0')
+    const corner = px(more, 'right') + px(more, 'width')
+    const main = block('.home-tile__main')
+    const reserved = Number(/padding:\s*\d+px (\d+)px/.exec(main)?.[1]) + 1 + px(block('.home-tile__name'), 'padding-right')
+    expect(reserved).toBeGreaterThanOrEqual(corner)
+  })
+
+  it('a long name keeps its full text in a tooltip, in the wall and in Edit mode', async () => {
+    install()
+    world.home = houseWithRooms()
+    world.home.rooms[0].entities[0].name = 'Basement Living Room Pendants Over The Bar'
+    renderPage()
+    await settle()
+    expect(tile('Basement Living Room Pendants Over The Bar').querySelector('.home-tile__name')?.getAttribute('title')).toBe(
+      'Basement Living Room Pendants Over The Bar',
+    )
+    click(byText('✎ Edit')!)
+    await settle()
+    expect(document.querySelector('.home-tile--edit .home-tile__name')?.getAttribute('title')).toBe(
+      'Basement Living Room Pendants Over The Bar',
+    )
+    unmount()
+    vi.unstubAllGlobals()
+    await new Promise((r) => setTimeout(r, 420))
+  })
+})
+
+describe('Home Control masonry', () => {
+  let widthNow = 800
+  const heights: Record<string, number> = {}
+  let observers: { cb: () => void; targets: Element[] }[] = []
+  const originals: Record<string, PropertyDescriptor | undefined> = {}
+
+  beforeEach(() => {
+    install()
+    world.home = houseWithRooms()
+    for (const k of Object.keys(heights)) delete heights[k]
+    Object.assign(heights, { 'room:basement': 300, 'room:kitchen': 100, 'room:den': 100 })
+    widthNow = 800
+    for (const prop of ['clientWidth', 'offsetHeight']) originals[prop] = Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop)
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.classList.contains('home__rooms') ? widthNow : 0
+      },
+    })
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return heights[this.dataset.cell ?? ''] ?? 0
+      },
+    })
+    observers = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        entry: { cb: () => void; targets: Element[] }
+        constructor(cb: () => void) {
+          this.entry = { cb, targets: [] }
+          observers.push(this.entry)
+        }
+        observe(el: Element) {
+          this.entry.targets.push(el)
+        }
+        disconnect() {
+          this.entry.targets = []
+        }
+      },
+    )
+  })
+  afterEach(async () => {
+    unmount()
+    vi.unstubAllGlobals()
+    for (const [prop, d] of Object.entries(originals)) {
+      if (d) Object.defineProperty(HTMLElement.prototype, prop, d)
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>)[prop]
+    }
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  const cell = (key: string) => document.querySelector<HTMLElement>(`[data-cell="${key}"]`)!
+  const at = (key: string) => [cell(key).style.gridColumn, cell(key).style.gridRow]
+  const fire = async () => {
+    await act(async () => observers.forEach((o) => o.targets.length && o.cb()))
+    await wait(40)
+  }
+
+  it('slides a short room up under another short room instead of under a tall one', async () => {
+    renderPage()
+    await settle()
+    const grid = document.querySelector<HTMLElement>('.home__rooms')!
+    expect(grid.style.gridTemplateColumns).toMatch(/^repeat\(2, minmax\(0(px)?, 1fr\)\)$/)
+    expect(grid.style.gridAutoRows).toBe('4px')
+    // Basement (300px + 16 gap = 79 rows) takes the left column; Kitchen (29 rows) the right,
+    // and Den (the third room) goes under Kitchen at row 30.
+    expect(at('room:basement')).toEqual(['1 / span 1', '1 / span 79'])
+    expect(at('room:kitchen')).toEqual(['2 / span 1', '1 / span 29'])
+    expect(at('room:den')).toEqual(['2 / span 1', '30 / span 29'])
+    // The DOM stays in the saved order, so Tab and the D-pad walk the rooms the way they read.
+    expect(Array.from(document.querySelectorAll('[data-cell]')).map((c) => (c as HTMLElement).dataset.cell)).toEqual([
+      'room:basement',
+      'room:kitchen',
+      'room:den',
+    ])
+  })
+
+  it('reflows when a room changes height (a device wrapping, a tile hidden)', async () => {
+    renderPage()
+    await settle()
+    heights['room:kitchen'] = 400
+    await fire()
+    // Kitchen is now taller than Basement, so Den goes under Basement instead.
+    expect(at('room:den')).toEqual(['1 / span 1', '80 / span 29'])
+  })
+
+  it('reflows when the page width changes', async () => {
+    renderPage()
+    await settle()
+    widthNow = 1250
+    await fire()
+    expect(document.querySelector<HTMLElement>('.home__rooms')!.dataset.columns).toBe('3')
+    expect(at('room:den')).toEqual(['3 / span 1', '1 / span 29'])
+    widthNow = 360
+    await fire()
+    expect(document.querySelector<HTMLElement>('.home__rooms')!.dataset.columns).toBe('1')
+    expect(at('room:kitchen')).toEqual(['1 / span 1', '80 / span 29'])
+  })
+
+  it('a wide room takes two columns and the others fill in beside it', async () => {
+    world.settings = {
+      ...world.settings,
+      home_layout: { rooms: [], hidden_rooms: [], wide_rooms: ['kitchen'], devices: {}, scenes: [] },
+    }
+    widthNow = 1250
+    renderPage()
+    await settle()
+    // Basement takes column 1. Kitchen is wide: columns 2 and 3 are both free at the top.
+    expect(at('room:kitchen')).toEqual(['2 / span 2', '1 / span 29'])
+    // Den goes into the highest free spot: under Kitchen's left half.
+    expect(at('room:den')).toEqual(['2 / span 1', '30 / span 29'])
+    // With a fourth column the next room fills in beside the wide one, at the top.
+    widthNow = 1650
+    await fire()
+    expect(at('room:den')).toEqual(['4 / span 1', '1 / span 29'])
+  })
+
+  it('the same packing applies while arranging in Edit mode', async () => {
+    renderPage()
+    await settle()
+    click(byText('✎ Edit')!)
+    await settle()
+    expect(document.querySelectorAll('.home__rooms > .home-masonry__cell').length).toBe(3)
+    expect(cell('basement')).toBeTruthy()
+  })
+})
+
+describe('Home Control drag and drop', () => {
+  // Room cards sit in a row, each tile row below its room, scene chips above.
+  const rooms: Record<string, [number, number, number, number]> = {
+    basement: [0, 100, 200, 300],
+    kitchen: [210, 100, 410, 300],
+    den: [420, 100, 620, 300],
+  }
+  const items: Record<string, [number, number, number, number]> = {
+    'light.b1': [10, 160, 100, 210],
+    'light.b2': [110, 160, 200, 210],
+    'scene.a': [0, 0, 100, 40],
+    'scene.b': [110, 0, 220, 40],
+  }
+  let box: Record<string, [number, number, number, number]>
+
+  beforeEach(() => {
+    install()
+    world.home = houseWithRooms()
+    box = { ...rooms, ...items }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const b = box[this.dataset.dragId ?? ''] ?? [0, 0, 0, 0]
+      return { x: b[0], y: b[1], left: b[0], top: b[1], right: b[2], bottom: b[3], width: b[2] - b[0], height: b[3] - b[1], toJSON: () => ({}) }
+    })
+  })
+  afterEach(async () => {
+    vi.restoreAllMocks()
+    unmount()
+    vi.unstubAllGlobals()
+    document.body.classList.remove('home-dragging')
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  const enter = async () => {
+    renderPage()
+    await settle()
+    click(byText('✎ Edit')!)
+    await settle()
+  }
+  const send = (target: EventTarget, type: string, x: number, y: number, pointerType = 'mouse') =>
+    act(() => {
+      target.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, clientX: x, clientY: y, button: 0, pointerType }),
+      )
+    })
+  const roomEl = (name: string) => document.querySelector<HTMLElement>(`section[aria-label="${name}"]`)!
+  const grip = (el: Element) => el.querySelector<HTMLElement>('[data-drag-grip]')!
+  const roomGrip = (name: string) => roomEl(name).querySelector<HTMLElement>('.home-room__head [data-drag-grip]')!
+  const tileEl = (name: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('.home-tile--edit')).find((t) => t.querySelector('.home-tile__name')?.textContent === name)!
+  const chipEl = (name: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('.home-scene-edit')).find((t) => t.textContent?.includes(name))!
+  const ghost = () => document.querySelector('[data-testid=drag-ghost]')
+  const patchedLayout = () => lastPatch().home_layout as { rooms: string[]; devices: Record<string, string[]>; scenes: string[] }
+
+  it('dragging a room by its handle over another shows a placeholder, reflows live, and saves on Done', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110)
+    expect(ghost()).toBeNull() // not yet: a press alone is not a drag
+    send(window, 'pointermove', 20, 112)
+    expect(ghost()).not.toBeNull()
+    expect(document.body.classList.contains('home-dragging')).toBe(true)
+    expect(roomEl('Basement').getAttribute('data-drag-state')).toBe('source') // the placeholder
+    expect(ghost()?.textContent).toContain('Basement')
+    send(window, 'pointermove', 500, 150) // over Den
+    expect(titles()).toEqual(['Kitchen', 'Den', 'Basement']) // live reflow, before letting go
+    expect(world.patches).toEqual([])
+    send(window, 'pointerup', 500, 150)
+    expect(ghost()).toBeNull()
+    expect(document.body.classList.contains('home-dragging')).toBe(false)
+    expect(roomEl('Basement').getAttribute('data-drag-state')).toBeNull()
+    expect(titles()).toEqual(['Kitchen', 'Den', 'Basement'])
+    expect(world.patches).toEqual([]) // still a draft until Done
+    click(byText('Done')!)
+    await settle()
+    expect(patchedLayout().rooms).toEqual(['kitchen', 'den', 'basement'])
+  })
+
+  it('moves the floating copy with the pointer', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110)
+    send(window, 'pointermove', 60, 150)
+    expect((ghost() as HTMLElement).style.transform).toBe('translate(50px, 40px)')
+  })
+
+  it('pressing on a room card body drags it with a mouse, but a plain click does not', async () => {
+    await enter()
+    const title = roomEl('Kitchen').querySelector('.home-room__title')!
+    send(title, 'pointerdown', 220, 110)
+    send(window, 'pointermove', 222, 111) // under the threshold
+    send(window, 'pointerup', 222, 111)
+    expect(ghost()).toBeNull()
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    send(title, 'pointerdown', 220, 110)
+    send(window, 'pointermove', 100, 110)
+    send(window, 'pointermove', 50, 150) // over Basement
+    send(window, 'pointerup', 50, 150)
+    expect(titles()).toEqual(['Kitchen', 'Basement', 'Den'])
+  })
+
+  it('dropping back where it started changes nothing and saves no new order', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110)
+    send(window, 'pointermove', 40, 112)
+    send(window, 'pointerup', 40, 112)
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    click(byText('Done')!)
+    await settle()
+    expect(patchedLayout().rooms).toEqual([])
+  })
+
+  it('Escape puts everything back', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110)
+    send(window, 'pointermove', 20, 112)
+    send(window, 'pointermove', 500, 150)
+    expect(titles()).toEqual(['Kitchen', 'Den', 'Basement'])
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+    expect(ghost()).toBeNull()
+    send(window, 'pointerup', 500, 150)
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    expect(document.body.classList.contains('home-dragging')).toBe(false)
+  })
+
+  it('a cancelled pointer (the browser took the touch) also puts everything back', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110, 'touch')
+    send(window, 'pointermove', 20, 130, 'touch')
+    send(window, 'pointermove', 500, 150, 'touch')
+    send(window, 'pointercancel', 500, 150, 'touch')
+    expect(ghost()).toBeNull()
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+  })
+
+  it('a finger on the handle drags straight away, with no hold', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110, 'touch')
+    send(window, 'pointermove', 30, 130, 'touch')
+    expect(ghost()).not.toBeNull()
+    send(window, 'pointermove', 430, 150, 'touch')
+    send(window, 'pointerup', 430, 150, 'touch')
+    expect(titles()).toEqual(['Kitchen', 'Den', 'Basement'])
+  })
+
+  it('a finger on the card body drags after a short hold', async () => {
+    await enter()
+    const title = roomEl('Basement').querySelector('.home-room__title')!
+    send(title, 'pointerdown', 10, 110, 'touch')
+    await wait(400)
+    expect(ghost()).not.toBeNull()
+    send(window, 'pointermove', 300, 150, 'touch')
+    send(window, 'pointerup', 300, 150, 'touch')
+    expect(titles()).toEqual(['Kitchen', 'Basement', 'Den'])
+  })
+
+  it('a finger that moves before the hold is up is scrolling, not dragging', async () => {
+    await enter()
+    const title = roomEl('Basement').querySelector('.home-room__title')!
+    send(title, 'pointerdown', 10, 110, 'touch')
+    send(window, 'pointermove', 10, 160, 'touch')
+    await wait(400)
+    expect(ghost()).toBeNull()
+    send(window, 'pointermove', 300, 150, 'touch')
+    send(window, 'pointerup', 300, 150, 'touch')
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+  })
+
+  it('a quick tap on the card body is just a tap', async () => {
+    await enter()
+    const title = roomEl('Basement').querySelector('.home-room__title')!
+    send(title, 'pointerdown', 10, 110, 'touch')
+    send(window, 'pointerup', 10, 110, 'touch')
+    await wait(400)
+    expect(ghost()).toBeNull()
+  })
+
+  it('pressing a button (Hide, ◀ ▶, Wide) never starts a drag', async () => {
+    await enter()
+    const hide = tools('Hide Bar')
+    send(hide, 'pointerdown', 150, 180)
+    send(window, 'pointermove', 400, 190)
+    send(window, 'pointermove', 420, 195)
+    expect(ghost()).toBeNull()
+    send(window, 'pointerup', 420, 195)
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+  })
+
+  it('dragging a device moves it within its room only, and the room stays put', async () => {
+    await enter()
+    send(grip(tileEl('Basement Lamp')), 'pointerdown', 20, 165)
+    send(window, 'pointermove', 40, 170)
+    expect(tileEl('Basement Lamp').getAttribute('data-drag-state')).toBe('source')
+    expect(roomEl('Basement').getAttribute('data-drag-state')).toBeNull() // the room did not start dragging
+    send(window, 'pointermove', 150, 180) // over Bar
+    send(window, 'pointerup', 150, 180)
+    expect(Array.from(document.querySelectorAll('[aria-label=Basement] .home-tile__name')).map((n) => n.textContent)).toEqual([
+      'Bar',
+      'Basement Lamp',
+    ])
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    click(byText('Done')!)
+    await settle()
+    expect(patchedLayout().devices).toEqual({ basement: ['light.b2', 'light.b1'] })
+    expect(patchedLayout().rooms).toEqual([])
+  })
+
+  it('a device dropped outside its room stays in its room', async () => {
+    await enter()
+    send(grip(tileEl('Basement Lamp')), 'pointerdown', 20, 165)
+    send(window, 'pointermove', 40, 170)
+    send(window, 'pointermove', 500, 150) // over the Den room card, not a Basement tile
+    send(window, 'pointerup', 500, 150)
+    expect(Array.from(document.querySelectorAll('[aria-label=Basement] .home-tile__name')).map((n) => n.textContent)).toEqual([
+      'Basement Lamp',
+      'Bar',
+    ])
+  })
+
+  it('a finger held on a device tile drags the tile, not the room', async () => {
+    await enter()
+    send(tileEl('Basement Lamp').querySelector('.home-tile__name')!, 'pointerdown', 20, 165, 'touch')
+    await wait(400)
+    expect(tileEl('Basement Lamp').getAttribute('data-drag-state')).toBe('source')
+    expect(roomEl('Basement').getAttribute('data-drag-state')).toBeNull()
+    send(window, 'pointermove', 150, 180, 'touch')
+    send(window, 'pointerup', 150, 180, 'touch')
+    expect(tileEl('Basement Lamp').nextElementSibling).toBeNull()
+  })
+
+  it('dragging a scene chip reorders the scenes', async () => {
+    await enter()
+    send(grip(chipEl('Away')), 'pointerdown', 10, 20)
+    send(window, 'pointermove', 30, 22)
+    expect(chipEl('Away').getAttribute('data-drag-state')).toBe('source')
+    send(window, 'pointermove', 160, 20) // over Home
+    send(window, 'pointerup', 160, 20)
+    click(byText('Done')!)
+    await settle()
+    expect(patchedLayout().scenes).toEqual(['scene.b', 'scene.a'])
+  })
+
+  it('the ◀ ▶ buttons still work, and are the small secondary controls', async () => {
+    await enter()
+    expect(tools('Move Basement later').className).toContain('home-edit__arrow')
+    click(tools('Move Basement later'))
+    expect(titles()).toEqual(['Kitchen', 'Basement', 'Den'])
+    expect(homeCss).toMatch(/\.home-edit__arrow \{[^}]*width: 32px;\s*min-width: 0/)
+  })
+
+  it('the handle is hidden from screen readers, which use the buttons', async () => {
+    await enter()
+    expect(roomGrip('Basement').getAttribute('aria-hidden')).toBe('true')
+    expect(homeCss).toMatch(/\.home-edit__grip \{[^}]*touch-action: none/)
+  })
+
+  it('leaving Edit mode mid-drag cleans up', async () => {
+    await enter()
+    send(roomGrip('Basement'), 'pointerdown', 10, 110)
+    send(window, 'pointermove', 20, 112)
+    expect(document.body.classList.contains('home-dragging')).toBe(true)
+    click(byText('Cancel')!)
+    await settle()
+    expect(document.body.classList.contains('home-dragging')).toBe(false)
+    expect(ghost()).toBeNull()
   })
 })

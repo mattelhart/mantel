@@ -1,6 +1,6 @@
 import { takeSseFrames } from '../../live/sse'
 
-/* Pure helpers for the Home page: what a tile says, what a tap does, what a live update
+/* Pure helpers for Home Control: what a tile says, what a tap does, what a live update
  * changes, how rooms are laid out. No React in here, so all of it is tested directly. */
 
 export type HomeStatus = 'ok' | 'not_configured' | 'unreachable' | 'invalid_token' | 'error' | 'connecting'
@@ -350,6 +350,16 @@ export function moveScene(data: HomeData, hidden: string[], prefs: HomeLayoutPre
   const order = editView(data, hidden, prefs).scenes.map((i) => i.entity.entity_id)
   return { ...prefs, scenes: moveItem(order, id, delta) }
 }
+
+/** Drag and drop hands over the whole new order of one group at once. */
+export const setRoomOrder = (prefs: HomeLayoutPrefs, keys: string[]): HomeLayoutPrefs => ({ ...prefs, rooms: keys })
+
+export const setDeviceOrder = (prefs: HomeLayoutPrefs, roomKey: string, ids: string[]): HomeLayoutPrefs => ({
+  ...prefs,
+  devices: { ...prefs.devices, [roomKey]: ids },
+})
+
+export const setSceneOrder = (prefs: HomeLayoutPrefs, ids: string[]): HomeLayoutPrefs => ({ ...prefs, scenes: ids })
 
 const toggled = (ids: string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
 
