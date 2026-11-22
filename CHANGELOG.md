@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+- **Phone app fixes.** System Back now returns to the Home tab before leaving the app; text fields stay above the keyboard; the family home buttons wrap instead of squeezing "Pair TV"; rotating keeps the page you were on; landscape content stays clear of the camera cutout. The TV app is now labelled **Mantel TV** so it can't be mistaken for the phone app.
+
 - **Phone app: pair a TV and set up home control.** Settings → Pair a TV shows a one-time code (and a QR) so a paired phone can pair a TV. Settings → Home control takes the Home Assistant address and token (masked, saved on the server, never echoed back), tests the connection, and opens a Lights page. The wall's Devices tab gains a Pair a TV button.
 
 **Home control.** A new **Home** page controls lights, fans, shades, thermostats, locks, switches and scenes through Home Assistant, which already speaks Lutron Caseta, SmartThings and most other brands. Devices are grouped by the rooms (areas) set in Home Assistant, with scenes and scripts as a row of buttons on top. Tap a tile to switch it, press and hold (or tap the small **⋯**) for a brightness, speed or position slider, a thermostat's target and mode, **Add to favorites** and **Hide from Home**. Locks always ask first, and the server refuses a lock command that wasn't confirmed. Changes made at a wall switch or in the Home Assistant app appear on the page within a second, relayed over a server-sent stream; the connection to Home Assistant is opened only while a Home page is open. The page works from the D-pad in TV mode and is in the side navigation for the wall, the TV and phones.

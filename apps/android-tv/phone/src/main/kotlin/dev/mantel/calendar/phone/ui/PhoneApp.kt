@@ -12,6 +12,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -152,10 +161,22 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
             permission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    BackHandler(enabled = scanning || stack.isNotEmpty()) {
-        if (scanning) scanning = false else stack = stack.dropLast(1)
+    // System back: close the scanner, then pop a page, then return to the Home tab. Only Back
+    // on the Home tab itself leaves the app.
+    BackHandler(enabled = scanning || stack.isNotEmpty() || (state.phase == Phase.Ready && tab != PhoneTab.Home)) {
+        when {
+            scanning -> scanning = false
+            stack.isNotEmpty() -> stack = stack.dropLast(1)
+            else -> tab = PhoneTab.Home
+        }
     }
     MaterialTheme(colorScheme = if (dark) mantelDark() else mantelLight()) {
+      // Edge to edge draws under a landscape camera cutout; keep content beside it.
+      Box(
+          Modifier.fillMaxSize()
+              .background(MaterialTheme.colorScheme.background)
+              .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)),
+      ) {
         if (scanning) {
             QrScanner(onResult = {
                 scanning = false
@@ -212,7 +233,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                     }
                 },
             ) { padding ->
-                Column(Modifier.fillMaxSize().padding(padding)) {
+                Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
                     if (state.offline) OfflineBanner(state.offlineDetail.ifBlank { "Offline, last synced earlier" })
                     state.message?.let { text ->
                         MessageBanner(text)
@@ -263,6 +284,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
                 }
             }
         }
+      }
     }
 }
 
@@ -385,7 +407,7 @@ private fun SetupColumn(message: String?, content: @Composable () -> Unit) {
             contentColor = MaterialTheme.colorScheme.onBackground,
         ) {
             Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+                Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 content()

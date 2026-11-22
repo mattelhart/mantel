@@ -20,6 +20,8 @@ Without a computer: copy `phone-debug.apk` onto the phone and open it. Android w
 
 `./gradlew assembleDebug` in that directory also builds the TV app. `./gradlew test` runs the core and phone unit tests. The version code is the git commit count, so the checkout needs its full history. See [apps/android-tv/README.md](../apps/android-tv/README.md).
 
+**Install the phone APK, not the TV APK.** The TV app (`dev.mantel.calendar.tv`, label **Mantel TV**) is locked to landscape and built for a remote; on a phone it looks frozen. If a phone has it, uninstall it. The phone app follows the phone's rotation, portrait by default.
+
 ## Pairing
 
 The phone reaches Mantel over the home Wi-Fi, or over Tailscale or WireGuard. Do not port-forward the server. The app refuses cleartext HTTP to a public IP. It allows cleartext to private addresses (the LAN, and WireGuard's `10.x`), to Tailscale's `100.64.0.0/10` range, and to names such as `familycal.local` or a MagicDNS hostname. HTTPS is allowed anywhere.
