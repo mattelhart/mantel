@@ -362,21 +362,19 @@ def test_poll_inbound_stores_unknown_and_known_and_never_auto_replies(client, mo
     listing = client.get("/api/messages/conversations").json()
     names = [c["name"] for c in listing["conversations"]]
     assert "Austin" in names
-    assert "Unknown" in names
-    unknown = next(c for c in listing["conversations"] if c["unknown"])
-    assert unknown["phone"] == STRANGER
-    assert unknown["last_message"]["media_url"]
+    # Strangers are stored but hidden from the list and from direct lookup.
+    assert "Unknown" not in names
+    assert not any(c["unknown"] for c in listing["conversations"])
+    digits = "".join(ch for ch in STRANGER if ch.isdigit())
+    assert client.get(f"/api/messages/conversations/phone-{digits}").status_code == 404
 
     austin_thread = client.get(f"/api/messages/conversations/user-{person['id']}").json()
     assert austin_thread["messages"][0]["body"] == "On my way"
     assert austin_thread["can_send"] is True
 
-    stranger_thread = client.get(f"/api/messages/conversations/phone-{STRANGER[1:]}").json()
-    assert stranger_thread["unknown"] is True
-    assert stranger_thread["can_send"] is False
-    picture = client.get(stranger_thread["messages"][0]["media_url"])
-    assert picture.status_code == 200
-    assert picture.content.startswith(b"\x89PNG")
+    stranger_rows = list(db.scalars(select(FamilyMessage).where(FamilyMessage.phone == STRANGER)))
+    assert stranger_rows and stranger_rows[0].media_path
+    assert client.get(f"/api/messages/{stranger_rows[0].id}/media").status_code == 404
 
     # Polling again must not duplicate, and must never POST a reply.
     again = sms.poll_once(db)

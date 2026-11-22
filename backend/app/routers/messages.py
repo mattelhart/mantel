@@ -83,7 +83,11 @@ def _parse_conversation(db: Session, conversation_id: str) -> tuple[User | None,
         phone = sms.normalize_e164(digits)
         if not sms.valid_e164(phone):
             raise HTTPException(404, "Conversation not found")
-        return sms.user_by_phone(db, phone), phone
+        user = sms.user_by_phone(db, phone)
+        if user is None:
+            # Unknown numbers are hidden everywhere.
+            raise HTTPException(404, "Conversation not found")
+        return user, phone
     raise HTTPException(404, "Conversation not found")
 
 
@@ -102,8 +106,8 @@ def _last_message(db: Session, phone: str | None, user_id: int | None) -> Family
     "/conversations",
     summary="List message threads",
     description=(
-        "One thread per family member who has a phone number, plus a thread for each "
-        "unknown inbound number."
+        "One thread per family member who has a phone number. Messages from numbers "
+        "that don't belong to a family member are hidden."
     ),
 )
 def list_conversations(db: Session = Depends(get_db)) -> dict:
@@ -132,37 +136,13 @@ def list_conversations(db: Session = Depends(get_db)) -> dict:
             }
         )
 
-    unknown_phones = db.scalars(
-        select(FamilyMessage.phone)
-        .where(FamilyMessage.user_id.is_(None))
-        .distinct()
-    )
-    unknown_threads: list[dict] = []
-    for phone in unknown_phones:
-        if not phone or phone in used_phones:
-            continue
-        last = _last_message(db, phone, None)
-        unknown_threads.append(
-            {
-                "id": _conversation_id(None, phone),
-                "user_id": None,
-                "name": "Unknown",
-                "phone": phone,
-                "color": "#64748b",
-                "avatar_emoji": None,
-                "unknown": True,
-                "last_message": _message_out(last) if last else None,
-            }
-        )
-    unknown_threads.sort(
-        key=lambda t: (t["last_message"] or {}).get("created_at") or "",
-        reverse=True,
-    )
+    # Messages from numbers that aren't a family member are kept in the database but
+    # never shown, so a stranger texting the house number can't put anything on the wall.
     return {
         "configured": cfg_ok,
         "from_number": sms.from_number(db) if cfg_ok else "",
         "quick_replies": QUICK_REPLIES,
-        "conversations": threads + unknown_threads,
+        "conversations": threads,
     }
 
 
@@ -278,7 +258,8 @@ def signal_qr(db: Session = Depends(get_db)):
 )
 def get_media(message_id: int, db: Session = Depends(get_db)):
     row = db.get(FamilyMessage, message_id)
-    if row is None or not row.media_path:
+    if row is None or not row.media_path or row.user_id is None:
+        # Pictures from unknown numbers stay hidden too.
         raise HTTPException(404, "Picture not found")
     try:
         path = sms.media_file(row.media_path)

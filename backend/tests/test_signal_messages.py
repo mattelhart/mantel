@@ -282,7 +282,7 @@ def test_poll_inbound_stores_unknown_and_known_and_never_auto_replies(client, mo
     assert listing["configured"] is True
     names = {c["name"]: c for c in listing["conversations"]}
     assert "Austin" in names
-    assert names["Unknown"]["unknown"] is True
+    assert "Unknown" not in names
 
 
 def test_receipt_poll_marks_message_read(client, monkeypatch, db):
