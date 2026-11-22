@@ -247,3 +247,18 @@ Also stored, currently only settable through the API (`PATCH /api/settings`):
 | Version             | The `VERSION` file at the repo root                    |
 | Server settings     | `.env`                                                 |
 | Display preferences | The database (`app_settings` table)                    |
+
+### `UNIFI_PROTECT_KEY_FILE`
+
+Default unset, which means the Cameras page reports that it is not configured. Path to a file
+that contains a UniFi Protect Integration API key (the key itself, nothing else). The key is
+read at request time, is never written to logs, and is never returned by the API. Create the
+key in the UniFi Site Manager (or the console's Protect settings) and put it in a file the
+container can read, for example a Docker bind-mount.
+
+### `UNIFI_PROTECT_URL`
+
+Default `https://10.0.0.1/proxy/protect/integration`. Base URL of the Protect Integration API
+on your UniFi console (a UDM, Cloud Key, or similar). Mantel calls `GET /v1/cameras` and
+`GET /v1/cameras/{id}/snapshot` with the `X-API-KEY` header. TLS certificate verification is
+turned off only for this host, because UniFi consoles typically use a self-signed certificate.

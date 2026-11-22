@@ -807,13 +807,18 @@ html[data-theme='airy'] .shell__nav {
 @media (orientation: landscape) and (min-width: 700px) {
   html[data-theme='airy'] .shell__nav {
     gap: 8px;
-    padding: 14px 10px;
+    padding: 10px 10px;
     align-items: stretch;
-    overflow: visible;
+    min-height: 0;
+    /* Rings sit inside the button (offset -4px), so the rail can scroll when
+       Games and Cameras join the existing items on a short wall display. */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   html[data-theme='airy'] .navbtn {
-    min-height: 68px;
+    min-height: 56px;
+    padding: 6px 6px;
     gap: 4px;
     overflow: visible;
     /* A fractional scale on press slightly blurs the type on a Pi panel. */

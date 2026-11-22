@@ -29,6 +29,8 @@ const NAV = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/lists', label: 'Lists' },
   { to: '/home', label: 'Home' },
+  { to: '/games', label: 'Games' },
+  { to: '/cameras', label: 'Cameras' },
   { to: '/meals', label: 'Meals' },
   { to: '/show-on-tv', label: 'Show on TV' },
   { to: '/chores', label: 'Chores' },

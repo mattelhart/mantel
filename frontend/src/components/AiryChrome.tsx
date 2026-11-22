@@ -91,6 +91,8 @@ const NAV = [
   { to: '/lists', label: 'Lists', icon: 'lists' },
   { to: '/home', label: 'Home', icon: 'home' },
   { to: '/photos', label: 'Photos', icon: 'photos' },
+  { to: '/games', label: 'Games', icon: 'games' },
+  { to: '/cameras', label: 'Cameras', icon: 'cameras' },
   { to: '/meals', label: 'Meals', icon: 'lists' },
   { to: '/show-on-tv', label: 'Show on TV', icon: 'calendar' },
 ] as const
@@ -179,6 +181,22 @@ function paths(name: string): ReactNode {
       )
     case 'sleep':
       return <path d="M20 14.5A7.5 7.5 0 1 1 9.5 4 6 6 0 0 0 20 14.5z" />
+    case 'games':
+      return (
+        <>
+          <rect x="3.5" y="8" width="17" height="12" rx="3" />
+          <circle cx="8.5" cy="14" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="15.5" cy="14" r="1.2" fill="currentColor" stroke="none" />
+          <path d="M9.5 14h5M8.5 11v6M15.5 12.5v3" />
+        </>
+      )
+    case 'cameras':
+      return (
+        <>
+          <path d="M4 9.5h3l1.6-2h6.8l1.6 2H20a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19v-8A1.5 1.5 0 0 1 4 9.5z" />
+          <circle cx="12" cy="15" r="3.2" />
+        </>
+      )
     default:
       return (
         <>
