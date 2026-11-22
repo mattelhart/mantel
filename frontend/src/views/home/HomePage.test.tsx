@@ -51,7 +51,7 @@ const enc = new TextEncoder()
 function install() {
   world = {
     home: snapshot(),
-    settings: { home_favorites: [], home_hidden: [], theme: 'airy', server: { ha_token_set: true } },
+    settings: { home_favorites: [], home_hidden: [], home_layout: { rooms: [], hidden_rooms: [], wide_rooms: [], devices: {}, scenes: [] }, theme: 'airy', server: { ha_token_set: true } },
     posts: [],
     patches: [],
     stream: null,
@@ -275,5 +275,289 @@ describe('Home page', () => {
     await settle()
     expect(document.body.textContent).toContain('Home Assistant rejected the access token.')
     expect(byText('Try again')).toBeTruthy()
+  })
+})
+
+const tvEntity = (over: Partial<HomeEntity> = {}) =>
+  ent({
+    entity_id: 'media_player.den_tv',
+    domain: 'media_player',
+    name: 'TV',
+    state: 'on',
+    level: 25,
+    adjustable: true,
+    attrs: { can_power: true, can_volume_step: true, can_mute: true, can_source: true, source: 'HDMI1', sources: ['HDMI1', 'Netflix'], muted: false },
+    ...over,
+  })
+
+const houseWithRooms = (): HomeData => ({
+  status: 'ok',
+  message: '',
+  rooms: [
+    { area_id: 'basement', name: 'Basement', entities: [ent({ entity_id: 'light.b1', name: 'Basement Lamp', area_id: 'basement' }), ent({ entity_id: 'light.b2', name: 'Bar', area_id: 'basement' })] },
+    { area_id: 'kitchen', name: 'Kitchen', entities: [ent({ entity_id: 'light.k1', name: 'Pendant', area_id: 'kitchen' })] },
+    { area_id: 'den', name: 'Den', entities: [tvEntity()] },
+  ],
+  actions: [
+    ent({ entity_id: 'scene.a', domain: 'scene', name: 'Away', on: null, level: null, adjustable: false }),
+    ent({ entity_id: 'scene.b', domain: 'scene', name: 'Home', on: null, level: null, adjustable: false }),
+  ],
+})
+
+const titles = () => Array.from(document.querySelectorAll('.home-room__title')).map((n) => n.textContent)
+const sceneNames = () => Array.from(document.querySelectorAll('.home__scenes .home-scene')).map((n) => n.textContent?.trim())
+const tools = (label: string) => document.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!
+const lastPatch = () => world.patches[world.patches.length - 1]
+
+describe('Home page TVs', () => {
+  beforeEach(() => {
+    install()
+    world.home = houseWithRooms()
+  })
+  afterEach(async () => {
+    unmount()
+    vi.unstubAllGlobals()
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  it('a TV is a tile showing what it is on, and a tap turns it off', async () => {
+    renderPage()
+    await settle()
+    expect(tile('TV').textContent).toContain('HDMI1')
+    expect(tile('TV').textContent).toContain('📺')
+    click(tile('TV'))
+    await settle()
+    expect(world.posts).toEqual([
+      { url: '/api/home/entities/media_player.den_tv/action', body: { action: 'turn_off', confirm: false } },
+    ])
+    expect(tile('TV').textContent).toContain('Off')
+  })
+
+  it('its controls have volume, mute and inputs, each sent to Home Assistant', async () => {
+    renderPage()
+    await settle()
+    click(document.querySelector('[aria-label="TV controls"]')!)
+    await settle()
+    const sheet = document.querySelector('[role=dialog]')!
+    click(sheet.querySelector('[aria-label="Volume up"]')!)
+    click(sheet.querySelector('[aria-label="Volume down"]')!)
+    click(byText('🔈 Mute', sheet)!)
+    click(byText('Netflix', sheet)!)
+    await settle()
+    expect(world.posts.map((p) => p.body)).toEqual([
+      { action: 'volume_up', confirm: false },
+      { action: 'volume_down', confirm: false },
+      { action: 'mute', confirm: false },
+      { action: 'select_source', value: 'Netflix', confirm: false },
+    ])
+    expect(byText('🔇 Muted', sheet)).toBeTruthy()
+    // The volume slider is there too, and the TV tile shows no brightness-style bar for it.
+    expect(sheet.querySelector('input[type=range]')).toBeTruthy()
+    expect(tile('TV').querySelector('.home-tile__bar')).toBeNull()
+    expect(tile('Basement Lamp').querySelector('.home-tile__bar')).toBeTruthy()
+  })
+
+  it('a TV that is off shows only the power button', async () => {
+    world.home.rooms[2].entities = [tvEntity({ on: false, state: 'off' })]
+    renderPage()
+    await settle()
+    click(document.querySelector('[aria-label="TV controls"]')!)
+    await settle()
+    const sheet = document.querySelector('[role=dialog]')!
+    expect(byText('Turn on', sheet)).toBeTruthy()
+    expect(sheet.querySelector('[aria-label="Volume up"]')).toBeNull()
+    expect(sheet.querySelector('input[type=range]')).toBeNull()
+    expect(sheet.querySelector('[aria-label=Input]')).toBeNull()
+  })
+})
+
+describe('Home page edit mode', () => {
+  beforeEach(() => {
+    install()
+    world.home = houseWithRooms()
+  })
+  afterEach(async () => {
+    unmount()
+    vi.unstubAllGlobals()
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  const enter = async () => {
+    renderPage()
+    await settle()
+    click(byText('✎ Edit')!)
+    await settle()
+  }
+
+  it('Edit is a real button, and while editing a tap arranges instead of switching things', async () => {
+    await enter()
+    expect(document.querySelector('.home')?.getAttribute('data-editing')).toBe('true')
+    expect(document.querySelector('h1')?.textContent).toBe('Edit Home')
+    expect(byText('Done')).toBeTruthy()
+    expect(byText('Cancel')).toBeTruthy()
+    expect(byText('Reset to default')).toBeTruthy()
+    expect(byText('✎ Edit')).toBeUndefined()
+    expect(document.querySelector('.home-tile__main')?.tagName).toBe('DIV')
+    expect(world.posts).toEqual([])
+  })
+
+  it('moves a room later and saves the order for every screen on Done', async () => {
+    await enter()
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    click(tools('Move Basement later'))
+    expect(titles()).toEqual(['Kitchen', 'Basement', 'Den'])
+    expect(world.patches).toEqual([]) // nothing is saved until Done
+    click(byText('Done')!)
+    await settle()
+    expect(lastPatch()).toEqual({
+      home_layout: { rooms: ['kitchen', 'basement', 'den'], hidden_rooms: [], wide_rooms: [], devices: {}, scenes: [] },
+      home_hidden: [],
+    })
+    expect(document.querySelector('.home')?.getAttribute('data-editing')).toBeNull()
+    expect(titles()).toEqual(['Kitchen', 'Basement', 'Den'])
+  })
+
+  it('the first room cannot move earlier and the last cannot move later', async () => {
+    await enter()
+    expect(tools('Move Basement earlier').disabled).toBe(true)
+    expect(tools('Move Den later').disabled).toBe(true)
+    expect(tools('Move Den earlier').disabled).toBe(false)
+  })
+
+  it('reorders devices inside a room', async () => {
+    await enter()
+    click(tools('Move Bar earlier'))
+    click(byText('Done')!)
+    await settle()
+    expect((lastPatch().home_layout as { devices: unknown }).devices).toEqual({ basement: ['light.b2', 'light.b1'] })
+    const names = Array.from(document.querySelectorAll('[aria-label=Basement] .home-tile__name')).map((n) => n.textContent)
+    expect(names).toEqual(['Bar', 'Basement Lamp'])
+  })
+
+  it('hides a device, and Show brings it back, before anything is saved', async () => {
+    await enter()
+    click(tools('Hide Bar'))
+    expect(tools('Show Bar')).toBeTruthy()
+    expect(document.querySelector('[aria-label=Basement]')?.textContent).toContain('Hidden')
+    click(tools('Show Bar'))
+    expect(tools('Hide Bar')).toBeTruthy()
+    click(tools('Hide Bar'))
+    click(byText('Done')!)
+    await settle()
+    expect(lastPatch().home_hidden).toEqual(['light.b2'])
+    expect(tile('Basement Lamp')).toBeTruthy()
+    expect(Array.from(document.querySelectorAll('.home-tile__name')).map((n) => n.textContent)).not.toContain('Bar')
+    expect(document.body.textContent).toContain('1 hidden')
+  })
+
+  it('hides a whole room, says so, and a tap on it re-enters Edit to bring it back', async () => {
+    await enter()
+    click(tools('Hide Kitchen room'))
+    click(byText('Done')!)
+    await settle()
+    expect((lastPatch().home_layout as { hidden_rooms: string[] }).hidden_rooms).toEqual(['kitchen'])
+    expect(titles()).toEqual(['Basement', 'Den'])
+    click(byText('1 hidden room')!)
+    await settle()
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    click(tools('Show Kitchen room'))
+    click(byText('Done')!)
+    await settle()
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    expect(byText('1 hidden room')).toBeUndefined()
+  })
+
+  it('makes a room wide', async () => {
+    await enter()
+    click(tools('Den wide'))
+    expect(document.querySelector('[aria-label=Den]')?.className).toContain('home-room--wide')
+    click(byText('Done')!)
+    await settle()
+    expect((lastPatch().home_layout as { wide_rooms: string[] }).wide_rooms).toEqual(['den'])
+    expect(document.querySelector('[aria-label=Den]')?.className).toContain('home-room--wide')
+    expect(document.querySelector('[aria-label=Kitchen]')?.className).not.toContain('home-room--wide')
+  })
+
+  it('reorders and hides scene chips', async () => {
+    await enter()
+    click(tools('Move Away later'))
+    click(tools('Hide Home'))
+    click(byText('Done')!)
+    await settle()
+    expect((lastPatch().home_layout as { scenes: string[] }).scenes).toEqual(['scene.b', 'scene.a'])
+    expect(lastPatch().home_hidden).toEqual(['scene.b'])
+    expect(sceneNames()).toEqual(['✨ Away'])
+  })
+
+  it('Cancel throws every change away and saves nothing', async () => {
+    await enter()
+    click(tools('Move Basement later'))
+    click(tools('Hide Bar'))
+    click(byText('Cancel')!)
+    await settle()
+    expect(world.patches).toEqual([])
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    expect(tile('Bar')).toBeTruthy()
+  })
+
+  it('Reset to default puts the usual order back and shows everything, once Done', async () => {
+    world.settings = {
+      ...world.settings,
+      home_hidden: ['light.b2'],
+      home_layout: { rooms: ['den', 'kitchen', 'basement'], hidden_rooms: ['kitchen'], wide_rooms: ['den'], devices: { basement: ['light.b2', 'light.b1'] }, scenes: ['scene.b', 'scene.a'] },
+    }
+    renderPage()
+    await settle()
+    expect(titles()).toEqual(['Den', 'Basement'])
+    click(byText('✎ Edit')!)
+    await settle()
+    click(byText('Reset to default')!)
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    expect(world.patches).toEqual([]) // still a draft: Cancel could undo it
+    click(byText('Done')!)
+    await settle()
+    expect(lastPatch()).toEqual({
+      home_layout: { rooms: [], hidden_rooms: [], wide_rooms: [], devices: {}, scenes: [] },
+      home_hidden: [],
+    })
+    expect(titles()).toEqual(['Basement', 'Kitchen', 'Den'])
+    expect(sceneNames()).toEqual(['✨ Away', '✨ Home'])
+  })
+
+  it('shows a layout somebody saved on another screen', async () => {
+    world.settings = { ...world.settings, home_layout: { rooms: ['den'], hidden_rooms: [], wide_rooms: [], devices: {}, scenes: [] } }
+    renderPage()
+    await settle()
+    expect(titles()).toEqual(['Den', 'Basement', 'Kitchen'])
+  })
+
+  it('a room that appears later goes after the arranged ones', async () => {
+    world.settings = { ...world.settings, home_layout: { rooms: ['den', 'basement'], hidden_rooms: [], wide_rooms: [], devices: {}, scenes: [] } }
+    world.home.rooms.push({ area_id: 'garage', name: 'Garage', entities: [ent({ entity_id: 'light.g1', name: 'Garage Light', area_id: 'garage' })] })
+    renderPage()
+    await settle()
+    expect(titles()).toEqual(['Den', 'Basement', 'Kitchen', 'Garage'])
+  })
+
+  it('says so and stays in Edit mode when saving fails', async () => {
+    await enter()
+    click(tools('Move Basement later'))
+    const original = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    original.mockImplementationOnce(async () => new Response(JSON.stringify({ error: { code: 'error', message: 'nope' } }), { status: 500 }))
+    click(byText('Done')!)
+    await settle()
+    expect(document.querySelector('[role=alert]')?.textContent).toContain("Couldn't save the layout")
+    expect(document.querySelector('.home')?.getAttribute('data-editing')).toBe('true')
+    expect(titles()).toEqual(['Kitchen', 'Basement', 'Den'])
+    click(byText('Done')!)
+    await settle()
+    expect(document.querySelector('.home')?.getAttribute('data-editing')).toBeNull()
+  })
+
+  it('has no Edit button when there is nothing to arrange', async () => {
+    world.home = { status: 'ok', message: '', rooms: [], actions: [] }
+    renderPage()
+    await settle()
+    expect(byText('✎ Edit')).toBeUndefined()
   })
 })

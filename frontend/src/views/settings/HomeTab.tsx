@@ -84,7 +84,7 @@ export function HomeTab() {
     <section className="panel">
       <h2>Home control</h2>
       <p className="hint">
-        Mantel controls your lights, fans, shades, locks and scenes through{' '}
+        Mantel controls your lights, fans, shades, TVs, locks and scenes through{' '}
         <strong>Home Assistant</strong>. Add Lutron Caseta, SmartThings and the rest to Home
         Assistant, and they appear on the Home page automatically, grouped by room.
       </p>

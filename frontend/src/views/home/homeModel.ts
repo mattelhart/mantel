@@ -110,6 +110,12 @@ export function describe(e: HomeEntity): string {
       const mode = cap(String(e.attrs.hvac_mode ?? e.state))
       return typeof now === 'number' ? `${Math.round(now)}° · ${mode}` : mode
     }
+    case 'media_player': {
+      if (!e.on) return 'Off'
+      const source = typeof e.attrs.source === 'string' ? e.attrs.source : ''
+      const lead = source || (e.state === 'on' ? 'On' : cap(e.state))
+      return e.attrs.muted === true ? `${lead} · Muted` : lead
+    }
     case 'scene':
     case 'script':
       return ''
@@ -128,6 +134,8 @@ export type TapResult =
 export function tapResult(e: HomeEntity): TapResult {
   if (e.domain === 'lock') return { kind: 'confirm', action: e.on ? 'lock' : 'unlock' }
   if (e.domain === 'climate') return { kind: 'sheet' }
+  // A TV that can't be switched from here still has its volume and inputs in the sheet.
+  if (e.domain === 'media_player' && e.attrs.can_power === false) return { kind: 'sheet' }
   if (e.domain === 'cover') return { kind: 'action', action: e.on ? 'close' : 'open' }
   return { kind: 'action', action: e.on ? 'turn_off' : 'turn_on' }
 }
@@ -147,8 +155,14 @@ export function predict(e: HomeEntity, action: string, value?: number): Partial<
       }
     case 'set_level': {
       const level = Math.max(0, Math.min(100, Math.round(value ?? 0)))
+      // A TV's level is its volume: turning it down to 0 does not turn the TV off.
+      if (e.domain === 'media_player') return { level }
       return { level, on: level > 0, state: e.domain === 'cover' ? (level > 0 ? 'open' : 'closed') : level > 0 ? 'on' : 'off' }
     }
+    case 'mute':
+      return { attrs: { muted: true } }
+    case 'unmute':
+      return { attrs: { muted: false } }
     case 'lock':
       return { on: false, state: 'locked' }
     case 'unlock':
@@ -160,28 +174,208 @@ export function predict(e: HomeEntity, action: string, value?: number): Partial<
 
 // ----------------------------------------------------------------------- layout
 
+/** How the family arranged the page: the household-wide `home_layout` setting. It only
+ *  records choices. Anything not listed (a new light, a new room) simply follows the things
+ *  that were arranged, in the usual order. Rooms are keyed by `roomKey`. */
+export interface HomeLayoutPrefs {
+  rooms: string[]
+  hidden_rooms: string[]
+  wide_rooms: string[]
+  devices: Record<string, string[]>
+  scenes: string[]
+}
+
+export const DEFAULT_PREFS: HomeLayoutPrefs = { rooms: [], hidden_rooms: [], wide_rooms: [], devices: {}, scenes: [] }
+
+export const roomKey = (room: { area_id: string | null }): string => room.area_id ?? 'other'
+
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
+
+/** Whatever the server sent, as something safe to use: never throws, never undefined. */
+export function normalizePrefs(raw: unknown): HomeLayoutPrefs {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const devices: Record<string, string[]> = {}
+  if (r.devices && typeof r.devices === 'object' && !Array.isArray(r.devices)) {
+    for (const [room, ids] of Object.entries(r.devices)) devices[room] = strings(ids)
+  }
+  return {
+    rooms: strings(r.rooms),
+    hidden_rooms: strings(r.hidden_rooms),
+    wide_rooms: strings(r.wide_rooms),
+    devices,
+    scenes: strings(r.scenes),
+  }
+}
+
+/** Listed items first, in the listed order; everything else after, in its own order. A
+ *  listed id that no longer exists is ignored. */
+export function orderBy<T>(items: T[], idOf: (item: T) => string, order: string[] | undefined): T[] {
+  if (!order || order.length === 0) return items
+  const rank = new Map(order.map((id, i) => [id, i]))
+  const listed = items.filter((item) => rank.has(idOf(item)))
+  const rest = items.filter((item) => !rank.has(idOf(item)))
+  return [...listed.sort((a, b) => rank.get(idOf(a))! - rank.get(idOf(b))!), ...rest]
+}
+
 export interface HomeLayout {
   favorites: HomeEntity[]
-  rooms: HomeRoom[]
+  rooms: (HomeRoom & { key: string; wide: boolean })[]
   actions: HomeEntity[]
   hiddenCount: number
+  /** Whole rooms switched off in Edit mode (Settings can't bring these back). */
+  hiddenRooms: number
 }
 
 /** Favorites float to the top as their own card (still listed in their room); hidden
- *  devices disappear everywhere but the Settings checklist; empty rooms are dropped. */
-export function layoutHome(data: HomeData, favorites: string[], hidden: string[]): HomeLayout {
+ *  devices disappear everywhere but the Settings checklist; empty and hidden rooms are
+ *  dropped; rooms, the devices in them and the scene row follow the saved arrangement. */
+export function layoutHome(
+  data: HomeData,
+  favorites: string[],
+  hidden: string[],
+  prefs: HomeLayoutPrefs = DEFAULT_PREFS,
+): HomeLayout {
   const gone = new Set(hidden)
+  const switchedOff = new Set(prefs.hidden_rooms)
+  const wide = new Set(prefs.wide_rooms)
   const all = data.rooms.flatMap((room) => room.entities)
-  const rooms = data.rooms
-    .map((room) => ({ ...room, entities: room.entities.filter((e) => !gone.has(e.entity_id)) }))
+  const shown = data.rooms
+    .map((room) => ({
+      ...room,
+      key: roomKey(room),
+      wide: wide.has(roomKey(room)),
+      entities: orderBy(
+        room.entities.filter((e) => !gone.has(e.entity_id)),
+        (e) => e.entity_id,
+        prefs.devices[roomKey(room)],
+      ),
+    }))
     .filter((room) => room.entities.length > 0)
+  const rooms = orderBy(shown, (r) => r.key, prefs.rooms).filter((r) => !switchedOff.has(r.key))
   const byId = new Map(all.map((e) => [e.entity_id, e]))
   const pinned = favorites.flatMap((id) => (byId.has(id) && !gone.has(id) ? [byId.get(id)!] : []))
   return {
     favorites: pinned,
     rooms,
-    actions: data.actions.filter((e) => !gone.has(e.entity_id)),
+    actions: orderBy(
+      data.actions.filter((e) => !gone.has(e.entity_id)),
+      (e) => e.entity_id,
+      prefs.scenes,
+    ),
     hiddenCount: all.filter((e) => gone.has(e.entity_id)).length + data.actions.filter((e) => gone.has(e.entity_id)).length,
+    hiddenRooms: shown.filter((r) => switchedOff.has(r.key)).length,
+  }
+}
+
+// ----------------------------------------------------------------------- editing the layout
+
+export interface EditItem {
+  entity: HomeEntity
+  hidden: boolean
+}
+
+export interface EditRoom {
+  key: string
+  name: string
+  wide: boolean
+  hidden: boolean
+  items: EditItem[]
+}
+
+export interface EditView {
+  rooms: EditRoom[]
+  scenes: EditItem[]
+}
+
+/** Everything, in the order it shows now, with hidden things still present (dimmed) so
+ *  they can be brought back. */
+export function editView(data: HomeData, hidden: string[], prefs: HomeLayoutPrefs): EditView {
+  const gone = new Set(hidden)
+  const off = new Set(prefs.hidden_rooms)
+  const wide = new Set(prefs.wide_rooms)
+  const item = (entity: HomeEntity): EditItem => ({ entity, hidden: gone.has(entity.entity_id) })
+  const rooms = data.rooms.map((room) => {
+    const key = roomKey(room)
+    return {
+      key,
+      name: room.name,
+      wide: wide.has(key),
+      hidden: off.has(key),
+      items: orderBy(room.entities, (e) => e.entity_id, prefs.devices[key]).map(item),
+    }
+  })
+  return {
+    rooms: orderBy(rooms, (r) => r.key, prefs.rooms),
+    scenes: orderBy(data.actions, (e) => e.entity_id, prefs.scenes).map(item),
+  }
+}
+
+/** Swap one id with its neighbour. Stays put at either end. */
+export function moveItem(ids: string[], id: string, delta: -1 | 1): string[] {
+  const from = ids.indexOf(id)
+  const to = from + delta
+  if (from < 0 || to < 0 || to >= ids.length) return ids
+  const next = [...ids]
+  ;[next[from], next[to]] = [next[to], next[from]]
+  return next
+}
+
+export function moveRoom(data: HomeData, hidden: string[], prefs: HomeLayoutPrefs, key: string, delta: -1 | 1): HomeLayoutPrefs {
+  const order = editView(data, hidden, prefs).rooms.map((r) => r.key)
+  return { ...prefs, rooms: moveItem(order, key, delta) }
+}
+
+export function moveDevice(
+  data: HomeData,
+  hidden: string[],
+  prefs: HomeLayoutPrefs,
+  key: string,
+  id: string,
+  delta: -1 | 1,
+): HomeLayoutPrefs {
+  const room = editView(data, hidden, prefs).rooms.find((r) => r.key === key)
+  if (!room) return prefs
+  const order = moveItem(room.items.map((i) => i.entity.entity_id), id, delta)
+  return { ...prefs, devices: { ...prefs.devices, [key]: order } }
+}
+
+export function moveScene(data: HomeData, hidden: string[], prefs: HomeLayoutPrefs, id: string, delta: -1 | 1): HomeLayoutPrefs {
+  const order = editView(data, hidden, prefs).scenes.map((i) => i.entity.entity_id)
+  return { ...prefs, scenes: moveItem(order, id, delta) }
+}
+
+const toggled = (ids: string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
+
+export const toggleRoomHidden = (prefs: HomeLayoutPrefs, key: string): HomeLayoutPrefs => ({
+  ...prefs,
+  hidden_rooms: toggled(prefs.hidden_rooms, key),
+})
+
+export const toggleRoomWide = (prefs: HomeLayoutPrefs, key: string): HomeLayoutPrefs => ({
+  ...prefs,
+  wide_rooms: toggled(prefs.wide_rooms, key),
+})
+
+export const toggleHidden = (hidden: string[], id: string): string[] => toggled(hidden, id)
+
+/** What gets saved: the arrangement without ids of rooms and devices Home Assistant no
+ *  longer has, so the setting can't grow forever. */
+export function pruneLayout(data: HomeData, prefs: HomeLayoutPrefs): HomeLayoutPrefs {
+  const keys = new Set(data.rooms.map(roomKey))
+  const devices: Record<string, string[]> = {}
+  for (const room of data.rooms) {
+    const key = roomKey(room)
+    const have = new Set(room.entities.map((e) => e.entity_id))
+    const kept = (prefs.devices[key] ?? []).filter((id) => have.has(id))
+    if (kept.length) devices[key] = kept
+  }
+  const scenes = new Set(data.actions.map((e) => e.entity_id))
+  return {
+    rooms: prefs.rooms.filter((k) => keys.has(k)),
+    hidden_rooms: prefs.hidden_rooms.filter((k) => keys.has(k)),
+    wide_rooms: prefs.wide_rooms.filter((k) => keys.has(k)),
+    devices,
+    scenes: prefs.scenes.filter((id) => scenes.has(id)),
   }
 }
 

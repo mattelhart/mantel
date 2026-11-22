@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from .models import AppSetting, Calendar
 from .services.google_config import seed_from_env
+from .services.home_layout import DEFAULT_LAYOUT
 
 # Colour themes the frontend ships (frontend/src/theme.ts). Validated here so a
 # typo from an API client is a 400 rather than a stored value the CSS silently ignores,
@@ -52,6 +53,9 @@ DEFAULT_SETTINGS: dict[str, object] = {
     # own: what to pin to the top, and what to leave off the wall. Lists of HA entity ids.
     "home_favorites": [],
     "home_hidden": [],
+    # How the Home page is arranged (room order, hidden rooms, room size, device and scene
+    # order). One value for every screen. See services/home_layout.py.
+    "home_layout": DEFAULT_LAYOUT,
     # Google Calendar. Configured in Settings -> Google rather than .env, so a
     # self-hoster never has to edit a file and restart a container to finish
     # setup. Seeded from .env once on first run for installs that predate this.

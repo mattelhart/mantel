@@ -117,7 +117,18 @@ def _require(config: HAConfig) -> None:
 # --------------------------------------------------------------------------- what is controllable
 
 # Order is also the order tiles appear in a room.
-DOMAINS = ("light", "fan", "cover", "switch", "climate", "lock", "input_boolean", "script", "scene")
+DOMAINS = (
+    "light",
+    "fan",
+    "cover",
+    "switch",
+    "climate",
+    "media_player",
+    "lock",
+    "input_boolean",
+    "script",
+    "scene",
+)
 # Shown as buttons in the row at the top rather than tiles in a room.
 ACTION_DOMAINS = ("scene", "script")
 
@@ -125,6 +136,14 @@ ACTION_DOMAINS = ("scene", "script")
 _FAN_SET_SPEED = 1
 _COVER_SET_POSITION = 4
 _LIGHT_ONOFF_ONLY = {"onoff"}
+# media_player (HA's MediaPlayerEntityFeature). A TV only offers what its integration says.
+_MP_VOLUME_SET = 4
+_MP_VOLUME_MUTE = 8
+_MP_TURN_ON = 128
+_MP_TURN_OFF = 256
+_MP_VOLUME_STEP = 1024
+_MP_SELECT_SOURCE = 2048
+_MAX_SOURCES = 40
 
 _ENTITY_ID = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
 
@@ -158,6 +177,9 @@ def dynamic_fields(state: dict) -> dict:
         out["on"] = raw == "unlocked"
     elif domain == "climate":
         out["on"] = raw not in ("off", "unavailable", "unknown")
+    elif domain == "media_player":
+        # "standby" is a TV that is asleep: from the couch that is off.
+        out["on"] = raw not in ("off", "standby", "unavailable", "unknown")
 
     if domain == "light":
         brightness = _num(attrs.get("brightness"))
@@ -171,6 +193,11 @@ def dynamic_fields(state: dict) -> dict:
     elif domain == "cover":
         pos = _num(attrs.get("current_position"))
         out["level"] = round(pos) if pos is not None else None
+    elif domain == "media_player":
+        out["attrs"] = _media_attrs(attrs)
+        volume = _num(attrs.get("volume_level"))
+        if volume is not None:
+            out["level"] = round(min(1.0, max(0.0, volume)) * 100)
     elif domain == "climate":
         out["attrs"] = {
             "current_temperature": _num(attrs.get("current_temperature")),
@@ -181,8 +208,30 @@ def dynamic_fields(state: dict) -> dict:
     return out
 
 
+def _media_attrs(attrs: dict) -> dict:
+    """What a TV tile and its sheet need. Keys HA left out stay out, so a live update from a
+    TV that just went to sleep does not wipe the source list the sheet is showing."""
+    features = int(_num(attrs.get("supported_features")) or 0)
+    out: dict[str, Any] = {
+        "can_power": bool(features & (_MP_TURN_ON | _MP_TURN_OFF)),
+        "can_volume_step": bool(features & _MP_VOLUME_STEP),
+        "can_mute": bool(features & _MP_VOLUME_MUTE),
+        "can_source": bool(features & _MP_SELECT_SOURCE),
+    }
+    if isinstance(attrs.get("is_volume_muted"), bool):
+        out["muted"] = attrs["is_volume_muted"]
+    if isinstance(attrs.get("source"), str) and attrs["source"]:
+        out["source"] = attrs["source"][:80]
+    sources = attrs.get("source_list")
+    if isinstance(sources, list) and sources:
+        out["sources"] = [str(x)[:80] for x in sources if isinstance(x, str)][:_MAX_SOURCES]
+    return out
+
+
 def _adjustable(domain: str, attrs: dict) -> bool:
     features = int(_num(attrs.get("supported_features")) or 0)
+    if domain == "media_player":
+        return bool(features & _MP_VOLUME_SET)
     if domain == "light":
         modes = set(attrs.get("supported_color_modes") or [])
         return bool(modes - _LIGHT_ONOFF_ONLY)
@@ -395,6 +444,7 @@ def plan_action(entity_id: str, action: str, value: Any, confirm: bool) -> tuple
         "fan",
         "input_boolean",
         "cover",
+        "media_player",
     ):
         if domain == "cover":
             return (
@@ -413,6 +463,17 @@ def plan_action(entity_id: str, action: str, value: Any, confirm: bool) -> tuple
             return domain, "set_percentage", {**data, "percentage": pct}
         if domain == "cover":
             return domain, "set_cover_position", {**data, "position": pct}
+        if domain == "media_player":
+            return domain, "volume_set", {**data, "volume_level": pct / 100}
+    if domain == "media_player":
+        if action in ("volume_up", "volume_down"):
+            return domain, action, data
+        if action in ("mute", "unmute"):
+            return domain, "volume_mute", {**data, "is_volume_muted": action == "mute"}
+        if action == "select_source":
+            if not isinstance(value, str) or not value.strip() or len(value) > 80:
+                raise HAError("refused", "Pick one of the TV's inputs.")
+            return domain, "select_source", {**data, "source": value}
     if action in ("open", "close", "stop") and domain == "cover":
         return domain, f"{action}_cover", data
     if action == "activate" and domain in ACTION_DOMAINS:

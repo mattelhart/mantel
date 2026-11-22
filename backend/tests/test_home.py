@@ -77,6 +77,7 @@ def test_only_controllable_things_appear():
         "fan.bedroom_fan",
         "cover.den_shade",
         "lock.front_door",
+        "media_player.living_room_tv",
     } <= ids
 
 
@@ -119,6 +120,70 @@ def test_unavailable_devices_are_marked():
     ]
     out = ha_home.build_snapshot(states, [], [], [])
     assert out["rooms"][0]["entities"][0]["available"] is False
+
+
+def test_a_tv_is_a_tile_with_its_volume_source_and_what_it_can_do():
+    tv = next(
+        e for r in snapshot()["rooms"] for e in r["entities"] if e["domain"] == "media_player"
+    )
+    assert tv["name"] == "TV" and tv["on"] is True and tv["available"] is True
+    assert tv["level"] == 25 and tv["adjustable"] is True
+    assert tv["attrs"] == {
+        "can_power": True,
+        "can_volume_step": True,
+        "can_mute": True,
+        "can_source": True,
+        "muted": False,
+        "source": "HDMI1",
+        "sources": ["HDMI1", "HDMI2", "Netflix"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("state", "on"),
+    [("on", True), ("playing", True), ("paused", True), ("idle", True)]
+    + [("off", False), ("standby", False), ("unavailable", False)],
+)
+def test_a_tv_that_is_asleep_reads_as_off(state, on):
+    out = ha_home.dynamic_fields(
+        {"entity_id": "media_player.tv", "state": state, "attributes": {"supported_features": 384}}
+    )
+    assert out["on"] is on and out["available"] is (state != "unavailable")
+
+
+def test_a_tv_with_no_volume_or_source_controls_does_not_offer_them():
+    states = [
+        {
+            "entity_id": "media_player.bare",
+            "state": "off",
+            "attributes": {"friendly_name": "Bare", "supported_features": 0},
+        }
+    ]
+    tv = ha_home.build_snapshot(states, [], [], [])["rooms"][0]["entities"][0]
+    assert tv["adjustable"] is False and tv["level"] is None
+    assert tv["attrs"] == {
+        "can_power": False,
+        "can_volume_step": False,
+        "can_mute": False,
+        "can_source": False,
+    }
+
+
+def test_a_live_update_from_a_sleeping_tv_does_not_blank_its_inputs():
+    asleep = ha_home.dynamic_fields(
+        {
+            "entity_id": "media_player.tv",
+            "state": "off",
+            "attributes": {"supported_features": 2048 | 256},
+        }
+    )
+    assert "sources" not in asleep["attrs"] and "source" not in asleep["attrs"]
+
+
+def test_tiles_in_a_room_run_lights_then_fans_then_tvs_then_locks():
+    living = next(r for r in snapshot()["rooms"] if r["name"] == "Living Room")
+    order = [e["domain"] for e in living["entities"]]
+    assert order.index("light") < order.index("cover") < order.index("media_player")
 
 
 # ------------------------------------------------------------------ GET /api/home
@@ -204,6 +269,63 @@ def test_favorites_and_hidden_are_lists_of_device_ids(client):
     assert client.patch("/api/settings", json={"home_hidden": [1]}).status_code == 400
 
 
+def test_home_layout_is_saved_for_every_screen_and_defaults_to_nothing_chosen(client):
+    first = client.get("/api/settings").json()["home_layout"]
+    assert first == {"rooms": [], "hidden_rooms": [], "wide_rooms": [], "devices": {}, "scenes": []}
+    layout = {
+        "rooms": ["kitchen", "living_room", "kitchen"],
+        "hidden_rooms": ["other"],
+        "wide_rooms": ["living_room"],
+        "devices": {"living_room": ["media_player.living_room_tv", "light.living_room_lamp"]},
+        "scenes": ["script.goodnight", "scene.movie_night"],
+    }
+    out = client.patch("/api/settings", json={"home_layout": layout}).json()["home_layout"]
+    assert out["rooms"] == ["kitchen", "living_room"]  # de-duplicated, order kept
+    assert out["devices"]["living_room"][0] == "media_player.living_room_tv"
+    assert out["scenes"] == ["script.goodnight", "scene.movie_night"]
+    # A second client sees the same thing, and it survives other settings changing.
+    client.patch("/api/settings", json={"theme": "midnight"})
+    assert client.get("/api/settings").json()["home_layout"] == out
+
+
+def test_home_layout_fills_in_what_was_left_out_and_can_be_reset(client):
+    client.patch("/api/settings", json={"home_layout": {"rooms": ["kitchen"]}})
+    got = client.get("/api/settings").json()["home_layout"]
+    assert got["rooms"] == ["kitchen"] and got["devices"] == {} and got["scenes"] == []
+    empty = {"rooms": [], "hidden_rooms": [], "wide_rooms": [], "devices": {}, "scenes": []}
+    reset = client.patch("/api/settings", json={"home_layout": empty}).json()
+    assert reset["home_layout"]["rooms"] == []
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "kitchen",
+        ["kitchen"],
+        {"rooms": "kitchen"},
+        {"rooms": [1]},
+        {"rooms": [""]},
+        {"rooms": ["x" * 200]},
+        {"rooms": [f"r{i}" for i in range(1001)]},
+        {"devices": ["light.a"]},
+        {"devices": {"den": "light.a"}},
+        {"devices": {"den": [3]}},
+        {"devices": {f"r{i}": [] for i in range(201)}},
+        {"colour": "red"},
+    ],
+)
+def test_a_malformed_home_layout_is_refused_and_changes_nothing(client, bad):
+    client.patch("/api/settings", json={"home_layout": {"rooms": ["kitchen"]}})
+    assert client.patch("/api/settings", json={"home_layout": bad}).status_code == 400
+    assert client.get("/api/settings").json()["home_layout"]["rooms"] == ["kitchen"]
+
+
+def test_the_layout_never_touches_hidden_devices(client):
+    client.patch("/api/settings", json={"home_hidden": ["light.a"]})
+    client.patch("/api/settings", json={"home_layout": {"rooms": ["den"]}})
+    assert client.get("/api/settings").json()["home_hidden"] == ["light.a"]
+
+
 # ------------------------------------------------------------------ connection test
 
 
@@ -263,6 +385,38 @@ def act(client, entity_id, action, **extra):
             ("cover", "set_cover_position"),
             {"position": 25},
         ),
+        ("media_player.living_room_tv", "turn_off", {}, ("media_player", "turn_off"), {}),
+        ("media_player.living_room_tv", "turn_on", {}, ("media_player", "turn_on"), {}),
+        ("media_player.living_room_tv", "volume_up", {}, ("media_player", "volume_up"), {}),
+        ("media_player.living_room_tv", "volume_down", {}, ("media_player", "volume_down"), {}),
+        (
+            "media_player.living_room_tv",
+            "mute",
+            {},
+            ("media_player", "volume_mute"),
+            {"is_volume_muted": True},
+        ),
+        (
+            "media_player.living_room_tv",
+            "unmute",
+            {},
+            ("media_player", "volume_mute"),
+            {"is_volume_muted": False},
+        ),
+        (
+            "media_player.living_room_tv",
+            "set_level",
+            {"value": 40},
+            ("media_player", "volume_set"),
+            {"volume_level": 0.4},
+        ),
+        (
+            "media_player.living_room_tv",
+            "select_source",
+            {"value": "HDMI2"},
+            ("media_player", "select_source"),
+            {"source": "HDMI2"},
+        ),
         ("scene.movie_night", "activate", {}, ("scene", "turn_on"), {}),
         ("script.goodnight", "activate", {}, ("script", "turn_on"), {}),
         (
@@ -310,6 +464,12 @@ def test_locks_need_a_confirmation(client, ha):
         ("climate.upstairs", "set_hvac_mode", {"value": "melt"}),
         ("climate.upstairs", "set_temperature", {"value": 900}),
         ("scene.movie_night", "turn_off", {}),
+        ("media_player.living_room_tv", "select_source", {}),
+        ("media_player.living_room_tv", "select_source", {"value": 5}),
+        ("media_player.living_room_tv", "select_source", {"value": "x" * 200}),
+        ("media_player.living_room_tv", "set_level", {"value": 101}),
+        ("media_player.living_room_tv", "play_media", {"value": "http://x"}),
+        ("light.living_room_lamp", "mute", {}),
         ("light.bad id", "turn_on", {}),
     ],
 )
@@ -399,6 +559,22 @@ def test_stream_relays_a_wall_switch_and_registry_changes(client, ha):
         ha.push_registry_change()
         frames = read_events(response, lambda f: has(f, "refresh"))
         assert has(frames, "refresh")
+
+
+def test_a_tv_turned_off_with_its_remote_reaches_the_stream(client, ha):
+    connect(client, ha)
+    with client.stream("GET", "/api/home/live", timeout=10) as response:
+        read_events(response, lambda f: has(f, "status", lambda d: d["status"] == "ok"))
+        deadline = time.time() + 5
+        while ha.subscriber_count() == 0 and time.time() < deadline:
+            time.sleep(0.05)
+        ha.push_state("media_player.living_room_tv", "off")
+        frames = read_events(
+            response,
+            lambda f: has(f, "state", lambda d: d["entity_id"] == "media_player.living_room_tv"),
+        )
+        tv = next(d for e, d in frames if e == "state")
+        assert tv["on"] is False and tv["available"] is True
 
 
 def test_controlling_from_mantel_shows_up_on_the_stream(client, ha):

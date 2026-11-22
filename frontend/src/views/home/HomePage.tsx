@@ -6,13 +6,25 @@ import { sendHomeAction, useHome, useHomeLive } from '../../api/home'
 import { useSettings } from '../../api/hooks'
 import type { AppSettings } from '../../api/types'
 import { swallowTapThrough, useDismissGuard } from '../../components/dismissGuard'
+import { HomeEditor } from './HomeEditor'
 import {
+  DEFAULT_PREFS,
   STATUS_HELP,
   describe,
+  editView,
   layoutHome,
+  moveDevice,
+  moveRoom,
+  moveScene,
+  normalizePrefs,
+  pruneLayout,
   roomSummary,
   tapResult,
+  toggleHidden,
+  toggleRoomHidden,
+  toggleRoomWide,
   type HomeEntity,
+  type HomeLayoutPrefs,
   type HomeStatus,
 } from './homeModel'
 
@@ -26,6 +38,7 @@ const ICONS: Record<string, string> = {
   input_boolean: '🔘',
   cover: '🪟',
   climate: '🌡️',
+  media_player: '📺',
   scene: '✨',
   script: '▶️',
 }
@@ -41,9 +54,13 @@ export function HomePage() {
   const [lockId, setLockId] = useState<{ id: string; action: 'lock' | 'unlock' } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
+  // Edit mode works on a copy and only saves on Done, so Cancel really does cancel.
+  const [draft, setDraft] = useState<{ prefs: HomeLayoutPrefs; hidden: string[] } | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const favorites = settings?.home_favorites ?? []
   const hidden = settings?.home_hidden ?? []
+  const prefs = normalizePrefs(settings?.home_layout)
 
   useEffect(() => {
     if (!notice) return
@@ -92,7 +109,7 @@ export function HomePage() {
   }
 
   const status: HomeStatus = data.status !== 'ok' ? data.status : live === 'ok' || live === 'connecting' ? 'ok' : live
-  const layout = layoutHome(data, favorites, hidden)
+  const layout = layoutHome(data, favorites, hidden, prefs)
   const all = [...data.rooms.flatMap((r) => r.entities), ...data.actions]
   const sheet = all.find((e) => e.entity_id === sheetId) ?? null
   const lock = lockId ? (all.find((e) => e.entity_id === lockId.id) ?? null) : null
@@ -121,16 +138,69 @@ export function HomePage() {
     )
   }
 
-  const empty = layout.rooms.length === 0 && layout.actions.length === 0
+  const empty = layout.rooms.length === 0 && layout.actions.length === 0 && layout.hiddenRooms === 0
+
+  const startEdit = () => setDraft({ prefs, hidden: [...hidden] })
+  const saveEdit = async () => {
+    if (!draft) return
+    setSaving(true)
+    try {
+      const updated = await api.patch<AppSettings>('/settings', {
+        home_layout: pruneLayout(data, draft.prefs),
+        home_hidden: draft.hidden,
+      })
+      qc.setQueryData<AppSettings>(['settings'], updated)
+      setDraft(null)
+      setNotice(null)
+    } catch {
+      setNotice("Couldn't save the layout. Nothing was changed. Try Done again.")
+    } finally {
+      setSaving(false)
+      void qc.invalidateQueries({ queryKey: ['settings'] })
+    }
+  }
+  const change = (next: Partial<{ prefs: HomeLayoutPrefs; hidden: string[] }>) =>
+    setDraft((d) => (d ? { ...d, ...next } : d))
+  const view = draft ? editView(data, draft.hidden, draft.prefs) : null
 
   return (
-    <div className="home">
+    <div className="home" data-editing={draft ? 'true' : undefined}>
       <header className="home__bar">
-        <h1 className="home__title">Home</h1>
-        {layout.hiddenCount > 0 && (
+        <h1 className="home__title">{draft ? 'Edit Home' : 'Home'}</h1>
+        {!draft && layout.hiddenCount > 0 && (
           <Link className="home__hidden" to="/settings?tab=home">{layout.hiddenCount} hidden</Link>
         )}
+        {!draft && layout.hiddenRooms > 0 && (
+          <button type="button" className="home__hidden home__hidden--link" onClick={startEdit}>
+            {layout.hiddenRooms} hidden {layout.hiddenRooms === 1 ? 'room' : 'rooms'}
+          </button>
+        )}
+        {!draft && all.length > 0 && (
+          <button type="button" className="btn home__edit" onClick={startEdit}>
+            ✎ Edit
+          </button>
+        )}
+        {draft && (
+          <div className="home__editbar" role="group" aria-label="Edit layout">
+            <button type="button" className="btn" disabled={saving} onClick={() => change({ prefs: DEFAULT_PREFS, hidden: [] })}>
+              Reset to default
+            </button>
+            <button type="button" className="btn" disabled={saving} onClick={() => setDraft(null)}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void saveEdit()}>
+              {saving ? 'Saving…' : 'Done'}
+            </button>
+          </div>
+        )}
       </header>
+
+      {draft && (
+        <p className="home__banner" role="status">
+          Use ◀ ▶ to move rooms, devices and scenes, and Hide to take one off the Home page. Done saves it for every
+          screen in the house. Nothing changes until then.
+        </p>
+      )}
 
       {status !== 'ok' && (
         <p className="home__banner" role="status">
@@ -139,7 +209,7 @@ export function HomePage() {
       )}
       {notice && <p className="home__banner home__banner--error" role="alert">{notice}</p>}
 
-      {layout.actions.length > 0 && (
+      {!view && layout.actions.length > 0 && (
         <section className="home__scenes" aria-label="Scenes">
           {layout.actions.map((scene) => (
             <button
@@ -161,29 +231,47 @@ export function HomePage() {
         </section>
       )}
 
-      {empty && (
+      {!view && empty && (
         <p className="home__empty">
-          Home Assistant is connected, but it has no lights, switches, fans, shades, locks or scenes to show.
+          Home Assistant is connected, but it has no lights, switches, fans, shades, TVs, locks or scenes to show.
           {layout.hiddenCount > 0 && ' Some are hidden.'}
         </p>
       )}
 
-      <div className="home__rooms">
-        {layout.favorites.length > 0 && (
-          <RoomCard title="Favorites" summary="" entities={layout.favorites} run={run} onOpen={setSheetId} onLock={setLockId} />
-        )}
-        {layout.rooms.map((room) => (
-          <RoomCard
-            key={room.area_id ?? 'other'}
-            title={room.name}
-            summary={roomSummary(room)}
-            entities={room.entities}
-            run={run}
-            onOpen={setSheetId}
-            onLock={setLockId}
-          />
-        ))}
-      </div>
+      {view && draft && (
+        <HomeEditor
+          view={view}
+          icons={ICONS}
+          on={{
+            moveRoom: (key, delta) => change({ prefs: moveRoom(data, draft.hidden, draft.prefs, key, delta) }),
+            toggleRoom: (key) => change({ prefs: toggleRoomHidden(draft.prefs, key) }),
+            toggleWide: (key) => change({ prefs: toggleRoomWide(draft.prefs, key) }),
+            moveDevice: (key, id, delta) => change({ prefs: moveDevice(data, draft.hidden, draft.prefs, key, id, delta) }),
+            toggleDevice: (id) => change({ hidden: toggleHidden(draft.hidden, id) }),
+            moveScene: (id, delta) => change({ prefs: moveScene(data, draft.hidden, draft.prefs, id, delta) }),
+          }}
+        />
+      )}
+
+      {!view && (
+        <div className="home__rooms">
+          {layout.favorites.length > 0 && (
+            <RoomCard title="Favorites" summary="" entities={layout.favorites} run={run} onOpen={setSheetId} onLock={setLockId} />
+          )}
+          {layout.rooms.map((room) => (
+            <RoomCard
+              key={room.area_id ?? 'other'}
+              title={room.name}
+              summary={roomSummary(room)}
+              entities={room.entities}
+              wide={room.wide}
+              run={run}
+              onOpen={setSheetId}
+              onLock={setLockId}
+            />
+          ))}
+        </div>
+      )}
 
       {sheet && (
         <DeviceSheet
@@ -224,6 +312,7 @@ function RoomCard({
   title,
   summary,
   entities,
+  wide = false,
   run,
   onOpen,
   onLock,
@@ -231,12 +320,13 @@ function RoomCard({
   title: string
   summary: string
   entities: HomeEntity[]
+  wide?: boolean
   run: Run
   onOpen: (id: string) => void
   onLock: (v: { id: string; action: 'lock' | 'unlock' }) => void
 }) {
   return (
-    <section className="home-room" aria-label={title}>
+    <section className={wide ? 'home-room home-room--wide' : 'home-room'} aria-label={title}>
       <header className="home-room__head">
         <h2 className="home-room__title">{title}</h2>
         {summary && <span className="home-room__sum">{summary}</span>}
@@ -308,7 +398,9 @@ function Tile({
     else void run(entity, result.action)
   }
 
-  const level = entity.adjustable && entity.on && entity.level !== null ? entity.level : null
+  // A TV's level is its volume: a bar on the tile would read like "how on" it is.
+  const level =
+    entity.adjustable && entity.on && entity.level !== null && entity.domain !== 'media_player' ? entity.level : null
   return (
     <div className="home-tile" data-on={!!entity.on} data-unavailable={!entity.available}>
       <button
@@ -374,7 +466,7 @@ function useDebouncedSend(send: (value: number) => void, ms = 250) {
   )
 }
 
-const LEVEL_LABEL: Record<string, string> = { light: 'Brightness', fan: 'Speed', cover: 'Position' }
+const LEVEL_LABEL: Record<string, string> = { light: 'Brightness', fan: 'Speed', cover: 'Position', media_player: 'Volume' }
 
 function DeviceSheet({
   entity,
@@ -404,6 +496,9 @@ function DeviceSheet({
   const step = typeof attrs.step === 'number' ? attrs.step : 1
   const modes = Array.isArray(attrs.hvac_modes) ? (attrs.hvac_modes as string[]) : []
   const shownTarget = target ?? temp
+  const tv = entity.domain === 'media_player'
+  const muted = attrs.muted === true
+  const sources = Array.isArray(attrs.sources) ? (attrs.sources as string[]) : []
 
   // Let go of the draft shortly after the last change so the live value takes over again.
   useEffect(() => {
@@ -433,7 +528,7 @@ function DeviceSheet({
         <h2 className="modal__title">{entity.name}</h2>
         <p className="home-sheet__state">{describe(entity)}</p>
 
-        {entity.domain !== 'climate' && entity.domain !== 'lock' && (
+        {entity.domain !== 'climate' && entity.domain !== 'lock' && !(tv && attrs.can_power === false) && (
           <button
             className="btn btn--primary home-sheet__toggle"
             disabled={!entity.available}
@@ -443,7 +538,31 @@ function DeviceSheet({
           </button>
         )}
 
-        {entity.adjustable && entity.domain !== 'climate' && (
+        {tv && entity.on && (attrs.can_volume_step === true || attrs.can_mute === true) && (
+          <div className="home-sheet__volume" role="group" aria-label="Volume">
+            {attrs.can_volume_step === true && (
+              <button className="btn" aria-label="Volume down" onClick={() => void run(entity, 'volume_down')}>
+                −
+              </button>
+            )}
+            {attrs.can_mute === true && (
+              <button
+                className="btn"
+                aria-pressed={muted}
+                onClick={() => void run(entity, muted ? 'unmute' : 'mute')}
+              >
+                {muted ? '🔇 Muted' : '🔈 Mute'}
+              </button>
+            )}
+            {attrs.can_volume_step === true && (
+              <button className="btn" aria-label="Volume up" onClick={() => void run(entity, 'volume_up')}>
+                +
+              </button>
+            )}
+          </div>
+        )}
+
+        {(!tv || entity.on) && entity.adjustable && entity.domain !== 'climate' && (
           <label className="home-sheet__slider">
             <span>
               {LEVEL_LABEL[entity.domain] ?? 'Level'} <strong>{level}%</strong>
@@ -463,6 +582,21 @@ function DeviceSheet({
               }}
             />
           </label>
+        )}
+
+        {tv && entity.on && attrs.can_source === true && sources.length > 0 && (
+          <div className="home-sheet__modes" role="group" aria-label="Input">
+            {sources.map((source) => (
+              <button
+                key={source}
+                className="btn"
+                aria-pressed={attrs.source === source}
+                onClick={() => void run(entity, 'select_source', source)}
+              >
+                {source}
+              </button>
+            ))}
+          </div>
         )}
 
         {entity.domain === 'climate' && (

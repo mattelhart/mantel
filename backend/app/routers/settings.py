@@ -6,7 +6,7 @@ from ..bootstrap import DEFAULT_SETTINGS, THEMES
 from ..config import get_settings
 from ..db import get_db
 from ..models import AppSetting
-from ..services import google_config, ha_home, homeassistant
+from ..services import google_config, ha_home, home_layout, homeassistant
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -100,6 +100,12 @@ def update_app_settings(payload: dict, db: Session = Depends(get_db)) -> dict:
             ):
                 raise HTTPException(400, f"{key} must be a list of device ids")
             payload[key] = list(dict.fromkeys(ids))
+
+    if "home_layout" in payload:
+        try:
+            payload["home_layout"] = home_layout.clean_layout(payload["home_layout"])
+        except home_layout.LayoutError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     for key, value in payload.items():
         row = db.get(AppSetting, key)
