@@ -89,7 +89,13 @@ html[data-theme='airy'] .navbtn:active {
   transform: scale(0.96);
 }
 
-html[data-theme='airy'] .navbtn:focus-visible,
+/* Nav rings sit inside the button so they are not clipped by the rail or
+   the next item. Other chrome keeps the outward offset. */
+html[data-theme='airy'] .navbtn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -4px;
+}
+
 html[data-theme='airy'] .airy-avatar:focus-visible,
 html[data-theme='airy'] .fab:focus-visible,
 html[data-theme='airy'] .viewtabs__tab:focus-visible {
@@ -773,9 +779,17 @@ html[data-theme='airy'] .shell__nav {
 /* Side menu (landscape: the wall Pi and TVs) reads from across the room, so its labels and
    icons are about 20% larger than the phone's bottom bar. The phone layout is untouched. */
 @media (orientation: landscape) and (min-width: 700px) {
+  html[data-theme='airy'] .shell__nav {
+    gap: 8px;
+    padding: 14px 10px;
+    align-items: stretch;
+    overflow: visible;
+  }
+
   html[data-theme='airy'] .navbtn {
     min-height: 64px;
     gap: 4px;
+    overflow: visible;
   }
 
   html[data-theme='airy'] .navbtn__icon {

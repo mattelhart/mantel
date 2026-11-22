@@ -67,6 +67,7 @@ fun SunnyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     container: Color = Card,
+    focusedScale: Float = 1.05f,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Surface(
@@ -79,7 +80,7 @@ fun SunnyButton(
             contentColor = Ink,
             focusedContentColor = Ink,
         ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = focusedScale),
         border = ClickableSurfaceDefaults.border(
             border = Border(border = BorderStroke(2.dp, Color(0xFFE1E6EB)), shape = Round),
             focusedBorder = Border(border = BorderStroke(4.dp, Color(0xFF1D4ED8)), shape = Round),
