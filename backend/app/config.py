@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     # proxy that overwrites that header; otherwise a caller picks their own address.
     auth_trust_proxy: bool = False
 
+    # UniFi Protect Integration API. A missing key file means Cameras is not configured.
+    # The key is read from the file at request time and is never logged or returned.
+    unifi_protect_key_file: str = ""
+    unifi_protect_url: str = "https://10.0.0.1/proxy/protect/integration"
+
+
     @property
     def version(self) -> str:
         return self.app_version or _read_version_file()

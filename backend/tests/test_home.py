@@ -1,8 +1,8 @@
 """Home control through Home Assistant, against a pretend HA (tests/fake_ha.py).
 
 What matters: the token never leaves the server, a bad URL or token says so plainly,
-only controllable things appear, locks cannot be driven without a yes, and a change at a
-wall switch reaches the stream.
+only controllable things and a few room sensors appear, locks cannot be driven without a yes,
+and a change at a wall switch (or a motion sensor) reaches the stream.
 """
 
 import json
@@ -219,6 +219,188 @@ def test_tiles_in_a_room_run_lights_then_fans_then_tvs_then_locks():
     living = next(r for r in snapshot()["rooms"] if r["name"] == "Living Room")
     order = [e["domain"] for e in living["entities"]]
     assert order.index("light") < order.index("cover") < order.index("media_player")
+
+
+
+def test_room_sensors_are_read_only_and_keep_their_readings():
+    states = [
+        {
+            "entity_id": "binary_sensor.kitchen_occupancy",
+            "state": "on",
+            "last_changed": "2026-11-22T17:10:00+00:00",
+            "attributes": {
+                "friendly_name": "Kitchen occupancy",
+                "device_class": "occupancy",
+            },
+        },
+        {
+            "entity_id": "sensor.austins_temperature",
+            "state": "71.4",
+            "last_changed": "2026-11-22T17:05:00+00:00",
+            "attributes": {
+                "friendly_name": "Austin's Bedroom Temperature",
+                "device_class": "temperature",
+                "unit_of_measurement": "°F",
+            },
+        },
+        {
+            "entity_id": "sensor.austins_humidity",
+            "state": "53",
+            "attributes": {
+                "friendly_name": "Austin's Bedroom Humidity",
+                "device_class": "humidity",
+                "unit_of_measurement": "%",
+            },
+        },
+        {
+            "entity_id": "sensor.cpu",
+            "state": "3",
+            "attributes": {"friendly_name": "CPU"},
+        },
+        {
+            "entity_id": "binary_sensor.window",
+            "state": "on",
+            "attributes": {"friendly_name": "Window", "device_class": "window"},
+        },
+        {
+            "entity_id": "light.kitchen_pendant",
+            "state": "off",
+            "attributes": {"friendly_name": "Kitchen Pendant", "supported_color_modes": ["onoff"]},
+        },
+    ]
+    areas = [
+        {"area_id": "kitchen", "name": "Kitchen"},
+        {"area_id": "austins", "name": "Austin's Bedroom"},
+    ]
+    entities = [
+        {"entity_id": "binary_sensor.kitchen_occupancy", "area_id": "kitchen"},
+        {"entity_id": "sensor.austins_temperature", "area_id": "austins"},
+        {"entity_id": "sensor.austins_humidity", "area_id": "austins"},
+        {"entity_id": "light.kitchen_pendant", "area_id": "kitchen"},
+    ]
+    snap = ha_home.build_snapshot(states, areas, [], entities)
+    ids = {e["entity_id"] for r in snap["rooms"] for e in r["entities"]}
+    assert "sensor.cpu" not in ids and "binary_sensor.window" not in ids
+    occ = entity(snap, "binary_sensor.kitchen_occupancy")
+    assert occ["readonly"] is True and occ["kind"] == "sensor"
+    assert occ["device_class"] == "occupancy" and occ["state"] == "on" and occ["on"] is True
+    assert occ["adjustable"] is False
+    assert occ["last_changed"] == "2026-11-22T17:10:00+00:00"
+    temp = entity(snap, "sensor.austins_temperature")
+    assert temp["readonly"] is True and temp["kind"] == "sensor"
+    assert temp["device_class"] == "temperature" and temp["state"] == "71.4"
+    assert temp["unit_of_measurement"] == "°F" and temp["on"] is None
+    assert entity(snap, "light.kitchen_pendant").get("readonly") is None
+    names = [r["name"] for r in snap["rooms"]]
+    assert names == ["Austin's Bedroom", "Kitchen"]
+
+
+def test_diagnostic_disabled_and_hidden_sensors_are_left_out():
+    states = [
+        {
+            "entity_id": "sensor.diag_temp",
+            "state": "70",
+            "attributes": {"friendly_name": "Diag", "device_class": "temperature"},
+        },
+        {
+            "entity_id": "binary_sensor.old_motion",
+            "state": "on",
+            "attributes": {"friendly_name": "Old", "device_class": "motion"},
+        },
+        {
+            "entity_id": "binary_sensor.hidden_occ",
+            "state": "on",
+            "attributes": {"friendly_name": "Hidden", "device_class": "occupancy"},
+        },
+        {
+            "entity_id": "sensor.ok_co2",
+            "state": "812",
+            "attributes": {
+                "friendly_name": "Air",
+                "device_class": "carbon_dioxide",
+                "unit_of_measurement": "ppm",
+            },
+        },
+    ]
+    entities = [
+        {"entity_id": "sensor.diag_temp", "entity_category": "diagnostic"},
+        {"entity_id": "binary_sensor.old_motion", "disabled_by": "user"},
+        {"entity_id": "binary_sensor.hidden_occ", "hidden_by": "user"},
+        {"entity_id": "sensor.ok_co2"},
+    ]
+    snap = ha_home.build_snapshot(states, [], [], entities)
+    ids = {e["entity_id"] for r in snap["rooms"] for e in r["entities"]}
+    assert ids == {"sensor.ok_co2"}
+    air = entity(snap, "sensor.ok_co2")
+    assert air["readonly"] is True and air["unit_of_measurement"] == "ppm"
+
+
+def test_a_thermostat_indoor_temp_sensor_is_not_repeated():
+    states = [
+        {
+            "entity_id": "climate.basement",
+            "state": "heat",
+            "attributes": {
+                "friendly_name": "Basement",
+                "current_temperature": 68,
+                "temperature": 70,
+                "hvac_modes": ["off", "heat"],
+            },
+        },
+        {
+            "entity_id": "sensor.basement_temperature",
+            "state": "68",
+            "attributes": {
+                "friendly_name": "Basement Temperature",
+                "device_class": "temperature",
+                "unit_of_measurement": "°F",
+            },
+        },
+        {
+            "entity_id": "sensor.basement_humidity",
+            "state": "41",
+            "attributes": {
+                "friendly_name": "Basement Humidity",
+                "device_class": "humidity",
+                "unit_of_measurement": "%",
+            },
+        },
+        {
+            "entity_id": "sensor.office_temperature",
+            "state": "72",
+            "attributes": {
+                "friendly_name": "Office Temperature",
+                "device_class": "temperature",
+                "unit_of_measurement": "°F",
+            },
+        },
+    ]
+    areas = [
+        {"area_id": "basement", "name": "Basement"},
+        {"area_id": "office", "name": "Office"},
+    ]
+    entities = [
+        {"entity_id": "climate.basement", "area_id": "basement", "device_id": "dev_tstat"},
+        {"entity_id": "sensor.basement_temperature", "area_id": "basement",
+         "device_id": "dev_tstat"},
+        {"entity_id": "sensor.basement_humidity", "area_id": "basement", "device_id": "dev_tstat"},
+        {"entity_id": "sensor.office_temperature", "area_id": "office", "device_id": "dev_office"},
+    ]
+    snap = ha_home.build_snapshot(states, areas, [], entities)
+    ids = {e["entity_id"] for r in snap["rooms"] for e in r["entities"]}
+    assert "sensor.basement_temperature" not in ids
+    assert {"climate.basement", "sensor.basement_humidity", "sensor.office_temperature"} <= ids
+    # A room with only a temperature sensor still gets a card.
+    assert "Office" in {r["name"] for r in snap["rooms"]}
+
+
+def test_sensor_actions_are_refused_without_calling_home_assistant():
+    with pytest.raises(ha_home.HAError) as exc:
+        ha_home.plan_action("binary_sensor.kitchen_occupancy", "turn_on", None, False)
+    assert exc.value.code == "refused" and "read-only" in str(exc.value)
+    with pytest.raises(ha_home.HAError) as exc:
+        ha_home.plan_action("sensor.austins_temperature", "set_temperature", 72, False)
+    assert exc.value.code == "refused"
 
 
 # ------------------------------------------------------------------ GET /api/home
@@ -514,6 +696,15 @@ def test_nonsense_is_refused_without_calling_home_assistant(client, ha, entity_i
     assert ha.calls == []
 
 
+def test_a_room_sensor_action_is_rejected_over_http(client, ha):
+    connect(client, ha)
+    refused = act(client, "binary_sensor.kitchen_kitchen_occupancy", "turn_on")
+    assert refused.status_code == 400
+    assert refused.json()["error"]["code"] == "refused"
+    assert "read-only" in refused.json()["error"]["message"]
+    assert ha.calls == []
+
+
 def test_action_failures_are_explained(client, ha):
     assert act(client, "light.living_room_lamp", "turn_on").status_code == 409  # not set up
     connect(client, ha)
@@ -594,6 +785,35 @@ def test_stream_relays_a_wall_switch_and_registry_changes(client, ha):
         ha.push_registry_change()
         frames = read_events(response, lambda f: has(f, "refresh"))
         assert has(frames, "refresh")
+
+
+def test_stream_relays_a_room_sensor(client, ha):
+    connect(client, ha)
+    ha.states["binary_sensor.kitchen_occupancy"] = {
+        "entity_id": "binary_sensor.kitchen_occupancy",
+        "state": "off",
+        "last_changed": "2026-11-22T17:00:00+00:00",
+        "attributes": {"friendly_name": "Kitchen occupancy", "device_class": "occupancy"},
+    }
+    with client.stream("GET", "/api/home/live", timeout=10) as response:
+        read_events(response, lambda f: has(f, "status", lambda d: d["status"] == "ok"))
+        deadline = time.time() + 5
+        while ha.subscriber_count() == 0 and time.time() < deadline:
+            time.sleep(0.05)
+        ha.push_state("binary_sensor.kitchen_occupancy", "on")
+        frames = read_events(
+            response,
+            lambda f: has(
+                f, "state", lambda d: d["entity_id"] == "binary_sensor.kitchen_occupancy"
+            ),
+        )
+        state = next(
+            d
+            for e, d in frames
+            if e == "state" and d["entity_id"] == "binary_sensor.kitchen_occupancy"
+        )
+        assert state["state"] == "on" and state["on"] is True
+        assert state["available"] is True
 
 
 def test_a_tv_turned_off_with_its_remote_reaches_the_stream(client, ha):

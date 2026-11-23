@@ -4,8 +4,10 @@ import {
   applyState,
   classifyPointerMove,
   describe,
+  describeSensor,
   editView,
   isLevelSlider,
+  isRoomSensor,
   layoutHome,
   levelFromX,
   moveDevice,
@@ -23,7 +25,9 @@ import {
   pruneLayout,
   publicEntityPicture,
   roomSummary,
+  sensorAgo,
   shownLevel,
+  sortRoomSensors,
   tapResult,
   toggleRoomHidden,
   toggleRoomWide,
@@ -403,5 +407,173 @@ suite('drag and drop order setters', () => {
     expect(setDeviceOrder(base, 'kitchen', ['k2', 'k1'])).toEqual({ ...base, devices: { den: ['a', 'b'], kitchen: ['k2', 'k1'] } })
     expect(setDeviceOrder(base, 'den', ['b', 'a']).devices.den).toEqual(['b', 'a'])
     expect(base.devices).toEqual({ den: ['a', 'b'] }) // never mutates
+  })
+})
+
+
+const NOW = Date.parse('2026-11-22T18:00:00.000Z')
+const agoIso = (ms: number) => new Date(NOW - ms).toISOString()
+
+const sensor = (over: Partial<HomeEntity>): HomeEntity =>
+  ent({
+    entity_id: 'binary_sensor.motion',
+    domain: 'binary_sensor',
+    name: 'Motion',
+    state: 'on',
+    on: true,
+    level: null,
+    adjustable: false,
+    readonly: true,
+    kind: 'sensor',
+    device_class: 'motion',
+    last_changed: agoIso(0),
+    ...over,
+  })
+
+suite('room sensors', () => {
+  it('recognizes a read-only sensor and leaves a light alone', () => {
+    expect(isRoomSensor(sensor({}))).toBe(true)
+    expect(isRoomSensor(ent({}))).toBe(false)
+  })
+
+  it('says Motion now, Motion 12 min ago, or No motion', () => {
+    expect(describeSensor(sensor({}), NOW).text).toBe('Motion now')
+    expect(describeSensor(sensor({ state: 'off', on: false, last_changed: agoIso(12 * 60_000) }), NOW)).toMatchObject({
+      text: 'Motion 12 min ago',
+      active: false,
+      dot: true,
+    })
+    expect(describeSensor(sensor({ state: 'off', on: false, last_changed: undefined }), NOW).text).toBe('No motion')
+    expect(describeSensor(sensor({ state: 'off', on: false, last_changed: agoIso(30_000) }), NOW).text).toBe('Motion <1 min ago')
+  })
+
+  it('describes occupancy, presence, temperature, humidity and CO2', () => {
+    expect(describeSensor(sensor({ device_class: 'occupancy', name: 'Kitchen occupancy' }), NOW).text).toBe('Occupied now')
+    expect(
+      describeSensor(
+        sensor({
+          entity_id: 'binary_sensor.occ',
+          device_class: 'occupancy',
+          name: 'Kitchen occupancy',
+          state: 'off',
+          on: false,
+          last_changed: agoIso(12 * 60_000),
+        }),
+        NOW,
+      ),
+    ).toMatchObject({ text: 'Occupied 12 min ago', label: 'Kitchen occupancy: Occupied 12 min ago' })
+    expect(describeSensor(sensor({ device_class: 'presence', state: 'off', on: false, last_changed: undefined }), NOW).text).toBe('Away')
+    expect(
+      describeSensor(
+        sensor({
+          entity_id: 'sensor.temp',
+          domain: 'sensor',
+          name: 'Temperature',
+          device_class: 'temperature',
+          state: '71.4',
+          on: null,
+          unit_of_measurement: '°F',
+        }),
+        NOW,
+      ).text,
+    ).toBe('71°')
+    expect(
+      describeSensor(
+        sensor({
+          entity_id: 'sensor.hum',
+          domain: 'sensor',
+          name: 'Humidity',
+          device_class: 'humidity',
+          state: '53',
+          on: null,
+          unit_of_measurement: '%',
+        }),
+        NOW,
+      ).text,
+    ).toBe('53%')
+    expect(
+      describeSensor(
+        sensor({
+          entity_id: 'sensor.co2',
+          domain: 'sensor',
+          name: 'Air',
+          device_class: 'carbon_dioxide',
+          state: '812.2',
+          on: null,
+          unit_of_measurement: 'ppm',
+        }),
+        NOW,
+      ).text,
+    ).toBe('812 ppm')
+  })
+
+  it('formats relative times without saying just now for an off sensor', () => {
+    expect(sensorAgo(agoIso(0), NOW)).toBe('<1 min ago')
+    expect(sensorAgo(agoIso(5 * 60_000), NOW)).toBe('5 min ago')
+    expect(sensorAgo(agoIso(3 * 60 * 60_000), NOW)).toBe('3h ago')
+    expect(sensorAgo(undefined, NOW)).toBe(null)
+  })
+
+  it('orders motion, then occupancy, then temperature and humidity', () => {
+    const ordered = sortRoomSensors([
+      sensor({ entity_id: 'sensor.hum', domain: 'sensor', name: 'Humidity', device_class: 'humidity' }),
+      sensor({ entity_id: 'sensor.temp', domain: 'sensor', name: 'Temperature', device_class: 'temperature' }),
+      sensor({ entity_id: 'binary_sensor.occ', name: 'Occupancy', device_class: 'occupancy' }),
+      sensor({ entity_id: 'binary_sensor.motion', name: 'Motion', device_class: 'motion' }),
+    ])
+    expect(ordered.map((e) => e.device_class)).toEqual(['motion', 'occupancy', 'temperature', 'humidity'])
+  })
+
+  it('keeps a room that only has sensors, and does not pin them as favorites', () => {
+    const motion = sensor({ area_id: 'austins' })
+    const home: HomeData = {
+      status: 'ok',
+      message: '',
+      rooms: [{ area_id: 'austins', name: "Austin's Bedroom", entities: [motion] }],
+      actions: [],
+    }
+    const out = layoutHome(home, [motion.entity_id], [], DEFAULT_PREFS)
+    expect(out.rooms.map((r) => r.name)).toEqual(["Austin's Bedroom"])
+    expect(out.favorites).toEqual([])
+    expect(roomSummary(home.rooms[0])).toBe('')
+  })
+
+  it('hides a sensor like any other entity, and ignores motion when counting lights that are on', () => {
+    const lamp = ent({})
+    const motion = sensor({ entity_id: 'binary_sensor.den_motion', area_id: 'den' })
+    const home: HomeData = {
+      status: 'ok',
+      message: '',
+      rooms: [{ area_id: 'den', name: 'Den', entities: [lamp, motion] }],
+      actions: [],
+    }
+    expect(roomSummary(home.rooms[0])).toBe('1 on')
+    const hidden = layoutHome(home, [], [motion.entity_id], DEFAULT_PREFS)
+    expect(hidden.rooms[0].entities.map((e) => e.entity_id)).toEqual(['light.lamp'])
+    expect(hidden.hiddenCount).toBe(1)
+  })
+
+  it('does not say All off for a room that only has a thermostat and sensors', () => {
+    const climate = ent({
+      entity_id: 'climate.basement',
+      domain: 'climate',
+      name: 'Thermostat',
+      area_id: 'basement',
+      state: 'heat',
+      on: true,
+      level: null,
+      adjustable: true,
+      attrs: { current_temperature: 68, hvac_mode: 'heat' },
+    })
+    const humidity = sensor({
+      entity_id: 'sensor.basement_humidity',
+      domain: 'sensor',
+      name: 'Humidity',
+      area_id: 'basement',
+      device_class: 'humidity',
+      state: '41',
+      on: null,
+    })
+    expect(roomSummary({ area_id: 'basement', name: 'Basement', entities: [climate, humidity] })).toBe('')
   })
 })

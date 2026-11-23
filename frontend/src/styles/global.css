@@ -342,6 +342,10 @@ textarea:focus-visible {
   padding: 6px max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-bottom));
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
+  /* Games and Cameras join an already-full bar; scroll rather than clipping Settings. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* --------------------------- bookmark top bar ----------------------------- */
@@ -394,21 +398,24 @@ textarea:focus-visible {
     flex-direction: column;
     width: var(--nav-size);
     height: 100%;
+    min-height: 0;
     border-top: none;
     border-right: 1px solid var(--border);
     /* 10px side padding and 8px gaps keep a 2–4px focus ring plus offset
        inside the rail, instead of clipping at the left edge or overlapping
-       the next item. */
+       the next item. Rings are drawn inside the button, so the rail can
+       scroll on a short wall when Games and Cameras are added. */
     padding: max(12px, env(safe-area-inset-top)) 10px 12px;
     gap: 8px;
     align-items: stretch;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 }
 
 .navbtn {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 0 auto;
+  min-width: 3.4rem;
   display: flex;
   align-items: center;
   justify-content: center;

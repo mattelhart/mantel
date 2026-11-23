@@ -8,10 +8,13 @@ never reaches a browser**. Screens call `/api/home/*` on Mantel; Mantel calls HA
 Three pieces:
 
 - `fetch_snapshot` -- one short websocket session: states plus the area, device and entity
-  registries, folded into rooms of controllable things.
+  registries, folded into rooms of controllable things plus a few read-only room sensors
+  (motion, occupancy, temperature, humidity).
 - `call_action` -- a whitelisted set of verbs turned into HA service calls over REST.
+  Read-only sensors are refused, even if a client asks.
 - `HomeStream` -- one long-lived websocket to HA, started when a screen is watching, that
-  relays `state_changed` events so a wall switch moves the tile on the wall.
+  relays `state_changed` events so a wall switch moves the tile on the wall, and so a
+  motion chip updates when a room sensor trips.
 
 Everything here raises `HAError` with a stable `code`; routers turn that into an answer a
 person can act on ("token rejected", "can't reach Home Assistant").
@@ -132,6 +135,11 @@ DOMAINS = (
 # Shown as buttons in the row at the top rather than tiles in a room.
 ACTION_DOMAINS = ("scene", "script")
 
+# Read-only room status, never controllable. Kept out of DOMAINS so a typo in the
+# action planner cannot turn a motion sensor into a switch.
+BINARY_SENSOR_CLASSES = frozenset({"motion", "occupancy", "presence"})
+SENSOR_CLASSES = frozenset({"temperature", "humidity", "carbon_dioxide"})
+
 # Bits of `supported_features` that matter here (HA's entity feature enums).
 _FAN_SET_SPEED = 1
 _COVER_SET_POSITION = 4
@@ -205,6 +213,15 @@ def dynamic_fields(state: dict) -> dict:
             "hvac_mode": raw,
             "hvac_action": attrs.get("hvac_action"),
         }
+    elif domain in ("binary_sensor", "sensor"):
+        # Motion is "on" while it is detecting; numeric sensors have no on/off.
+        out["on"] = raw == "on" if domain == "binary_sensor" else None
+        last = state.get("last_changed")
+        if isinstance(last, str) and last.strip():
+            out["last_changed"] = last.strip()
+        unit = attrs.get("unit_of_measurement")
+        if isinstance(unit, str) and unit.strip():
+            out["unit_of_measurement"] = unit.strip()[:24]
     return out
 
 
@@ -284,6 +301,29 @@ def _identity(reg: dict | None, devices_by_id: dict, attrs: dict) -> dict:
     return out
 
 
+def _device_class_of(reg: dict | None, attrs: dict) -> str | None:
+    return _clip(
+        (reg or {}).get("device_class")
+        or (reg or {}).get("original_device_class")
+        or attrs.get("device_class"),
+        40,
+    )
+
+
+def room_sensor_class(
+    entity_id: str, state: dict | None = None, reg: dict | None = None
+) -> str | None:
+    """The device_class when this is a room status sensor we show; otherwise None."""
+    domain = entity_id.split(".", 1)[0]
+    attrs = (state or {}).get("attributes") or {}
+    device_class = _device_class_of(reg, attrs)
+    if domain == "binary_sensor" and device_class in BINARY_SENSOR_CLASSES:
+        return device_class
+    if domain == "sensor" and device_class in SENSOR_CLASSES:
+        return device_class
+    return None
+
+
 def _tidy_name(name: str, area: str | None) -> str:
     """ "Living Room Floor Lamp" inside the Living Room card is just "Floor Lamp"."""
     if area and name.lower().startswith(area.lower() + " "):
@@ -303,26 +343,43 @@ def build_snapshot(
     devices_by_id = {d["id"]: d for d in devices}
     registry = {e["entity_id"]: e for e in entities}
 
+    # The climate tile already shows this device's indoor temperature, so a second
+    # chip for the same reading is just noise. Humidity on that device is kept.
+    climate_devices = {
+        registry[s["entity_id"]]["device_id"]
+        for s in states
+        if s.get("entity_id", "").split(".", 1)[0] == "climate"
+        and s.get("entity_id") in registry
+        and registry[s["entity_id"]].get("device_id")
+    }
+
     rooms: dict[str | None, list[dict]] = {}
     actions: list[dict] = []
 
     for state in states:
         entity_id = state.get("entity_id", "")
         domain = entity_id.split(".", 1)[0]
-        if domain not in DOMAINS:
-            continue
         reg = registry.get(entity_id)
         if reg and (reg.get("disabled_by") or reg.get("hidden_by")):
             continue
         # Config and diagnostic entities (a bridge's "identify" button) are not controls.
         if reg and reg.get("entity_category"):
             continue
+        attrs = state.get("attributes") or {}
+        sensor_class = room_sensor_class(entity_id, state, reg)
+        if domain not in DOMAINS and not sensor_class:
+            continue
+        if (
+            sensor_class == "temperature"
+            and reg
+            and reg.get("device_id") in climate_devices
+        ):
+            continue
 
         area_id = None
         if reg:
             area_id = reg.get("area_id") or device_area.get(reg.get("device_id"))
         area_id = area_id if area_id in area_names else None
-        attrs = state.get("attributes") or {}
         name = (
             attrs.get("friendly_name")
             or (reg or {}).get("name")
@@ -335,9 +392,12 @@ def build_snapshot(
             "domain": domain,
             "name": _tidy_name(str(name), area_names.get(area_id)),
             "area_id": area_id,
-            "adjustable": _adjustable(domain, attrs),
+            "adjustable": False if sensor_class else _adjustable(domain, attrs),
             **_identity(reg, devices_by_id, attrs),
         }
+        if sensor_class:
+            item["readonly"] = True
+            item["kind"] = "sensor"
         if domain == "climate":
             item["attrs"].update(
                 min_temp=_num(attrs.get("min_temp")),
@@ -352,8 +412,22 @@ def build_snapshot(
             rooms.setdefault(area_id, []).append(item)
 
     order = {d: i for i, d in enumerate(DOMAINS)}
+    sensor_rank = {
+        "motion": 0,
+        "occupancy": 1,
+        "presence": 2,
+        "temperature": 3,
+        "humidity": 4,
+        "carbon_dioxide": 5,
+    }
 
     def tile_key(item: dict):
+        if item.get("readonly"):
+            return (
+                len(DOMAINS),
+                sensor_rank.get(item.get("device_class") or "", 9),
+                item["name"].lower(),
+            )
         return (order[item["domain"]], item["name"].lower())
 
     out_rooms = [
@@ -461,8 +535,11 @@ async def test_connection(config: HAConfig) -> tuple[bool, str, str]:
         snapshot = await fetch_snapshot(config)
     except HAError as exc:
         return False, exc.code, exc.message
-    count = sum(len(r["entities"]) for r in snapshot["rooms"]) + len(snapshot["actions"])
-    return True, "ok", f"Connected. {count} controls in {len(snapshot['rooms'])} rooms."
+    controls = (
+        sum(1 for r in snapshot["rooms"] for e in r["entities"] if not e.get("readonly"))
+        + len(snapshot["actions"])
+    )
+    return True, "ok", f"Connected. {controls} controls in {len(snapshot['rooms'])} rooms."
 
 
 # --------------------------------------------------------------------------- actions
@@ -473,6 +550,8 @@ def plan_action(entity_id: str, action: str, value: Any, confirm: bool) -> tuple
     if not _ENTITY_ID.match(entity_id or ""):
         raise HAError("refused", "That isn't a device id.")
     domain = entity_id.split(".", 1)[0]
+    if domain in ("sensor", "binary_sensor"):
+        raise HAError("refused", "That sensor is read-only.")
     if domain not in DOMAINS:
         raise HAError("refused", f"Mantel doesn't control {domain} devices.")
     data: dict[str, Any] = {"entity_id": entity_id}
@@ -694,10 +773,13 @@ class HomeStream:
         old_id = (event.get("data") or {}).get("entity_id", "")
         if new is None:
             # Removed from HA: the room list is out of date.
-            if old_id.split(".", 1)[0] in DOMAINS:
+            gone = old_id.split(".", 1)[0]
+            if gone in DOMAINS or gone in ("sensor", "binary_sensor"):
                 self._publish("refresh", {})
             return
-        if new["entity_id"].split(".", 1)[0] in DOMAINS:
+        if new["entity_id"].split(".", 1)[0] in DOMAINS or room_sensor_class(
+            new["entity_id"], new
+        ):
             self._publish("state", dynamic_fields(new))
 
 

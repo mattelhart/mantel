@@ -39,6 +39,7 @@ const CACHEABLE_API = [
   '/api/chores/board',
   '/api/rewards',
   '/api/weather',
+  '/api/cameras',
 ]
 
 self.addEventListener('install', (event) => {

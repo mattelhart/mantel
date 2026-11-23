@@ -155,6 +155,65 @@
   gap: 10px;
 }
 
+/* Read-only room sensors: a flat status line, never a tile. No hover, press or
+   focus styles, and pointer-events: none so a swipe or D-pad cannot land on them. */
+.home-room__sensors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.home-room__sensors:last-child {
+  margin-bottom: 0;
+}
+
+.home-sensor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.home-sensor__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.45;
+  flex: 0 0 auto;
+}
+
+.home-sensor[data-active='true'] .home-sensor__dot {
+  background: var(--icon-switch);
+  opacity: 1;
+}
+
+.home-room__sensors--edit {
+  margin-top: 10px;
+}
+
+.home-sensor--edit {
+  pointer-events: auto;
+  gap: 8px;
+}
+
+.home-sensor--edit[data-hidden='true'] {
+  opacity: 0.5;
+}
+
 .home-tile {
   position: relative;
   display: flex;
@@ -180,6 +239,9 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   touch-action: manipulation;
+  /* Lets the name size itself to the tile (cqi below). Tile widths come from the
+     room grid's columns, never from their content, so containment is safe. */
+  container-type: inline-size;
 }
 
 .home-tile[data-on='true'] .home-tile__main {
@@ -211,7 +273,11 @@
      let a long one wrap onto a second line, and cut it with … after that. */
   min-width: 0;
   padding-right: 28px;
-  overflow-wrap: anywhere;
+  /* Shrink a long single word ("Thermostat", "Pendant") to fit a narrow tile
+     instead of splitting it mid-word; wrap only between words. */
+  font-size: min(1em, 9cqi);
+  overflow-wrap: break-word;
+  hyphens: auto;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;

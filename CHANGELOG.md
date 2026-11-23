@@ -25,6 +25,10 @@ they cannot write back.
 
 ## Unreleased
 
+- **Games.** A new **Games** page on the wall, the TV and phones, with large cards for 2048, Memory match, Minesweeper, tic-tac-toe and a doodle pad. The first three are vendored (MIT) and run same-origin in an iframe with a large Back button, so they work offline and never load a third-party host. Tic-tac-toe is native (two players, or a short game against the wall). The doodle pad is a native canvas with colours, brush size, undo and clear. Swipe and drag games keep a left gutter so a swipe from the edge of the Pi still goes back.
+
+- **Cameras, phase 1.** A **Cameras** page shows a snapshot grid from the UniFi Protect Integration API. Snapshots refresh every three seconds while the page is visible and pause when the tab is hidden; tapping a tile opens a full-screen view that refreshes about once a second, with Back. Disconnected cameras are greyed and labelled. The server reads the API key from the file at `UNIFI_PROTECT_KEY_FILE` (the feature reports "not configured" until that is set), talks to `UNIFI_PROTECT_URL` (default `https://10.0.0.1/proxy/protect/integration`), caches snapshots for about two seconds, and never logs or returns the key.
+
 - **Side-menu focus rings stay inside the rail.** The rounded outline around the selected or focused item (keyboard, mouse, or a TV remote) no longer clips at the left edge or overlaps the items above and below it, in Airy, the other themes, and `?tv=1`. The Android TV side menu gets the same treatment.
 
 - **Bigger side menu on the wall and TVs.** In landscape (the Pi kiosk, `?tv=1`, the Android TV app) the side-menu labels are about 20% larger and the icons grow with them. The phone's bottom bar is unchanged.

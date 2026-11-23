@@ -12,6 +12,8 @@ import './styles/dashboard.css'
 import './styles/screensaver.css'
 import './styles/chores.css'
 import './styles/home.css'
+import './styles/games.css'
+import './styles/cameras.css'
 import '@fontsource/nunito/latin-400.css'
 import '@fontsource/nunito/latin-600.css'
 import '@fontsource/nunito/latin-700.css'
@@ -23,6 +25,8 @@ import '@fontsource/nunito/latin-ext-800.css'
 import { CalendarPage } from './views/calendar/CalendarPage'
 import { ChoresPage } from './views/chores/ChoresPage'
 import { DashboardPage } from './views/dashboard/DashboardPage'
+import { CameraViewPage, CamerasPage } from './views/cameras/CamerasPage'
+import { GamePlayPage, GamesPage } from './views/games/GamesPage'
 import { HomePage } from './views/home/HomePage'
 import { ListsPage } from './views/lists/ListsPage'
 import { PhotosPage } from './views/photos/PhotosPage'
@@ -50,6 +54,10 @@ const router = createBrowserRouter([
       { path: 'home', element: <HomePage /> },
       { path: 'chores', element: <ChoresPage /> },
       { path: 'photos', element: <PhotosPage /> },
+      { path: 'games', element: <GamesPage /> },
+      { path: 'games/:id', element: <GamePlayPage /> },
+      { path: 'cameras', element: <CamerasPage /> },
+      { path: 'cameras/:id', element: <CameraViewPage /> },
       { path: 'settings', element: <SettingsPage /> },
       // The API guide used to be its own page. Keep old bookmarks and kiosk
       // shortcuts working by sending them to the tab that replaced it.

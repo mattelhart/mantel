@@ -792,7 +792,8 @@ describe('Home tile text clears the ⋯ button', () => {
     expect(block('.home-tile__main')).toContain('grid-template-columns: auto minmax(0, 1fr)')
     const name = block('.home-tile__name')
     expect(name).toContain('min-width: 0')
-    expect(name).toContain('overflow-wrap: anywhere')
+    expect(name).toContain('overflow-wrap: break-word')
+    expect(name).toMatch(/font-size: min\(1em, [0-9.]+cqi\)/)
     expect(name).toContain('-webkit-line-clamp: 2')
     expect(name).toContain('overflow: hidden')
   })
@@ -1243,5 +1244,148 @@ describe('Home Control drag and drop', () => {
     await settle()
     expect(document.body.classList.contains('home-dragging')).toBe(false)
     expect(ghost()).toBeNull()
+  })
+})
+
+
+describe('Home page room sensors', () => {
+  const sensorEnt = (over: Partial<HomeEntity>): HomeEntity =>
+    ent({
+      entity_id: 'binary_sensor.kitchen_occupancy',
+      domain: 'binary_sensor',
+      name: 'Kitchen occupancy',
+      state: 'off',
+      on: false,
+      level: null,
+      adjustable: false,
+      readonly: true,
+      kind: 'sensor',
+      device_class: 'occupancy',
+      last_changed: new Date(Date.now() - 12 * 60_000).toISOString(),
+      ...over,
+    })
+
+  beforeEach(() => {
+    install()
+    world.home = {
+      status: 'ok',
+      message: '',
+      rooms: [
+        {
+          area_id: 'kitchen',
+          name: 'Kitchen',
+          entities: [
+            ent({ entity_id: 'light.pendant', name: 'Pendant', area_id: 'kitchen', on: false, state: 'off', level: 0 }),
+            sensorEnt({}),
+          ],
+        },
+        {
+          area_id: 'austins',
+          name: "Austin's Bedroom",
+          entities: [
+            sensorEnt({
+              entity_id: 'binary_sensor.austins_motion',
+              name: 'Motion',
+              area_id: 'austins',
+              device_class: 'motion',
+              state: 'on',
+              on: true,
+              last_changed: new Date().toISOString(),
+            }),
+            sensorEnt({
+              entity_id: 'sensor.austins_temperature',
+              domain: 'sensor',
+              name: 'Temperature',
+              area_id: 'austins',
+              device_class: 'temperature',
+              state: '71.4',
+              on: null,
+              unit_of_measurement: '°F',
+              last_changed: undefined,
+            }),
+            sensorEnt({
+              entity_id: 'sensor.austins_humidity',
+              domain: 'sensor',
+              name: 'Humidity',
+              area_id: 'austins',
+              device_class: 'humidity',
+              state: '53',
+              on: null,
+              unit_of_measurement: '%',
+              last_changed: undefined,
+            }),
+          ],
+        },
+      ],
+      actions: [],
+    }
+  })
+  afterEach(async () => {
+    unmount()
+    vi.unstubAllGlobals()
+    await new Promise((r) => setTimeout(r, 420))
+  })
+
+  it('shows a compact status strip, not tiles, and a room of only sensors still appears', async () => {
+    renderPage()
+    await settle()
+    const austins = document.querySelector('[aria-label="Austin\'s Bedroom"]')
+    expect(austins).toBeTruthy()
+    expect(austins!.textContent).toContain('Motion now')
+    expect(austins!.textContent).toContain('71°')
+    expect(austins!.textContent).toContain('53%')
+    expect(austins!.querySelectorAll('.home-tile').length).toBe(0)
+    const chips = austins!.querySelectorAll('.home-sensor')
+    expect(chips).toHaveLength(3)
+    for (const chip of chips) {
+      expect(chip.tagName).toBe('LI')
+      expect(chip.getAttribute('role')).toBeNull()
+      expect((chip as HTMLElement).tabIndex).toBe(-1)
+      expect(chip.querySelector('button')).toBeNull()
+    }
+    expect(austins!.querySelector('[data-active="true"]')?.textContent).toContain('Motion now')
+    const kitchen = document.querySelector('[aria-label="Kitchen"]')
+    expect(kitchen!.textContent).toContain('Occupied 12 min ago')
+    expect(tile('Pendant')).toBeTruthy()
+  })
+
+  it('does not send an action when a chip is clicked', async () => {
+    renderPage()
+    await settle()
+    const chip = document.querySelector('.home-sensor') as HTMLElement
+    chip.click()
+    await settle()
+    expect(world.posts).toEqual([])
+  })
+
+  it('hides a sensor listed in home_hidden', async () => {
+    world.settings = { ...world.settings, home_hidden: ['binary_sensor.austins_motion'] }
+    renderPage()
+    await settle()
+    const austins = document.querySelector('[aria-label="Austin\'s Bedroom"]')
+    expect(austins!.textContent).not.toContain('Motion now')
+    expect(austins!.textContent).toContain('71°')
+  })
+
+  it('updates a chip when a live state event arrives', async () => {
+    renderPage()
+    await settle()
+    await push(
+      'event: state\ndata: {"entity_id":"binary_sensor.austins_motion","state":"off","available":true,"on":false,"level":null,"attrs":{},"last_changed":"' +
+        new Date(Date.now() - 5 * 60_000).toISOString() +
+        '"}\n\n',
+    )
+    const austins = document.querySelector('[aria-label="Austin\'s Bedroom"]')
+    expect(austins!.textContent).toContain('Motion 5 min ago')
+    expect(austins!.textContent).not.toContain('Motion now')
+  })
+
+  it('styles the strip as flat text, not a tappable tile', () => {
+    expect(homeCss).toMatch(/\.home-sensor \{[^}]*cursor: default/)
+    expect(homeCss).toMatch(/\.home-sensor \{[^}]*pointer-events: none/)
+    expect(homeCss).toMatch(/\.home-sensor \{[^}]*background: none/)
+    expect(homeCss).not.toMatch(/\.home-sensor:active/)
+    expect(homeCss).not.toMatch(/\.home-sensor:hover/)
+    expect(homeCss).toMatch(/\[data-active='true'\] \.home-sensor__dot \{[^}]*--icon-switch/)
   })
 })
