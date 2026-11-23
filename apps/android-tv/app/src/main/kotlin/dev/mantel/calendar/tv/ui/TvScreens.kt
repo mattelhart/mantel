@@ -234,14 +234,14 @@ private fun Home(state: TvState, vm: TvViewModel) {
                         focusedScale = 1f,
                     ) {
                         Text(if (item == Tab.Agenda) "Schedule" else if (item == Tab.Chores) "Tasks" else item.name,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 16.dp), fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 16.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
                 SunnyButton(onClick = { push(Overlay.Rewards) }, modifier = Modifier.fillMaxWidth(), focusedScale = 1f) {
-                    Text("Rewards", modifier = Modifier.padding(12.dp), fontSize = 19.sp, maxLines = 1)
+                    Text("Rewards", modifier = Modifier.padding(12.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
                 SunnyButton(onClick = { vm.forgetServer() }, modifier = Modifier.fillMaxWidth(), focusedScale = 1f) {
-                    Text("Server", modifier = Modifier.padding(12.dp), fontSize = 19.sp, maxLines = 1)
+                    Text("Server", modifier = Modifier.padding(12.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         Box(Modifier.weight(1f).fillMaxSize()) {

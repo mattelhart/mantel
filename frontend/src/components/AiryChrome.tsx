@@ -2,7 +2,7 @@ import { format } from 'date-fns'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSettings, useUsers, useWeather } from '../api/hooks'
-import { usePersonFilter } from '../hooks/usePersonFilter'
+import { personFilterApplies, usePersonFilter } from '../hooks/usePersonFilter'
 import { useEventColor } from './eventColor'
 
 /** Ask the screensaver to come forward. The same control Skylight puts on the
@@ -18,11 +18,13 @@ export function AiryBar({
   bookmark: string | null
   bookmarkText: string
 }) {
+  const { pathname } = useLocation()
   const { data: settings } = useSettings()
   const { data: weather } = useWeather()
   const { data: users = [] } = useUsers()
   const { toggle, showEveryone, isVisible, anyHidden } = usePersonFilter()
   const fill = useEventColor()
+  const showPeople = personFilterApplies(pathname)
   const now = useClock()
   const time = format(now, settings?.time_format_24h ? 'H:mm' : 'h:mm a')
   const current = weather?.current
@@ -51,7 +53,7 @@ export function AiryBar({
         </a>
       )}
       <div className="airybar__spacer" />
-      {users.length > 0 && (
+      {showPeople && users.length > 0 && (
         <div className="airybar__people" role="group" aria-label="Family">
           {users.map((u) => {
             const shown = isVisible(u.id)
