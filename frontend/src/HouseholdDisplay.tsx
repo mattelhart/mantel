@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from './api/client'
+import { UnsavedChangesPrompt, useDismissGuard } from './components/dismissGuard'
 
 const routes = {
   today: '/dashboard', week: '/calendar/week', month: '/calendar/month',
@@ -14,6 +15,37 @@ const titles: Record<Destination, string> = {
 }
 const slots = ['breakfast', 'lunch', 'dinner'] as const
 const dateKey = (day: Date) => format(day, 'yyyy-MM-dd')
+
+type MealEdit = { day: string; meal: typeof slots[number]; title: string }
+
+/** The meal editor. Opens with a title, and asks before throwing a changed one away. */
+function MealDialog({ edit, setEdit, save, onClose }: {
+  edit: MealEdit
+  setEdit: (edit: MealEdit) => void
+  save: { mutateAsync: (entry: MealEdit) => Promise<unknown>; mutate: (entry: MealEdit) => void; isPending: boolean; isError: boolean }
+  onClose: () => void
+}) {
+  const [openingTitle] = useState(edit.title)
+  const guard = useDismissGuard({
+    dirty: edit.title !== openingTitle,
+    // The mutation's own success handler closes the dialog.
+    save: () => save.mutateAsync(edit).then(() => true, () => false),
+    onClose,
+    busy: save.isPending,
+  })
+  return <div className="modal" role="dialog" aria-modal="true" aria-label="Edit meal" {...guard.backdropProps}>
+    <form className="modal__card" inert={guard.confirming}
+      onSubmit={event => { event.preventDefault(); save.mutate(edit) }}>
+      <h2>Edit {edit.meal}</h2>
+      <label>Meal name <input maxLength={200} value={edit.title} onChange={event => setEdit({ ...edit, title: event.target.value })} /></label>
+      {save.isError && <p role="alert">Could not save the meal.</p>}
+      <div><button type="button" disabled={save.isPending} onClick={guard.requestClose}>Cancel</button>
+        <button disabled={save.isPending}>Save meal</button>
+        {edit.title && <button type="button" disabled={save.isPending} onClick={() => save.mutate({ ...edit, title: '' })}>Clear meal</button>}</div>
+    </form>
+    {guard.confirming && <UnsavedChangesPrompt {...guard.promptProps} />}
+  </div>
+}
 
 export function MealsPage() {
   const [week, setWeek] = useState(() => startOfWeek(new Date()))
@@ -47,16 +79,7 @@ export function MealsPage() {
         </button></p>
       })}
     </section>)}</div>
-    {edit && <div className="modal" role="dialog" aria-label="Edit meal">
-      <form className="modal__card" onSubmit={event => { event.preventDefault(); save.mutate(edit) }}>
-        <h2>Edit {edit.meal}</h2>
-        <label>Meal name <input maxLength={200} value={edit.title} onChange={event => setEdit({ ...edit, title: event.target.value })} /></label>
-        {save.isError && <p role="alert">Could not save the meal.</p>}
-        <div><button type="button" disabled={save.isPending} onClick={() => setEdit(null)}>Cancel</button>
-          <button disabled={save.isPending}>Save meal</button>
-          {edit.title && <button type="button" disabled={save.isPending} onClick={() => save.mutate({ ...edit, title: '' })}>Clear meal</button>}</div>
-      </form>
-    </div>}
+    {edit && <MealDialog edit={edit} setEdit={setEdit} save={save} onClose={() => setEdit(null)} />}
   </div>
 }
 

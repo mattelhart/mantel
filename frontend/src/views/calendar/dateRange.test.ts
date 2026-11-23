@@ -13,6 +13,8 @@ import {
   extendDayWindow,
   extendWindow,
   firstVisibleIndex,
+  isViewKind,
+  normalizeView,
   monthsIn,
   monthWindow,
   rangeFor,
@@ -28,24 +30,6 @@ import { overlapsDay } from './overlap'
 const at = (s: string) => new Date(s)
 
 describe('rangeFor', () => {
-  it('gives one day for today view', () => {
-    const r = rangeFor('today', at('2026-07-30T15:00:00'), 0)
-    expect(r.days).toHaveLength(1)
-    expect(r.start.getHours()).toBe(0)
-  })
-
-  it('gives three days for 3day view', () => {
-    expect(rangeFor('3day', at('2026-07-30T15:00:00'), 0).days).toHaveLength(3)
-  })
-
-  it('gives a fortnight for schedule view and steps a week', () => {
-    const anchor = at('2026-07-30T15:00:00')
-    expect(rangeFor('schedule', anchor, 0).days).toHaveLength(14)
-    const next = step('schedule', anchor, 1)
-    expect(next.getMonth()).toBe(7)
-    expect(next.getDate()).toBe(6)
-  })
-
   it('gives seven days starting on the configured first day', () => {
     const sunday = rangeFor('week', at('2026-07-30T15:00:00'), 0)
     expect(sunday.days).toHaveLength(7)
@@ -77,11 +61,23 @@ describe('rangeFor', () => {
   })
 })
 
+describe('normalizeView', () => {
+  it('keeps the two views that exist', () => {
+    expect(normalizeView('week')).toBe('week')
+    expect(normalizeView('month')).toBe('month')
+  })
+
+  it('sends removed views, junk and nothing at all to Week', () => {
+    for (const old of ['today', 'day', '3day', 'schedule', 'fortnight', '', undefined, null]) {
+      expect(normalizeView(old)).toBe('week')
+      expect(isViewKind(old)).toBe(false)
+    }
+  })
+})
+
 describe('step', () => {
   it('moves by the size of the view', () => {
     const anchor = at('2026-07-30T12:00:00')
-    expect(step('today', anchor, 1).getDate()).toBe(31)
-    expect(step('3day', anchor, 1).getDate()).toBe(2)
     expect(step('week', anchor, -1).getDate()).toBe(23)
     expect(step('month', anchor, 1).getMonth()).toBe(7)
   })
@@ -231,10 +227,6 @@ describe('strip navigation', () => {
     expect(stripStartFor('week', thu, 1)).toEqual(new Date(2026, 9, 12))
   })
 
-  it('opens 3 Day on the day itself, at midnight', () => {
-    expect(stripStartFor('3day', thu, 0)).toEqual(new Date(2026, 9, 15))
-  })
-
   it('steps Week by seven days from a week start', () => {
     const sun = new Date(2026, 9, 11)
     expect(stripStep('week', sun, 1, 0)).toEqual(new Date(2026, 9, 18))
@@ -251,11 +243,6 @@ describe('strip navigation', () => {
     }
     expect(stripStep('week', thu, 1, 0)).toEqual(new Date(2026, 9, 18))
     expect(stripStep('week', thu, -1, 0)).toEqual(new Date(2026, 9, 4))
-  })
-
-  it('steps 3 Day by exactly three days', () => {
-    expect(stripStep('3day', new Date(2026, 9, 15), 1, 0)).toEqual(new Date(2026, 9, 18))
-    expect(stripStep('3day', new Date(2026, 9, 15), -1, 0)).toEqual(new Date(2026, 9, 12))
   })
 })
 

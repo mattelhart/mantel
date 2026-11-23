@@ -47,7 +47,7 @@ IDs, and everyone's calendars sit side by side on the same wall.
 
 |                            |                                                                                        |
 | -------------------------- | -------------------------------------------------------------------------------------- |
-| 📅 **Four views**           | Today, 3-day, week and month — touch-first, portrait *and* landscape                     |
+| 📅 **Two views**            | Week and month — touch-first, portrait *and* landscape                                   |
 | 🎨 **A colour per person**  | Everyone links as many Google or Apple accounts as they like and claims the ones they own |
 | 🔁 **Repeating events**     | Daily, weekly on chosen days, monthly, yearly — created on the wall, pushed as RRULEs    |
 | 👤 **Filter by person**     | Tap a family member to grey them out; remembered per device                              |

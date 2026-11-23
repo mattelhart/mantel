@@ -25,6 +25,10 @@ they cannot write back.
 
 ## Unreleased
 
+**Tapping outside a side panel closes it, and it asks before throwing away edits.** This covers the event panel, the meal editor, the add-widget picker and the About card. A tap on the dimmed area closes the panel, and that tap is consumed: it no longer also opens a new event on the calendar underneath. The tap is read from pointer events, so a finger that slides a little still counts. The browser sends no `click` for a slide of about 15px or more, which is why tapping outside used to be ignored on the wall touchscreen. A panel with unsaved edits asks **Save changes?** with large **Save**, **Discard** and **Keep editing** buttons. Save runs the panel's normal save, and if validation or the server refuses, the panel stays open and shows why. The same prompt appears for Escape, the TV remote's Back key, and Cancel. A panel with no edits closes without asking. In TV mode (`?tv=1`) the prompt sits inside the dialog, so the D-pad stays inside it, with focus on Save. Back means Keep editing.
+
+**Day, 3 Day and Schedule views are gone.** The Day/Week/Month/Schedule switcher is now Week and Month, and the side navigation lists the same two. Week and Month already show everything those views did. Old links and bookmarks (`/calendar/today`, `/3day`, `/schedule`, anything unknown) and the app's front door open Week. No view is stored in localStorage or `sessionStorage` (the saved `default_view` setting is not read by the web app), so nothing stored can still name a removed view.
+
 **The phone and TV connect screens can be read across the room.** Field text is near-black, placeholders and labels clear WCAG AA on the warm paper, errors are a dark red, and outlined buttons are no longer pale orange. Filled buttons stay the warm orange, with dark text.
 
 **TV and phone updates install over the last copy.** Debug and release APKs are signed with one keystore in the repo, so a build from another machine no longer forces an uninstall. The version code is the number of git commits, and the version name is `VERSION` plus that count.

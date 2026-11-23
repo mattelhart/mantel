@@ -305,8 +305,7 @@ html[data-theme='airy'] .timegrid__daynum {
 }
 
 html[data-theme='airy'] .timegrid__dayhead[data-today='true'] .timegrid__daynum,
-html[data-theme='airy'] .month__cell[data-today='true'] .month__daynum,
-html[data-theme='airy'] .schedule__date[data-today='true'] .timegrid__daynum {
+html[data-theme='airy'] .month__cell[data-today='true'] .month__daynum {
   width: 2.5rem;
   height: 2.5rem;
   min-width: 2.5rem;
@@ -325,8 +324,7 @@ html[data-theme='airy'] .month__cell {
 }
 
 html[data-theme='airy'] .event-block,
-html[data-theme='airy'] .chip,
-html[data-theme='airy'] .schedule__event {
+html[data-theme='airy'] .chip {
   border-radius: 14px;
   font-weight: 800;
   box-shadow: none;
@@ -353,8 +351,7 @@ html[data-theme='airy'] .event-block[data-dragging='true'] {
 }
 
 html[data-theme='airy'] .event-block:active,
-html[data-theme='airy'] .chip:active,
-html[data-theme='airy'] .schedule__event:active {
+html[data-theme='airy'] .chip:active {
   filter: brightness(0.97);
 }
 

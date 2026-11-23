@@ -10,12 +10,19 @@ import {
   startOfWeek,
 } from 'date-fns'
 
-export type ViewKind = 'today' | '3day' | 'week' | 'month' | 'schedule'
+export type ViewKind = 'week' | 'month'
 
-export const VIEW_KINDS: ViewKind[] = ['today', '3day', 'week', 'month', 'schedule']
+export const VIEW_KINDS: ViewKind[] = ['week', 'month']
 
-export function isViewKind(v: string | undefined): v is ViewKind {
+export function isViewKind(v: string | undefined | null): v is ViewKind {
   return !!v && (VIEW_KINDS as string[]).includes(v)
+}
+
+/** Week is the fallback for anything that is not a current view. Day, 3 Day and Schedule
+ *  were removed -- Week and Month show the same events -- but bookmarks, a TV pointed at
+ *  /calendar/today, and a stored `default_view` may still name them. */
+export function normalizeView(v: string | undefined | null): ViewKind {
+  return isViewKind(v) ? v : 'week'
 }
 
 export interface Range {
@@ -27,13 +34,6 @@ export interface Range {
 /** The visible span for a view anchored on `anchor`. Month view is padded out to whole
  *  weeks so the grid is always rectangular. */
 export function rangeFor(view: ViewKind, anchor: Date, weekStartsOn: 0 | 1): Range {
-  // A fortnight of agenda rows. Long enough to see the week ahead, short enough
-  // that the list still feels like a page you can scan from the doorway.
-  if (view === 'schedule') {
-    const start = startOfDay(anchor)
-    const end = addDays(start, 14)
-    return { start, end, days: eachDay(start, end) }
-  }
   if (view === 'month') {
     const start = startOfWeek(startOfMonth(anchor), { weekStartsOn })
     // endOfWeek lands on 23:59:59, so normalize before stepping to the exclusive end --
@@ -41,29 +41,13 @@ export function rangeFor(view: ViewKind, anchor: Date, weekStartsOn: 0 | 1): Ran
     const end = addDays(startOfDay(endOfWeek(endOfMonth(anchor), { weekStartsOn })), 1)
     return { start, end, days: eachDay(start, end) }
   }
-  if (view === 'week') {
-    const start = startOfWeek(anchor, { weekStartsOn })
-    return { start, end: addDays(start, 7), days: eachDay(start, addDays(start, 7)) }
-  }
-  const count = view === '3day' ? 3 : 1
-  const start = startOfDay(anchor)
-  return { start, end: addDays(start, count), days: eachDay(start, addDays(start, count)) }
+  const start = startOfWeek(anchor, { weekStartsOn })
+  return { start, end: addDays(start, 7), days: eachDay(start, addDays(start, 7)) }
 }
 
 /** How far one swipe / arrow tap moves the anchor. */
 export function step(view: ViewKind, anchor: Date, direction: 1 | -1): Date {
-  switch (view) {
-    case 'today':
-      return addDays(anchor, direction)
-    case '3day':
-      return addDays(anchor, 3 * direction)
-    case 'week':
-      return addDays(anchor, 7 * direction)
-    case 'month':
-      return addMonths(anchor, direction)
-    case 'schedule':
-      return addDays(anchor, 7 * direction)
-  }
+  return view === 'month' ? addMonths(anchor, direction) : addDays(anchor, 7 * direction)
 }
 
 /** A run of whole months, inclusive at both ends, each held as its first day. Month view
@@ -137,16 +121,16 @@ export function eventsRangeAround(month: Date, weekStartsOn: 0 | 1): { start: Da
   return windowRange(monthWindow(month, FULL_RENDER_PAD, FULL_RENDER_PAD), weekStartsOn)
 }
 
-/** Week and 3 Day are one continuous strip of day columns rather than pages. */
-export type StripKind = '3day' | 'week'
+/** Week is one continuous strip of day columns rather than pages. */
+export type StripKind = 'week'
 
 export function isStripKind(k: ViewKind | null): k is StripKind {
-  return k === '3day' || k === 'week'
+  return k === 'week'
 }
 
 /** Day columns a strip shows at once. */
-export function spanOf(kind: StripKind): number {
-  return kind === 'week' ? 7 : 3
+export function spanOf(_kind: StripKind): number {
+  return 7
 }
 
 /** A run of whole days, inclusive at both ends, each held as local midnight. */
@@ -192,15 +176,14 @@ export function extendDayWindow(win: DayWindow, side: 'start' | 'end', by = DAY_
     : { first: win.first, last: addDays(win.last, by) }
 }
 
-/** The day a strip should have in its first column to show `day` the way the view means
- *  it: the whole week containing it for Week, the day itself for 3 Day. */
-export function stripStartFor(kind: StripKind, day: Date, weekStartsOn: 0 | 1): Date {
-  return kind === 'week' ? startOfWeek(day, { weekStartsOn }) : startOfDay(day)
+/** The day a strip should have in its first column to show `day`: the whole week
+ *  containing it. */
+export function stripStartFor(_kind: StripKind, day: Date, weekStartsOn: 0 | 1): Date {
+  return startOfWeek(day, { weekStartsOn })
 }
 
 /** Where the arrows go from the first visible day. Week lands on a week start however far
- *  into a week the view was left, so repeated taps stay aligned; 3 Day just moves three
- *  days. */
+ *  into a week the view was left, so repeated taps stay aligned. */
 export function stripStep(kind: StripKind, from: Date, direction: 1 | -1, weekStartsOn: 0 | 1): Date {
   const moved = addDays(from, spanOf(kind) * direction)
   return stripStartFor(kind, moved, weekStartsOn)
