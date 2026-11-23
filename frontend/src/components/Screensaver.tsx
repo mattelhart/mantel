@@ -47,7 +47,24 @@ export function Screensaver() {
     return () => window.removeEventListener('mantel:show-saver', show)
   }, [])
 
-  const showing = forced || asleep || idle
+  const [wakeUntil, setWakeUntil] = useState(0)
+  useEffect(() => {
+    const wake = () => {
+      setForced(false)
+      setWakeUntil(Date.now() + Math.max(1000, delayMs))
+      window.dispatchEvent(new Event('pointerdown'))
+    }
+    window.addEventListener('mantel:dismiss-saver', wake)
+    return () => window.removeEventListener('mantel:dismiss-saver', wake)
+  }, [delayMs])
+
+  useEffect(() => {
+    if (!wakeUntil) return
+    const timer = window.setTimeout(() => setWakeUntil(0), Math.max(0, wakeUntil - Date.now()))
+    return () => window.clearTimeout(timer)
+  }, [wakeUntil])
+
+  const showing = forced || ((asleep || idle) && Date.now() >= wakeUntil)
   const usePhotos = mode !== 'clock' && photos.length > 0
 
   // Any interaction dismisses it; the capture-phase handler stops that same
@@ -61,7 +78,7 @@ export function Screensaver() {
 
   if (!showing) return null
 
-  if (asleep) {
+  if (asleep && Date.now() >= wakeUntil) {
     return (
       <div className="saver saver--sleep" onPointerDownCapture={dismiss} role="presentation">
         <SleepClock />

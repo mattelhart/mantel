@@ -34,7 +34,7 @@ class AgendaDreamService : DreamService() {
             orientation = LinearLayout.VERTICAL
             val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
                 Configuration.UI_MODE_NIGHT_YES
-            setBackgroundColor(if (night) Color.parseColor("#1A1613") else Color.parseColor("#FFF6E4"))
+            setBackgroundColor(if (night) Color.parseColor("#1A1613") else Color.parseColor("#FFFFFF"))
             ink = if (night) Color.parseColor("#F6EFE6") else Color.parseColor("#1C2430")
             setPadding(80, 64, 80, 64)
         }

@@ -98,7 +98,7 @@ def list_events(
     ),
     q: str | None = Query(default=None, description="Case-insensitive text search on title."),
     include_unclaimed: bool = Query(
-        default=True, description="Set false to hide calendars nobody has claimed."
+        default=False, description="Set true to include calendars nobody has claimed."
     ),
     db: Session = Depends(get_db),
 ) -> list[EventOut]:

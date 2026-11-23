@@ -21,9 +21,8 @@ export function ListsPage() {
 
   const add = () => {
     const name = newName.trim()
-    if (!name) return
-    createList.mutate({ name, icon: guessIcon(name) })
-    setNewName('')
+    if (!name || createList.isPending) return
+    createList.mutate({ name, icon: guessIcon(name) }, { onSuccess: () => setNewName('') })
   }
 
   return (
@@ -45,6 +44,7 @@ export function ListsPage() {
           ))}
         </div>
 
+        {createList.error && <p role="alert">{createList.error.message}</p>}
         <div className="row">
           <input
             className="row__name"
@@ -53,7 +53,7 @@ export function ListsPage() {
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && add()}
           />
-          <button className="btn btn--primary" onClick={add}>
+          <button className="btn btn--primary" disabled={createList.isPending || !newName.trim()} onClick={add}>
             Add list
           </button>
         </div>
@@ -65,11 +65,19 @@ export function ListsPage() {
 function ListCard({ list }: { list: SharedList }) {
   const { data: users = [] } = useUsers()
   const [text, setText] = useState('')
+  const [editing, setEditing] = useState<{ id: number | null; value: string } | null>(null)
+  const [deleting, setDeleting] = useState<'list' | 'checked' | number | null>(null)
   const [assignee, setAssignee] = useState<number | ''>('')
 
   const addItem = useEntityMutation(
     (body: { text: string; assigned_user_id: number | null }) =>
       api.post(`/lists/${list.id}/items`, body),
+    LIST_KEYS,
+  )
+  const edit = useEntityMutation(
+    ({ id, value }: { id: number | null; value: string }) => id === null
+      ? api.patch(`/lists/${list.id}`, { name: value.trim() })
+      : api.patch(`/lists/${list.id}/items/${id}`, { text: value.trim() }),
     LIST_KEYS,
   )
   const qc = useQueryClient()
@@ -85,9 +93,8 @@ function ListCard({ list }: { list: SharedList }) {
 
   const submit = () => {
     const value = text.trim()
-    if (!value) return
-    addItem.mutate({ text: value, assigned_user_id: assignee === '' ? null : assignee })
-    setText('')
+    if (!value || addItem.isPending) return
+    addItem.mutate({ text: value, assigned_user_id: assignee === '' ? null : assignee }, { onSuccess: () => setText('') })
   }
 
   const checkedCount = list.items.filter((i) => i.checked).length
@@ -102,17 +109,47 @@ function ListCard({ list }: { list: SharedList }) {
         {/* Grouped so a narrow card wraps both buttons together, rather than
             stranding Delete on a line of its own. */}
         <div className="listcard__actions">
+          <button className="iconbtn" onClick={() => setEditing({ id: null, value: list.name })}>Rename</button>
           {checkedCount > 0 && (
-            <button className="iconbtn" onClick={() => clearChecked.mutate(undefined as never)}>
+            <button className="iconbtn" onClick={() => setDeleting('checked')}>
               Clear {checkedCount}
             </button>
           )}
-          <button className="iconbtn iconbtn--danger" onClick={() => removeList.mutate(undefined as never)}>
+          <button className="iconbtn iconbtn--danger" onClick={() => setDeleting('list')}>
             Delete
           </button>
         </div>
       </div>
 
+      {editing && (
+        <form className="listcard__add" onSubmit={(event) => {
+          event.preventDefault()
+          if (editing.value.trim() && !edit.isPending) edit.mutate(editing, { onSuccess: () => setEditing(null) })
+        }}>
+          <input aria-label={editing.id === null ? 'List name' : 'Item text'} autoFocus
+            value={editing.value} maxLength={editing.id === null ? 100 : 500}
+            disabled={edit.isPending} onChange={(event) => setEditing({ ...editing, value: event.target.value })} />
+          <button className="btn" disabled={edit.isPending || !editing.value.trim()}>Save</button>
+          <button className="btn" type="button" disabled={edit.isPending} onClick={() => setEditing(null)}>Cancel</button>
+        </form>
+      )}
+      {deleting !== null && (
+        <div role="group" aria-label="Confirm deletion">
+          <p>{deleting === 'list' ? `Delete ${list.name} and all its items for everyone?`
+            : deleting === 'checked' ? `Delete ${checkedCount} completed items?` : 'Delete this item for everyone?'}</p>
+          <button className="btn" disabled={removeList.isPending || removeItem.isPending || clearChecked.isPending}
+            onClick={() => {
+              const options = { onSuccess: () => setDeleting(null) }
+              if (deleting === 'list') removeList.mutate(undefined as never, options)
+              else if (deleting === 'checked') clearChecked.mutate(undefined as never, options)
+              else removeItem.mutate(deleting, options)
+            }}>Delete</button>
+          <button className="btn" onClick={() => setDeleting(null)}>Cancel</button>
+        </div>
+      )}
+      {(edit.error || addItem.error || removeList.error || removeItem.error || clearChecked.error) && (
+        <p role="alert">{String(edit.error?.message || addItem.error?.message || removeList.error?.message || removeItem.error?.message || clearChecked.error?.message)}</p>
+      )}
       <ul className="listcard__items">
         {list.items.map((item) => (
           <li key={item.id} className="listitem" data-checked={item.checked}>
@@ -130,10 +167,11 @@ function ListCard({ list }: { list: SharedList }) {
               {item.checked ? '✓' : ''}
             </button>
             <span className="listitem__text">{item.text}</span>
+            <button className="iconbtn" aria-label={`Edit ${item.text}`} onClick={() => setEditing({ id: item.id, value: item.text })}>Edit</button>
             <button
               className="listitem__remove"
               aria-label={`Remove ${item.text}`}
-              onClick={() => removeItem.mutate(item.id)}
+              onClick={() => setDeleting(item.id)}
             >
               ✕
             </button>
@@ -162,7 +200,7 @@ function ListCard({ list }: { list: SharedList }) {
             ))}
           </select>
         )}
-        <button className="btn btn--primary" onClick={submit}>
+        <button className="btn btn--primary" disabled={addItem.isPending || !text.trim()} onClick={submit}>
           Add
         </button>
       </div>

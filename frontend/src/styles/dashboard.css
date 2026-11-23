@@ -296,17 +296,26 @@
 
 /* ------------------------------ widget picker ------------------------------ */
 
+/* Airy's side panel (and the TV dialog) give .modal__card a fixed height.
+   Flex items shrink by default, so a two-line description used to overflow
+   each option's bottom border. Keep every .picker at its content height;
+   .picker-list scrolls when the options no longer fit. */
 .picker {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: stretch;
+  gap: calc(4px * var(--scale));
   text-align: left;
-  padding: 12px 14px;
+  padding: calc(12px * var(--scale)) calc(14px * var(--scale));
   border-radius: 10px;
   background: var(--bg);
   border: 1px solid var(--border);
   width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: var(--touch);
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .picker:active {
@@ -315,11 +324,36 @@
 
 .picker__name {
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .picker__desc {
   color: var(--text-dim);
   font-size: var(--font-sm);
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* In a height-capped card (Airy side panel, TV max-height), this list
+   scrolls so the title and Cancel stay in view while each .picker keeps
+   its full text. */
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for the focus outline (2px + 2px offset; Airy uses 3px). */
+  padding: 4px;
+  margin: 0 -4px;
+}
+
+.modal__card > .modal__title,
+.modal__card > .modal__actions {
+  flex-shrink: 0;
 }
 
 /* ------------------------------- countdown -------------------------------- */

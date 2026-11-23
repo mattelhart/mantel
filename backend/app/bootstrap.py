@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from .models import AppSetting, Calendar
 from .services.google_config import seed_from_env
+from .services.home_layout import DEFAULT_LAYOUT
 
 # Colour themes the frontend ships (frontend/src/theme.ts). Validated here so a
 # typo from an API client is a 400 rather than a stored value the CSS silently ignores,
@@ -48,12 +49,28 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "ha_base_url": "",
     "ha_token": "",
     "ha_entity_id": "calendar.family_calendar",
+    # Home control (the Home page) reuses the URL and token above. These two are Mantel's
+    # own: what to pin to the top, and what to leave off the wall. Lists of HA entity ids.
+    "home_favorites": [],
+    "home_hidden": [],
+    # How the Home page is arranged (room order, hidden rooms, room size, device and scene
+    # order). One value for every screen. See services/home_layout.py.
+    "home_layout": DEFAULT_LAYOUT,
     # Google Calendar. Configured in Settings -> Google rather than .env, so a
     # self-hoster never has to edit a file and restart a container to finish
     # setup. Seeded from .env once on first run for installs that predate this.
     "google_client_id": "",
     "google_client_secret": "",
     "public_base_url": "",
+    # Family messaging via Twilio SMS/MMS or a self-hosted Signal CLI API.
+    # Twilio SID and auth token are sealed like ha_token and never returned.
+    # The From number is the toll-free number on the Twilio account.
+    "twilio_account_sid": "",
+    "twilio_auth_token": "",
+    "twilio_from_number": "",
+    "message_provider": "twilio",  # twilio | signal
+    "signal_api_url": "http://host.docker.internal:8081",
+    "signal_account_number": "",
 }
 
 

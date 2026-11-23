@@ -1,5 +1,6 @@
 package dev.mantel.calendar.phone.ui
 
+import dev.mantel.calendar.core.ChoreDefinition
 import dev.mantel.calendar.core.CalEvent
 import java.time.LocalDate
 
@@ -7,7 +8,14 @@ sealed interface Page {
     data class Event(val event: CalEvent) : Page
     data class Edit(val event: CalEvent?, val day: LocalDate) : Page
     data class ListDetail(val id: Int) : Page
+    data class EditChore(val chore: ChoreDefinition? = null) : Page
+    data object AllChores : Page
     data object Rewards : Page
-    data class ChoreForm(val id: Int?) : Page
+    data object Meals : Page
+    data object ShowOnTv : Page
+    data object PairTv : Page
+    data object HomeControl : Page
     data object Settings : Page
+    data class Thread(val id: String) : Page
+    data class Draw(val conversationId: String?) : Page
 }

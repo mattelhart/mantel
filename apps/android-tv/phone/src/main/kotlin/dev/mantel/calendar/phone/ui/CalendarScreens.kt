@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -237,7 +239,7 @@ fun EventRow(event: CalEvent, state: PhoneState, vm: PhoneViewModel, onClick: ()
             .fillMaxWidth()
             .touchTarget()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .background(lerp(MaterialTheme.colorScheme.surface, parseHex(event.color), 0.16f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -245,7 +247,7 @@ fun EventRow(event: CalEvent, state: PhoneState, vm: PhoneViewModel, onClick: ()
     ) {
         Box(Modifier.width(6.dp).height(40.dp).clip(RoundedCornerShape(3.dp)).background(parseHex(event.color)))
         Column(Modifier.weight(1f)) {
-            Text(event.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(event.title, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Text(
                 formatWhen(event, vm.zone(), state.settings.timeFormat24h) + " · " + event.calendarName,
                 style = MaterialTheme.typography.bodyMedium,
@@ -512,4 +514,68 @@ private fun minutesLabel(minutes: Int, use24: Boolean): String {
     val hourText = if (shown == 0) 12 else shown
     val suffix = if (hour < 12) "AM" else "PM"
     return "$hourText:${"%02d".format(minute)} $suffix"
+}
+
+@Composable
+fun WeekScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
+    val days = weekDays(state.anchor, state.settings.firstDayOfWeek)
+    val shown = visibleEvents(state.events, state.hiddenUserIds)
+    val today = LocalDate.now(vm.zone())
+    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { vm.setAnchor(state.anchor.minusWeeks(1)) },
+                modifier = Modifier.touchTarget(),
+            ) { Icon(Icons.Filled.ChevronLeft, contentDescription = "Previous week") }
+            Text(
+                dayLabel(days.first()),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            TextButton(onClick = { vm.setAnchor(today) }, modifier = Modifier.touchTarget()) { Text("Today") }
+            IconButton(
+                onClick = { vm.setAnchor(state.anchor.plusWeeks(1)) },
+                modifier = Modifier.touchTarget(),
+            ) { Icon(Icons.Filled.ChevronRight, contentDescription = "Next week") }
+        }
+        PersonStrip(state, vm)
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val dayWidth = maxOf(164.dp, (maxWidth - 48.dp) / 7)
+            Row(
+                Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                days.forEach { day ->
+                    Column(
+                        Modifier.width(dayWidth).fillMaxSize()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(if (day == today) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()))
+                            Text(day.dayOfMonth.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        }
+                        Column(
+                            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            val events = eventsOn(shown, day, vm.zone())
+                            if (events.isEmpty()) Text("Nothing planned", style = MaterialTheme.typography.bodyMedium)
+                            events.forEach { event -> EventRow(event, state, vm) { open(Page.Event(event)) } }
+                            TextButton(
+                                onClick = { open(Page.Edit(null, day)) },
+                                modifier = Modifier.fillMaxWidth().touchTarget(),
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = null)
+                                Text("Add event")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

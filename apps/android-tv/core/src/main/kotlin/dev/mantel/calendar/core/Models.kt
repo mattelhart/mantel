@@ -102,20 +102,6 @@ data class SharedList(
 )
 
 @Serializable
-data class ChoreDef(
-    val id: Int = 0,
-    val title: String,
-    val notes: String? = null,
-    val points: Int = 1,
-    val schedule: String = "daily",
-    val weekdays: List<Int> = emptyList(),
-    val dueOn: String? = null,
-    val requiresApproval: Boolean = false,
-    val icon: String? = null,
-    val assigneeIds: List<Int> = emptyList(),
-)
-
-@Serializable
 data class ChoreCompletion(
     val id: Int,
     val choreId: Int,
@@ -188,3 +174,94 @@ data class ChoreBoard(
 
 @Serializable
 data class CompleteResult(val completion: ChoreCompletion? = null)
+
+@Serializable
+data class ChoreDefinition(
+    val id: Int,
+    val title: String,
+    val notes: String? = null,
+    val points: Int = 0,
+    val schedule: String = "daily",
+    val weekdays: List<Int> = emptyList(),
+    val dueOn: String? = null,
+    val requiresApproval: Boolean = false,
+    val icon: String? = null,
+    val assigneeIds: List<Int> = emptyList(),
+)
+
+@Serializable
+data class DisplayTarget(val id: String, val name: String)
+
+/** A single-use code a phone or TV exchanges for a token. The server also returns an SVG; the app draws its own QR. */
+@Serializable
+data class PairingCode(val code: String, val expiresAt: String, val qrPayload: String = "")
+
+/** What Settings > Home needs to know. The token itself is never in this: only whether one is saved. */
+@Serializable
+data class HomeSetup(val haBaseUrl: String = "", val server: HomeSetupServer = HomeSetupServer())
+
+@Serializable
+data class HomeSetupServer(val haTokenSet: Boolean = false)
+
+@Serializable
+data class HomeTestResult(val ok: Boolean = false, val status: String = "", val message: String = "")
+
+@Serializable
+data class HomeEntity(
+    val entityId: String,
+    val domain: String,
+    val name: String,
+    val state: String = "",
+    val available: Boolean = true,
+    val on: Boolean? = null,
+    val level: Int? = null,
+    val adjustable: Boolean = false,
+)
+
+@Serializable
+data class HomeRoom(val areaId: String? = null, val name: String = "", val entities: List<HomeEntity> = emptyList())
+
+/** `GET /api/home`. [status] is ok, not_configured, unreachable or invalid_token, with a [message] a person can act on. */
+@Serializable
+data class HomeSnapshot(
+    val status: String = "ok",
+    val message: String = "",
+    val rooms: List<HomeRoom> = emptyList(),
+    val actions: List<HomeEntity> = emptyList(),
+)
+
+@Serializable
+data class ConversationMessage(
+    val id: Int,
+    val userId: Int? = null,
+    val phone: String = "",
+    val direction: String = "in",
+    val body: String? = null,
+    val mediaUrl: String? = null,
+    val mediaContentType: String? = null,
+    val status: String = "",
+    val errorMessage: String? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class Conversation(
+    val id: String,
+    val userId: Int? = null,
+    val name: String,
+    val phone: String? = null,
+    val color: String = "#3b82f6",
+    val avatarEmoji: String? = null,
+    val unknown: Boolean = false,
+    val canSend: Boolean = false,
+    val lastMessage: ConversationMessage? = null,
+    val messages: List<ConversationMessage> = emptyList(),
+)
+
+@Serializable
+data class ConversationsListing(
+    val configured: Boolean = false,
+    val fromNumber: String = "",
+    val quickReplies: List<String> = emptyList(),
+    val conversations: List<Conversation> = emptyList(),
+)

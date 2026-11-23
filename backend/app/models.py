@@ -41,9 +41,15 @@ class User(TimestampMixin, Base):
     color: Mapped[str] = mapped_column(String(9), nullable=False, default="#3b82f6")
     avatar_emoji: Mapped[str | None] = mapped_column(String(16))
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Optional E.164 number used by family messaging. Nullable so existing
+    # databases can gain the column automatically (see schema_sync.py).
+    phone: Mapped[str | None] = mapped_column(String(20))
 
     accounts: Mapped[list["LinkedAccount"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+    messages: Mapped[list["FamilyMessage"]] = relationship(
+        back_populates="user",
     )
 
 
@@ -442,6 +448,44 @@ class PointRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+
+class FamilyMessage(TimestampMixin, Base):
+    """One SMS or MMS between the wall and a phone, via Twilio.
+
+    Conversations are derived: one thread per family member, plus a thread per
+    inbound number that is not saved on a person. `user_id` is null for those
+    unknown numbers. The Twilio SID is unique so a poller can run often without
+    duplicating a message.
+    """
+
+    __tablename__ = "family_messages"
+    __table_args__ = (
+        UniqueConstraint("twilio_sid", name="uq_family_message_sid"),
+        Index("ix_family_messages_phone_created", "phone", "created_at"),
+        Index("ix_family_messages_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # E.164 of the other party (the family member, or an unknown sender).
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    # "in" (they texted the wall) or "out" (the wall sent it).
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    body: Mapped[str | None] = mapped_column(Text)
+    # Filename only, under the data directory's messages/ folder.
+    media_path: Mapped[str | None] = mapped_column(String(80))
+    media_content_type: Mapped[str | None] = mapped_column(String(80))
+    # Twilio status: queued, sending, sent, delivered, undelivered, failed, received.
+    status: Mapped[str] = mapped_column(String(32), default="queued")
+    twilio_sid: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    user: Mapped["User | None"] = relationship(back_populates="messages")
+
+
+
 class WeatherCache(Base):
     """Raw upstream responses, keyed by request. Kept in the database rather than
     memory so a restart doesn't leave the wall display blank until the next fetch."""
@@ -497,3 +541,10 @@ class PairingCode(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MealPlanEntry(Base):
+    __tablename__ = "meal_plan_entries"
+
+    key: Mapped[str] = mapped_column(String(24), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))

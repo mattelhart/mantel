@@ -1,0 +1,708 @@
+/* Family messages: list, thread, and the doodle overlay. */
+
+.messages {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 18px 16px;
+}
+
+.messages__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.messages__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-xl);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 64px;
+  min-width: 120px;
+  padding: 8px 18px;
+  border-radius: 16px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-weight: 800;
+  text-decoration: none;
+  border: 0;
+  font: inherit;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.messages__back:focus-visible,
+.messages__person:focus-visible,
+.messages__chip:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.messages__who {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages__number {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.messages__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 32rem;
+  font-size: var(--font-md);
+  line-height: 1.4;
+}
+
+.messages__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  padding-bottom: 12px;
+}
+
+.messages__person {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 96px;
+  padding: 14px 18px;
+  border-radius: 24px;
+  background: var(--bg-elev);
+  box-shadow: 0 10px 28px rgba(28, 36, 48, 0.06);
+  color: var(--text);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.messages__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.85rem;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.messages__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.messages__name {
+  font-size: var(--font-lg);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.messages__preview {
+  color: var(--text-dim);
+  font-size: var(--font-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages--thread .messages__thread {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+
+.messages__bubble {
+  max-width: min(78%, 680px);
+  padding: 14px 18px;
+  border-radius: 24px;
+  background: var(--bg-elev);
+  box-shadow: 0 8px 20px rgba(28, 36, 48, 0.06);
+}
+
+.messages__bubble[data-dir='out'] {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 28%, var(--bg-elev));
+  color: var(--text);
+}
+
+.messages__bubble[data-dir='in'] {
+  align-self: flex-start;
+  border-left: 8px solid var(--person-color, var(--accent));
+}
+
+.messages__text {
+  font-size: var(--font-lg);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.messages__pic {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 16px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.messages__status {
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+}
+
+.messages__compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  flex: none;
+}
+
+.messages__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.messages__chip {
+  min-height: 64px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 800;
+  touch-action: manipulation;
+  box-shadow: 0 2px 8px rgba(28, 36, 48, 0.06);
+}
+
+.messages__input {
+  width: 100%;
+  min-height: 96px;
+  resize: none;
+  font: inherit;
+  font-size: var(--font-lg);
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+}
+
+.messages__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.messages__actions .btn,
+.messages__draw {
+  min-height: 64px;
+  min-width: 140px;
+  padding: 0 22px;
+  border-radius: 18px;
+  font-size: var(--font-md);
+  font-weight: 800;
+}
+
+.messages__readonly {
+  margin-top: auto;
+}
+
+.messages__doodle {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px 16px;
+  background: var(--bg);
+  min-height: 0;
+}
+
+.messages__doodle .doodle {
+  flex: 1;
+  min-height: 0;
+}
+
+html[data-theme='airy'] .messages__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+/* The people tab phone field sits beside the name on a wide wall, under it on a phone. */
+.row__phone {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+}
+
+.messages__send-doodle {
+  flex: none;
+  min-height: 64px;
+  min-width: 180px;
+  padding: 0 22px;
+  border-radius: 18px;
+  font-weight: 800;
+}
+
+.messages__open-doodle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 64px;
+  margin: 6px 0 2px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+/* Recipient picker used from the Messages list and from the Doodle pad. */
+.doodle-send {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 18px 16px;
+  background: var(--bg);
+}
+
+.doodle-send__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex: none;
+  min-width: 0;
+}
+
+.doodle-send__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-xl);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doodle-send__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-height: 64px;
+  min-width: 120px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.doodle-send__back:focus-visible,
+.doodle-send__person:focus-visible,
+.messages__send-doodle:focus-visible,
+.messages__open-doodle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.doodle-send__empty,
+.doodle-send__done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  max-width: 36rem;
+  font-size: var(--font-md);
+  line-height: 1.4;
+}
+
+.doodle-send__threads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.doodle-send__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  padding-bottom: 8px;
+}
+
+.doodle-send__person {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 96px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--bg-elev);
+  box-shadow: 0 10px 28px rgba(28, 36, 48, 0.06);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  touch-action: manipulation;
+}
+
+.doodle-send__person[aria-pressed='true'] {
+  box-shadow: 0 0 0 3px var(--accent), 0 10px 28px rgba(28, 36, 48, 0.06);
+}
+
+.doodle-send__person:disabled,
+.doodle-send__person--no-phone {
+  opacity: 1;
+  cursor: default;
+}
+
+.doodle-send__person--no-phone .doodle-send__hint {
+  color: var(--text-dim);
+}
+
+.doodle-send__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.85rem;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.doodle-send__meta {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doodle-send__name {
+  font-size: var(--font-lg);
+  font-weight: 800;
+}
+
+.doodle-send__hint {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+}
+
+.doodle-send__check {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.doodle-send__compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  padding-top: 8px;
+}
+
+.doodle-send__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.doodle-send__caption input {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 500;
+}
+
+.doodle-send__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.doodle-send__actions .btn {
+  min-height: 64px;
+  min-width: 140px;
+  border-radius: 18px;
+  font-weight: 800;
+}
+
+html[data-theme='airy'] .doodle-send__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+@media (max-height: 700px) {
+  .doodle-send__person {
+    min-height: 72px;
+    padding: 10px 14px;
+  }
+
+  .doodle-send__avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .doodle-send__caption input,
+  .doodle-send__back,
+  .doodle-send__actions .btn,
+  .messages__send-doodle,
+  .messages__back,
+  .messages__chip,
+  .messages__open-doodle,
+  .messages__actions .btn {
+    min-height: 64px;
+  }
+}
+
+
+.messages__avatar--header {
+  width: 56px;
+  height: 56px;
+  font-size: 1.45rem;
+}
+
+.messages__toast {
+  margin: 0;
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 28%, var(--bg-elev));
+  color: var(--text);
+  font-size: var(--font-lg);
+  font-weight: 800;
+  text-align: center;
+}
+
+.messages__need-phone {
+  margin-top: auto;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: var(--bg-elev);
+  box-shadow: 0 8px 20px rgba(28, 36, 48, 0.06);
+  font-size: var(--font-lg);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.messages__need-phone p {
+  margin: 0;
+}
+
+.messages__draw {
+  background: var(--bg-elev-2);
+  color: var(--text);
+}
+
+.messages__doodle .messages__actions {
+  justify-content: space-between;
+}
+
+html[data-scale='wall'] .messages__back,
+html[data-scale='wall'] .messages__chip,
+html[data-scale='wall'] .messages__send-doodle,
+html[data-scale='wall'] .messages__open-doodle,
+html[data-scale='wall'] .messages__actions .btn,
+html[data-scale='wall'] .messages__draw,
+html[data-scale='wall'] .doodle-send__back,
+html[data-scale='wall'] .doodle-send__actions .btn,
+html[data-scale='wall'] .doodle-send__caption input {
+  min-height: 72px;
+}
+
+html[data-scale='wall'] .messages__avatar,
+html[data-scale='wall'] .doodle-send__avatar {
+  width: 88px;
+  height: 88px;
+  font-size: 2.1rem;
+}
+
+html[data-scale='wall'] .messages__avatar--header {
+  width: 72px;
+  height: 72px;
+  font-size: 1.85rem;
+}
+
+html[data-scale='wall'] .messages__person,
+html[data-scale='wall'] .doodle-send__person {
+  min-height: 112px;
+}
+
+.messages__draw:focus-visible,
+.messages__actions .btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.messages-provider {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1;
+}
+
+.messages-provider__btn {
+  min-height: 56px;
+  min-width: 140px;
+  padding: 0 22px;
+  border-radius: 18px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(28, 36, 48, 0.08);
+  touch-action: manipulation;
+}
+
+.messages-provider__btn[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.signal-link {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 32px 32px;
+  background: var(--bg);
+  overflow: auto;
+}
+
+.signal-link__bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 960px;
+}
+
+.signal-link__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 56px;
+  min-width: 120px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.signal-link__title {
+  margin: 0;
+  font-size: var(--font-xl);
+}
+
+.signal-link__instructions,
+.signal-link__status {
+  margin: 0;
+  max-width: 36rem;
+  text-align: center;
+  font-size: var(--font-lg);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.signal-link__qr {
+  width: min(480px, 80vw);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  padding: 18px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(28, 36, 48, 0.12);
+}
+
+.signal-link__back:focus-visible,
+.messages-provider__btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+html[data-theme='airy'] .signal-link__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}

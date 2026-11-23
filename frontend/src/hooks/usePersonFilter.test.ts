@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPersonVisible, parseHidden, toggleId } from './usePersonFilter'
+import { isPersonVisible, parseHidden, personFilterApplies, toggleId } from './usePersonFilter'
 
 describe('parseHidden', () => {
   it('treats an empty store as everyone visible', () => {
@@ -52,5 +52,25 @@ describe('isPersonVisible', () => {
     // not empty the calendar.
     expect(isPersonVisible([1, 2, 3], null)).toBe(true)
     expect(isPersonVisible([1, 2, 3], undefined)).toBe(true)
+  })
+})
+
+describe('personFilterApplies', () => {
+  it('is used by the Calendar and the Chores page', () => {
+    expect(personFilterApplies('/calendar')).toBe(true)
+    expect(personFilterApplies('/calendar/week')).toBe(true)
+    expect(personFilterApplies('/calendar/month')).toBe(true)
+    expect(personFilterApplies('/chores')).toBe(true)
+  })
+
+  it('is ignored on Today and the other wall pages', () => {
+    expect(personFilterApplies('/dashboard')).toBe(false)
+    expect(personFilterApplies('/lists')).toBe(false)
+    expect(personFilterApplies('/home')).toBe(false)
+    expect(personFilterApplies('/photos')).toBe(false)
+    expect(personFilterApplies('/meals')).toBe(false)
+    expect(personFilterApplies('/show-on-tv')).toBe(false)
+    expect(personFilterApplies('/settings')).toBe(false)
+    expect(personFilterApplies('/')).toBe(false)
   })
 })

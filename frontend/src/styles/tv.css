@@ -1,0 +1,66 @@
+html[data-tv='true'] :focus {
+  outline: 4px solid var(--accent) !important;
+  outline-offset: 3px;
+  scroll-margin: 16px;
+}
+/* Same idea as the profile-row exception below: the side rail is narrow, so a
+   4px ring with a 3px outward offset was clipped on the left and ran over
+   neighbouring items. Keep the ring inside the button. */
+html[data-tv='true'] .shell__nav .navbtn:focus {
+  outline: 4px solid var(--accent) !important;
+  outline-offset: -5px;
+}
+html[data-tv='true'] .shell { padding: 20px; }
+html[data-tv='true'] button,
+html[data-tv='true'] input,
+html[data-tv='true'] select { min-height: 52px; }
+html[data-tv='true'] .modal__card { max-height: 88vh; overflow-y: auto; }
+
+/* Keep the focus border inside the profile row's scrolling viewport. */
+html[data-tv='true'] .airybar__people :is(.airy-avatar, .airybar__everyone) {
+  flex-shrink: 0;
+  min-height: 56px;
+  border: 2px solid #84949f;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+html[data-tv='true'] .airybar__people :is(.airy-avatar, .airybar__everyone):focus {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  outline: none !important;
+}
+
+html[data-tv='true'] .airybar__people .airy-avatar[data-off='true'] {
+  opacity: 1;
+  filter: none;
+  background: #f0f2f4 !important;
+  color: #52616d;
+  border-style: dashed;
+}
+
+.tv-choices { color: #1c2430; background: white; border: 1px solid #84949f; border-radius: 16px; width: min(520px, 85vw); max-height: 80vh; padding: 24px; }
+.tv-choices::backdrop { background: rgb(0 0 0 / 45%); }
+.tv-choices button { display: block; width: 100%; margin: 10px 0; }
+html[data-tv='true'] .shell__nav .version-badge { display: none; }
+
+html[data-tv='true'] .month__head,
+html[data-tv='true'] .month__cell { border: 0; }
+html[data-tv='true'] .month__cell {
+  background: transparent;
+  border-radius: 12px;
+  padding: 3px 6px;
+}
+html[data-tv='true'] .month__cell[data-outside='true'] { visibility: hidden; }
+html[data-tv='true'] .month__addlayer:focus { outline: none !important; }
+html[data-tv='true'] .month__cell:focus-within {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+html[data-tv='true'] .month__events { gap: 2px; }
+html[data-tv='true'] .month__events .chip--month {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 1px 5px;
+  font-size: 0.75rem;
+  line-height: 1.15;
+}

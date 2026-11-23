@@ -71,6 +71,18 @@ data class TvState(
 )
 
 class TvViewModel(app: Application) : AndroidViewModel(app) {
+    private val uiPrefs = app.getSharedPreferences("mantel_tv_ui", 0)
+    val displayId: String = uiPrefs.getString("display_id", null) ?: java.util.UUID.randomUUID().toString().also {
+        uiPrefs.edit().putString("display_id", it).apply()
+    }
+    val displayName = MutableStateFlow(uiPrefs.getString("display_name", "Google TV") ?: "Google TV")
+    suspend fun mealPlan(day: LocalDate) = client.mealPlan(day.toString(), day.plusDays(6).toString())
+    suspend fun saveMeal(day: LocalDate, meal: String, title: String) = client.saveMeal(day.toString(), meal, title)
+    suspend fun pollDisplay(name: String) = client.pollDisplay(displayId, name)
+    fun nameDisplay(name: String) {
+        displayName.value = name.trim()
+        uiPrefs.edit().putString("display_name", displayName.value).apply()
+    }
     private val store = SecureTokenStore(app)
     private val origin = MutableStateFlow<String?>(null)
     private val token = MutableStateFlow<String?>(null)
@@ -85,7 +97,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     private var wantResync = false
     private var coalescing = false
 
-    private val _state = MutableStateFlow(TvState())
+    private val _state = MutableStateFlow(TvState(anchor = runCatching { LocalDate.parse(uiPrefs.getString("anchor", null)) }.getOrDefault(LocalDate.now())))
     val state: StateFlow<TvState> = _state
 
     init {
@@ -149,6 +161,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setAnchor(day: LocalDate) {
+        uiPrefs.edit().putString("anchor", day.toString()).apply()
         _state.update { it.copy(anchor = day) }
         viewModelScope.launch { refresh() }
     }
@@ -249,6 +262,18 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
             } catch (e: MantelException) {
                 onError(e.message ?: "Could not add that")
+            }
+        }
+    }
+
+    fun saveChore(body: kotlinx.serialization.json.JsonObject, result: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                client.saveChore(null, body)
+                result(null)
+                refresh()
+            } catch (e: MantelException) {
+                result(e.message ?: "Could not save chore")
             }
         }
     }
@@ -409,7 +434,7 @@ class TvViewModel(app: Application) : AndroidViewModel(app) {
                     board = board,
                     offline = false,
                     offlineDetail = "",
-                    anchor = if (it.phase == Phase.Loading) dev.mantel.calendar.core.todayIn(zone) else it.anchor,
+
                 )
             }
             screenCache.save(ScreenCache(at, settings, users, calendars, events, lists, board))

@@ -105,7 +105,7 @@ export function useMouseDragScroll(ref: RefObject<HTMLElement | null>) {
  *  stopping mid-way (to read the middle of a month) stays put. */
 export const SNAP_FRACTION = 0.12
 
-/** The pull of a scroller's home position (Week/3 Day: today's default view), as a
+/** The pull of a scroller's home position (Week: today's default view), as a
  *  fraction of a unit. Medium rather than light: coming back to "now" should land on it
  *  without having to be lined up by hand, but a distant stop is still left alone. */
 export const HOME_FRACTION = 0.5

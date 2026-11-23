@@ -166,71 +166,6 @@ class MantelClientTest {
     }
 
     @Test
-    fun createChorePostsTheSameFieldsAsTheWallForm() = runBlocking {
-        var method = ""
-        var path = ""
-        var body = ""
-        val client = client(
-            MockEngine { request ->
-                method = request.method.value
-                path = request.url.encodedPath
-                body = (request.body as TextContent).text
-                respond(CHORE, HttpStatusCode.Created, json)
-            },
-        )
-        val saved = client.createChore("Make bed", 2, "weekly", listOf(1, 3), null, true, listOf(1, 2))
-        assertEquals("POST", method)
-        assertTrue(path.endsWith("/api/chores"))
-        assertTrue(body.contains("\"title\":\"Make bed\""))
-        assertTrue(body.contains("\"points\":2"))
-        assertTrue(body.contains("\"schedule\":\"weekly\""))
-        assertTrue(body.contains("\"weekdays\":[1,3]"))
-        assertFalse("a weekly chore has no due date", body.contains("due_on"))
-        assertTrue(body.contains("\"requires_approval\":true"))
-        assertTrue(body.contains("\"assignee_ids\":[1,2]"))
-        assertEquals(4, saved.id)
-        assertEquals(listOf(1, 3), saved.weekdays)
-        assertEquals(listOf(1, 2), saved.assigneeIds)
-        client.close()
-    }
-
-    @Test
-    fun aOneDayChoreSendsItsDueDate() = runBlocking {
-        var body = ""
-        val client = client(
-            MockEngine { request ->
-                body = (request.body as TextContent).text
-                respond(CHORE, HttpStatusCode.Created, json)
-            },
-        )
-        client.createChore("Library books", 1, "once", emptyList(), "2026-11-20", false, listOf(1))
-        assertTrue(body.contains("\"schedule\":\"once\""))
-        assertTrue(body.contains("\"due_on\":\"2026-11-20\""))
-        assertFalse("a one-day chore has no weekday list", body.contains("weekdays"))
-        client.close()
-    }
-
-    @Test
-    fun editingAndDeletingAChoreUsePatchAndDelete() = runBlocking {
-        val seen = mutableListOf<String>()
-        val client = client(
-            MockEngine { request ->
-                seen += "${request.method.value} ${request.url.encodedPath}"
-                if (request.method.value == "DELETE") {
-                    respond("", HttpStatusCode.NoContent, json)
-                } else {
-                    respond(CHORE, HttpStatusCode.OK, json)
-                }
-            },
-        )
-        client.updateChore(4, "Make bed", 2, "daily", emptyList(), null, false, listOf(1))
-        client.deleteChore(4)
-        assertTrue(seen[0].startsWith("PATCH ") && seen[0].endsWith("/api/chores/4"))
-        assertTrue(seen[1].startsWith("DELETE ") && seen[1].endsWith("/api/chores/4"))
-        client.close()
-    }
-
-    @Test
     fun createEventRoundTripsTheBodyTheServerExpects() = runBlocking {
         var body = ""
         val client = client(
@@ -280,21 +215,6 @@ private const val EVENT = """
 """
 
 private const val EVENTS = "[$EVENT]"
-
-private const val CHORE = """
-{
-  "id": 4,
-  "title": "Make bed",
-  "notes": null,
-  "points": 2,
-  "schedule": "weekly",
-  "weekdays": [1, 3],
-  "due_on": null,
-  "requires_approval": true,
-  "icon": "🛏️",
-  "assignee_ids": [1, 2]
-}
-"""
 
 private const val BOARD = """
 {

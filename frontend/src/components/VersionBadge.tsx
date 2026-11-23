@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useVersionPoll } from '../hooks/useVersionPoll'
+import { useDismissGuard } from './dismissGuard'
 import { dockerUpgradeHint, hasUpdate, safeReleaseUrl, versionBadgeLabel } from './updateNotice'
 
 export function VersionBadge() {
@@ -29,8 +30,8 @@ export function VersionBadge() {
         )}
       </button>
       {open && (
-        <div className="about-popover" onClick={() => setOpen(false)} role="dialog">
-          <div className="about-popover__card" onClick={(e) => e.stopPropagation()}>
+        <AboutDialog onClose={() => setOpen(false)}>
+          <div className="about-popover__card">
             <h2 style={{ marginTop: 0 }}>Family Calendar</h2>
             <p style={{ color: 'var(--text-dim)' }}>
               Version {version}
@@ -70,8 +71,18 @@ export function VersionBadge() {
               Close
             </button>
           </div>
-        </div>
+        </AboutDialog>
       )}
     </>
+  )
+}
+
+/** The about card's backdrop: a tap outside it, or Escape, closes it. */
+function AboutDialog({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const guard = useDismissGuard({ dirty: false, onClose })
+  return (
+    <div className="about-popover" role="dialog" aria-modal="true" aria-label="About this app" {...guard.backdropProps}>
+      {children}
+    </div>
   )
 }

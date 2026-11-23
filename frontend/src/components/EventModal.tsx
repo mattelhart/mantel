@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useCalendars, useCreateEvent, useDeleteEvent, useUpdateEvent, useUsers } from '../api/hooks'
 import type { CalendarEvent } from '../api/types'
@@ -8,8 +8,10 @@ import { moveNote } from './moveNote'
 import { calendarsForProfile, initialSelection, profilesWithCalendars } from './eventProfiles'
 import { rememberLastTarget } from './lastEventTarget'
 import { DEFAULT_MINUTES, endFor, toLocalInput } from './eventTimes'
+import { useAiryTheme, useEventColor } from './eventColor'
 import { acquireReloadGuard } from '../hooks/useVersionPoll'
 import { type Freq, RecurrencePicker, buildRule, parseRule } from './RecurrencePicker'
+import { UnsavedChangesPrompt, useDismissGuard } from './dismissGuard'
 
 interface Props {
   event: CalendarEvent | null
@@ -28,6 +30,8 @@ function saveError(e: unknown, fallback = 'Could not save the event.'): string {
 export function EventModal({ event, defaultStart, onClose }: Props) {
   const { data: calendars = [] } = useCalendars()
   const { data: users = [] } = useUsers()
+  const airy = useAiryTheme()
+  const fill = useEventColor()
   const create = useCreateEvent()
   const update = useUpdateEvent()
   const remove = useDeleteEvent()
@@ -78,11 +82,19 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [repeat, setRepeat] = useState(() => parseRule(event?.recurrence_rule))
 
+  // What the panel opened with, for "are there unsaved edits?". The selection is part of
+  // it only once calendars have arrived and the opening choice has been made.
+  const [opening] = useState(() => ({
+    title, location, description, allDay, start, end, repeat: JSON.stringify(repeat),
+  }))
+  const openingSel = useRef(start0)
+
   useEffect(() => {
     // Calendars arrive after the first render, so the opening choice has to be made
     // again once they do.
     if (calendarId === null && choices.length > 0) {
       const pick = initialSelection(choices, users, event?.calendar_id ?? null)
+      openingSel.current = pick
       setProfileId(pick.profileId)
       setCalendarId(pick.calendarId)
     }
@@ -91,21 +103,33 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
   // Hold off the kiosk auto-reload while someone is mid-edit.
   useEffect(() => acquireReloadGuard(), [])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const busy = create.isPending || update.isPending || remove.isPending
 
-  const submit = async () => {
+  const dirty =
+    !readOnly &&
+    (title !== opening.title ||
+      location !== opening.location ||
+      description !== opening.description ||
+      allDay !== opening.allDay ||
+      start !== opening.start ||
+      end !== opening.end ||
+      JSON.stringify(repeat) !== opening.repeat ||
+      (calendarId !== null &&
+        (calendarId !== openingSel.current.calendarId || profileId !== openingSel.current.profileId)))
+
+  /** Resolves true once the event is saved and the panel has closed; false when it
+   *  could not be (the reason is in `error`, and the panel stays open). */
+  const submit = async (): Promise<boolean> => {
+    const fail = (message: string) => {
+      setError(message)
+      return false
+    }
     setError(null)
-    if (!title.trim()) return setError('Give the event a title.')
-    if (calendarId === null) return setError('No writable calendar available.')
+    if (!title.trim()) return fail('Give the event a title.')
+    if (calendarId === null) return fail('No writable calendar available.')
     const startISO = allDay ? utcMidnight(start, 0) : new Date(start).toISOString()
     const endISO = allDay ? utcMidnight(end, 1) : new Date(end).toISOString()
-    if (endISO <= startISO) return setError('The end time must be after the start time.')
+    if (endISO <= startISO) return fail('The end time must be after the start time.')
 
     const body = {
       calendar_id: calendarId,
@@ -127,10 +151,15 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
         await update.mutateAsync({ id: event.id, ...body })
       }
       onClose()
+      return true
     } catch (e) {
-      setError(saveError(e))
+      return fail(saveError(e))
     }
   }
+
+  // Outside tap, Escape / Back and Cancel all come through here: a clean panel closes, a
+  // dirty one asks first.
+  const guard = useDismissGuard({ dirty, save: submit, onClose, busy })
 
   const destroy = async () => {
     if (!event) return
@@ -148,8 +177,8 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
   // and sized relative to a box that itself moves with the keyboard. That is the
   // floating, and the scrolling that worked only sometimes.
   return createPortal(
-    <div className="modal" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal__card" onClick={(e) => e.stopPropagation()}>
+    <div className="modal" role="dialog" aria-modal="true" {...guard.backdropProps}>
+      <div className="modal__card" inert={guard.confirming}>
         <h2 className="modal__title">{isNew ? 'New event' : readOnly ? 'Event' : 'Edit event'}</h2>
 
         {readOnly && (
@@ -180,6 +209,22 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
           />
         </label>
 
+        {airy ? (
+          <fieldset className="event-profiles">
+            <legend>Who is this for?</legend>
+            {profiles.map((profile) => (
+              <button key={profile.id ?? 'household'} type="button"
+                aria-pressed={profileId === profile.id} disabled={calendarLocked}
+                style={{ background: fill(users.find((u) => u.id === profile.id)?.color ?? '#cbd5e1') }}
+                onClick={() => {
+                  setProfileId(profile.id)
+                  setCalendarId(calendarsForProfile(choices, profile.id)[0]?.id ?? null)
+                }}>
+                {profile.name}
+              </button>
+            ))}
+          </fieldset>
+        ) : (
         <label className="field">
           <span>Who is this for?</span>
           <select
@@ -200,6 +245,7 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
             ))}
           </select>
         </label>
+        )}
 
         <label className="field">
           <span>Calendar</span>
@@ -297,7 +343,7 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
             </button>
           )}
           <div className="modal__spacer" />
-          <button className="btn" onClick={onClose} disabled={busy}>
+          <button className="btn" onClick={guard.requestClose} disabled={busy}>
             {readOnly ? 'Close' : 'Cancel'}
           </button>
           {!readOnly && (
@@ -307,6 +353,7 @@ export function EventModal({ event, defaultStart, onClose }: Props) {
           )}
         </div>
       </div>
+      {guard.confirming && <UnsavedChangesPrompt {...guard.promptProps} />}
     </div>
   ,
     document.body,

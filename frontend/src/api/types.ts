@@ -1,9 +1,12 @@
+import type { HomeLayoutPrefs } from '../views/home/homeModel'
+
 export interface User {
   id: number
   name: string
   color: string
   avatar_emoji: string | null
   sort_order: number
+  phone?: string | null
 }
 
 /** A connected Google or iCloud account. Credentials are never sent to the client. */
@@ -262,15 +265,32 @@ export interface AppSettings {
   ha_base_url: string
   ha_token: string
   ha_entity_id: string
+  /** Home Control: entity ids pinned to the top, and ones kept off the wall. */
+  home_favorites: string[]
+  home_hidden: string[]
+  /** How Home Control is arranged, one value for every screen (see homeModel.ts). */
+  home_layout?: HomeLayoutPrefs
   google_client_id: string
   google_client_secret: string
   public_base_url: string
+  twilio_account_sid?: string
+  twilio_auth_token?: string
+  twilio_from_number?: string
+  message_provider?: 'twilio' | 'signal'
+  signal_api_url?: string
+  signal_account_number?: string
   server: {
     version: string
     google_configured: boolean
     icloud_linked: boolean
     google_client_secret_set: boolean
     ha_token_set: boolean
+    twilio_account_sid_set?: boolean
+    twilio_auth_token_set?: boolean
+    twilio_configured?: boolean
+    signal_configured?: boolean
+    messages_configured?: boolean
+    messages_provider?: 'twilio' | 'signal'
     google_redirect_uri: string
     sync_enabled: boolean
     sync_interval_seconds: number

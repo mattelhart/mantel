@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { queryClient } from './api/queryClient'
+import { MealsPage, ShowOnTvPage } from './HouseholdDisplay'
 import { App } from './App'
 import './styles/global.css'
 import './styles/calendar.css'
@@ -10,6 +11,10 @@ import './styles/settings.css'
 import './styles/dashboard.css'
 import './styles/screensaver.css'
 import './styles/chores.css'
+import './styles/home.css'
+import './styles/games.css'
+import './styles/cameras.css'
+import './styles/messages.css'
 import '@fontsource/nunito/latin-400.css'
 import '@fontsource/nunito/latin-600.css'
 import '@fontsource/nunito/latin-700.css'
@@ -21,11 +26,19 @@ import '@fontsource/nunito/latin-ext-800.css'
 import { CalendarPage } from './views/calendar/CalendarPage'
 import { ChoresPage } from './views/chores/ChoresPage'
 import { DashboardPage } from './views/dashboard/DashboardPage'
+import { CameraViewPage, CamerasPage } from './views/cameras/CamerasPage'
+import { GamePlayPage, GamesPage } from './views/games/GamesPage'
+import { HomePage } from './views/home/HomePage'
 import { ListsPage } from './views/lists/ListsPage'
 import { PhotosPage } from './views/photos/PhotosPage'
 import { SettingsPage } from './views/settings/SettingsPage'
+import { MessagesPage, MessageThreadPage } from './views/messages/MessagesPage'
 import { hydrate, watchQueries } from './offline/persist'
 import './styles/airy.css'
+import './styles/tv.css'
+import { installTvNavigation } from './tv/navigation'
+
+installTvNavigation()
 
 const router = createBrowserRouter([
   {
@@ -34,17 +47,26 @@ const router = createBrowserRouter([
     children: [
       // Opening the app with no route lands on today. A week is what you plan with;
       // a day is what you came to check.
-      { index: true, element: <Navigate to="/calendar/today" replace /> },
+      { index: true, element: <Navigate to="/calendar/week" replace /> },
       { path: 'calendar/:view', element: <CalendarPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'meals', element: <MealsPage /> },
+      { path: 'show-on-tv', element: <ShowOnTvPage /> },
       { path: 'lists', element: <ListsPage /> },
+      { path: 'home', element: <HomePage /> },
       { path: 'chores', element: <ChoresPage /> },
       { path: 'photos', element: <PhotosPage /> },
+      { path: 'games', element: <GamesPage /> },
+      { path: 'games/:id', element: <GamePlayPage /> },
+      { path: 'cameras', element: <CamerasPage /> },
+      { path: 'cameras/:id', element: <CameraViewPage /> },
+      { path: 'messages', element: <MessagesPage /> },
+      { path: 'messages/:id', element: <MessageThreadPage /> },
       { path: 'settings', element: <SettingsPage /> },
       // The API guide used to be its own page. Keep old bookmarks and kiosk
       // shortcuts working by sending them to the tab that replaced it.
       { path: 'docs', element: <Navigate to="/settings?tab=api" replace /> },
-      { path: '*', element: <Navigate to="/calendar/today" replace /> },
+      { path: '*', element: <Navigate to="/calendar/week" replace /> },
     ],
   },
 ])

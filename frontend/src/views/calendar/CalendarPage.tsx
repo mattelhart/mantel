@@ -9,7 +9,7 @@ import {
   startOfMonth,
 } from 'date-fns'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useEvents, useSettings, useUpdateEvent, useUsers } from '../../api/hooks'
 import type { CalendarEvent } from '../../api/types'
@@ -18,8 +18,7 @@ import { EventModal } from '../../components/EventModal'
 import { usePersonFilter } from '../../hooks/usePersonFilter'
 import { useSwipe } from '../../hooks/useSwipe'
 import { MonthView, type MonthScrollRequest } from './MonthView'
-import { ScheduleView } from './ScheduleView'
-import { TimeGridView } from './TimeGridView'
+import { WeekCardsView } from './WeekCardsView'
 import { TimeStripView, type StripScrollRequest } from './TimeStripView'
 import {
   DAY_EXTEND_BATCH,
@@ -47,34 +46,32 @@ import {
  *  short events big enough to tap. */
 const SCALE_FACTOR: Record<string, number> = { normal: 1, large: 1.2, wall: 1.45 }
 
-/** The phone shows one nav entry for the calendar, so the four views need a home
- *  on the page itself. Hidden above phone size, where the nav still lists them. */
+/** The phone shows one nav entry for the calendar, so the two views need a home on the
+ *  page itself. Day, 3 Day and Schedule are gone: Week and Month show the same events. */
 const VIEW_TABS = [
-  { kind: 'today', label: 'Day' },
-  { kind: '3day', label: '3 Day' },
   { kind: 'week', label: 'Week' },
   { kind: 'month', label: 'Month' },
-] as const
-
-/** The Airy switcher matches a wall calendar: Day, Week, Month, and an agenda. */
-const AIRY_TABS = [
-  { kind: 'today', label: 'Day' },
-  { kind: 'week', label: 'Week' },
-  { kind: 'month', label: 'Month' },
-  { kind: 'schedule', label: 'Schedule' },
 ] as const
 
 export function CalendarPage() {
   const { view } = useParams()
   const navigate = useNavigate()
   const airy = useAiryTheme()
+  const [weekLayout, setWeekLayout] = useState<'cards' | 'hours'>('cards')
   const qc = useQueryClient()
   const updateEvent = useUpdateEvent()
   const [moveError, setMoveError] = useState<string | null>(null)
   const { data: settings } = useSettings()
   const { data: users = [] } = useUsers()
   const { toggle, showEveryone, isVisible, anyHidden } = usePersonFilter()
-  const [anchor, setAnchor] = useState(() => new Date())
+  const [anchor, setAnchor] = useState(() => {
+    const saved = sessionStorage.getItem('mantel.calendar.anchor')
+    const date = saved && isViewKind(view) ? new Date(saved) : new Date()
+    return Number.isNaN(date.getTime()) ? new Date() : date
+  })
+  useEffect(() => {
+    sessionStorage.setItem('mantel.calendar.anchor', anchor.toISOString())
+  }, [anchor])
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [creatingAt, setCreatingAt] = useState<Date | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -93,10 +90,11 @@ export function CalendarPage() {
   // Where the last ‹/› press is heading, for the strip (see scrollToDay).
   const pendingDay = useRef<{ day: Date; at: number } | null>(null)
 
-  // Week and 3 Day scroll through a window of days the same way. `stripStart` is the first
+  // Week scrolls through a window of days the same way. `stripStart` is the first
   // fully visible day: it names the toolbar title and picks what to fetch, while `anchor`
   // only follows it so the other views open somewhere sensible.
-  const stripKind = isStripKind(kind) ? kind : null
+  const compactWeek = airy && kind === 'week' && weekLayout === 'cards'
+  const stripKind = isStripKind(kind) && !compactWeek ? kind : null
   const [stripOpen, setStripOpen] = useState(() => ({
     epoch: 0,
     initial: stripStartFor(stripKind ?? 'week', anchor, weekStartsOn),
@@ -104,9 +102,11 @@ export function CalendarPage() {
   const [stripWin, setStripWin] = useState<DayWindow>(() => dayWindow(stripOpen.initial))
   const [stripStart, setStripStart] = useState(stripOpen.initial)
   const [stripReq, setStripReq] = useState<StripScrollRequest | null>(null)
+  const [prevCompact, setPrevCompact] = useState(compactWeek)
   const [prevKind, setPrevKind] = useState(kind)
   const [prevWeekStart, setPrevWeekStart] = useState(weekStartsOn)
-  if (kind !== prevKind || weekStartsOn !== prevWeekStart) {
+  if (kind !== prevKind || weekStartsOn !== prevWeekStart || compactWeek !== prevCompact) {
+    setPrevCompact(compactWeek)
     setPrevKind(kind)
     setPrevWeekStart(weekStartsOn)
     // Coming back to month view from Week/Day: open on wherever the anchor is now.
@@ -216,8 +216,9 @@ export function CalendarPage() {
   }
   const swipe = useSwipe(goStep)
 
-  // e.g. /calendar/fortnight. Same landing place as the app's front door.
-  if (!kind) return <Navigate to="/calendar/today" replace />
+  // /calendar/today, /3day, /schedule (removed views) or anything unknown: land on Week,
+  // the same place as the app's front door.
+  if (!kind) return <Navigate to="/calendar/week" replace />
 
   const openEvent = (e: CalendarEvent) => {
     setEditing(e)
@@ -324,7 +325,7 @@ export function CalendarPage() {
       )}
 
       <div className="viewtabs" role="tablist" aria-label="Calendar view">
-        {(airy ? AIRY_TABS : VIEW_TABS).map((t) => (
+        {VIEW_TABS.map((t) => (
           <button
             key={t.kind}
             className="viewtabs__tab"
@@ -336,9 +337,19 @@ export function CalendarPage() {
         ))}
       </div>
 
-      {/* Week and 3 Day scroll natively, so the swipe-to-page handler would only fight it. */}
-      <div className="calpage__body" {...(stripKind ? {} : swipe)}>
-        {kind === 'month' ? (
+      {airy && kind === 'week' && (
+        <div className="week-layout" role="group" aria-label="Week layout">
+          <button aria-pressed={weekLayout === 'cards'} onClick={() => setWeekLayout('cards')}>Compact</button>
+          <button aria-pressed={weekLayout === 'hours'} onClick={() => setWeekLayout('hours')}>Hourly</button>
+        </div>
+      )}
+
+      {/* Week scrolls natively, so the swipe-to-page handler would only fight it. */}
+      <div className="calpage__body" {...(stripKind || compactWeek ? {} : swipe)}>
+        {compactWeek ? (
+          <WeekCardsView days={range.days} events={events} use24h={settings?.time_format_24h ?? false}
+            onSelectEvent={openEvent} onSelectSlot={openSlot} />
+        ) : kind === 'month' ? (
           <MonthView
             key={monthOpen.epoch}
             window={monthWin}
@@ -348,14 +359,6 @@ export function CalendarPage() {
             scrollRequest={scrollReq}
             onVisibleMonthChange={onVisibleMonthChange}
             onExtend={(side) => setMonthWin((w) => extendWindow(w, side))}
-            onSelectEvent={openEvent}
-            onSelectSlot={openSlot}
-          />
-        ) : kind === 'schedule' ? (
-          <ScheduleView
-            days={range.days}
-            events={events}
-            use24h={settings?.time_format_24h ?? false}
             onSelectEvent={openEvent}
             onSelectSlot={openSlot}
           />
@@ -378,19 +381,7 @@ export function CalendarPage() {
             onSelectSlot={openSlot}
             onReschedule={airy ? reschedule : undefined}
           />
-        ) : (
-          <TimeGridView
-            days={range.days}
-            events={events}
-            dayStartHour={settings?.day_start_hour ?? 7}
-            dayEndHour={settings?.day_end_hour ?? 22}
-            use24h={settings?.time_format_24h ?? false}
-            hourHeight={64 * SCALE_FACTOR[settings?.display_scale ?? 'normal']}
-            onSelectEvent={openEvent}
-            onSelectSlot={openSlot}
-            onReschedule={airy ? reschedule : undefined}
-          />
-        )}
+        ) : null}
       </div>
 
       {airy && (
@@ -423,7 +414,6 @@ function nextHour(): Date {
 
 function titleFor(kind: string, start: Date, end: Date, anchor: Date): string {
   if (kind === 'month') return format(anchor, 'MMMM yyyy')
-  if (kind === 'today') return format(start, 'EEEE, MMMM d')
   const last = new Date(end.getTime() - 1)
   return isSameMonth(start, last)
     ? `${format(start, 'MMM d')} – ${format(last, 'd, yyyy')}`
