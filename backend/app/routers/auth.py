@@ -13,6 +13,8 @@ implement. The same text is summarised on each route below, which is what
 `/api/docs` renders.
 """
 
+import io
+import re
 from urllib.parse import quote, urlparse
 
 import segno
@@ -118,6 +120,29 @@ def _safe_base(url: str) -> str | None:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def _qr_svg(payload: str) -> str:
+    """The QR as a standalone SVG document an <img> can show.
+
+    segno's `svg_inline` is meant to be pasted into HTML, so it leaves out
+    `xmlns="http://www.w3.org/2000/svg"`; as an image (a data: URI) that renders as a
+    broken picture. This is the full form, with a viewBox so CSS can size it, a solid white
+    background and a four-module quiet zone so a scanner reads it on a dark theme too."""
+    out = io.BytesIO()
+    segno.make(payload, error="m").save(
+        out, kind="svg", scale=1, border=4, dark="#000", light="#fff", xmldecl=False, svgns=True
+    )
+    svg = out.getvalue().decode("utf-8")
+    size = re.search(r'width="(\d+)" height="(\d+)"', svg)
+    if size and "viewBox" not in svg:
+        svg = svg.replace(
+            size.group(0),
+            f'viewBox="0 0 {size.group(1)} {size.group(2)}" width="{size.group(1)}" '
+            f'height="{size.group(2)}" shape-rendering="crispEdges"',
+            1,
+        )
+    return svg
+
+
 def _qr_payload(base: str, code: str) -> str:
     return f"mantel://pair?v=1&base={quote(base, safe='')}&code={quote(code, safe='')}"
 
@@ -182,7 +207,7 @@ def create_pairing_code(
     db.commit()
 
     payload = _qr_payload(base, code)
-    svg = segno.make(payload, error="m").svg_inline(scale=4)
+    svg = _qr_svg(payload)
     return PairingCodeOut(
         code=code,
         expires_at=_iso(expires) or "",

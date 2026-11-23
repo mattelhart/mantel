@@ -42,6 +42,26 @@ class PairingAndRepeatTest {
     }
 
     @Test
+    fun theQrTheWallShowsNowIsReadByThePhone() {
+        // Exactly what backend/app/routers/auth.py builds for the Pi at 10.0.15.178.
+        val payload = "mantel://pair?v=1&base=http%3A%2F%2F10.0.15.178%3A8080&code=TFT3-L6Y7"
+        val link = parsePairingLink(payload)
+        assertEquals("http://10.0.15.178:8080", link?.base)
+        assertEquals("TFT3L6Y7", link?.code)
+        assertTrue(cleartextPermitted(link!!.base))
+    }
+
+    @Test
+    fun aCodeTypedWithOrWithoutTheDashIsTheSameCode() {
+        for (typed in listOf("TFT3-L6Y7", "tft3-l6y7", "TFT3L6Y7", " TFT3 L6Y7 ", "TFT3\u2013L6Y7")) {
+            assertTrue(typed, pairCodeComplete(typed))
+            assertEquals("TFT3L6Y7", normalizePairCode(typed))
+        }
+        assertFalse(pairCodeComplete("TFT3-L6Y"))
+        assertFalse("a typed 0 is not in the alphabet", pairCodeComplete("TFT3-L6Y0"))
+    }
+
+    @Test
     fun weeklyRuleRoundTripsTheDaysTheWallSends() {
         val choice = RepeatChoice(RepeatFreq.WEEKLY, listOf("WE", "MO"), "2026-12-31")
         val rule = buildRepeat(choice)

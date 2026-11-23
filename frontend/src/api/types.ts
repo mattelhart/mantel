@@ -1,3 +1,5 @@
+import type { HomeLayoutPrefs } from '../views/home/homeModel'
+
 export interface User {
   id: number
   name: string
@@ -262,9 +264,11 @@ export interface AppSettings {
   ha_base_url: string
   ha_token: string
   ha_entity_id: string
-  /** Home page: entity ids pinned to the top, and ones kept off the wall. */
+  /** Home Control: entity ids pinned to the top, and ones kept off the wall. */
   home_favorites: string[]
   home_hidden: string[]
+  /** How Home Control is arranged, one value for every screen (see homeModel.ts). */
+  home_layout?: HomeLayoutPrefs
   google_client_id: string
   google_client_secret: string
   public_base_url: string

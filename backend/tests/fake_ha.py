@@ -80,6 +80,20 @@ def default_states() -> list[dict]:
             },
         },
         {
+            "entity_id": "media_player.living_room_tv",
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Living Room TV",
+                # turn on + off, volume set, mute, volume step, select source
+                "supported_features": 4 | 8 | 128 | 256 | 1024 | 2048,
+                "volume_level": 0.25,
+                "is_volume_muted": False,
+                "source": "HDMI1",
+                "source_list": ["HDMI1", "HDMI2", "Netflix"],
+                "device_class": "tv",
+            },
+        },
+        {
             "entity_id": "scene.movie_night",
             "state": "scening",
             "attributes": {"friendly_name": "Movie Night"},
@@ -109,13 +123,30 @@ AREAS = [
     {"area_id": "kitchen", "name": "Kitchen"},
     {"area_id": "bedroom", "name": "Bedroom"},
 ]
-DEVICES = [{"id": "dev_den", "name": "Den Shade", "area_id": "living_room", "name_by_user": None}]
+DEVICES = [
+    {"id": "dev_den", "name": "Den Shade", "area_id": "living_room", "name_by_user": None},
+    {
+        "id": "dev_tv",
+        "name": "Living Room TV",
+        "area_id": "living_room",
+        "name_by_user": None,
+        "manufacturer": "Samsung Electronics",
+        "model": "UN55CU7000FXZA",
+        "model_id": "UN55CU7000FXZA",
+    },
+]
 ENTITIES = [
     {"entity_id": "light.living_room_lamp", "area_id": "living_room", "device_id": None},
     {"entity_id": "light.kitchen_pendant", "area_id": "kitchen", "device_id": None},
     {"entity_id": "light.old_bulb", "area_id": "kitchen", "disabled_by": "user"},
     {"entity_id": "light.bridge_identify", "entity_category": "config"},
     {"entity_id": "fan.bedroom_fan", "area_id": "bedroom"},
+    {
+        "entity_id": "media_player.living_room_tv",
+        "area_id": "living_room",
+        "device_id": "dev_tv",
+        "original_device_class": "tv",
+    },
     # Area comes from the device, as it does for most Caseta entities.
     {"entity_id": "cover.den_shade", "device_id": "dev_den", "area_id": None},
 ]
@@ -204,6 +235,12 @@ class FakeHA:
                 new["state"] = "closed" if domain == "cover" else "off"
             elif service == "set_percentage":
                 new["attributes"]["percentage"] = data["percentage"]
+            elif service == "volume_set":
+                new["attributes"]["volume_level"] = data["volume_level"]
+            elif service == "volume_mute":
+                new["attributes"]["is_volume_muted"] = data["is_volume_muted"]
+            elif service == "select_source":
+                new["attributes"]["source"] = data["source"]
             elif service == "unlock":
                 new["state"] = "unlocked"
             await self._set_state(new)

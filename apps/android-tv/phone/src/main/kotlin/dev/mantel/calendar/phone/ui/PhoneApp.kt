@@ -151,7 +151,7 @@ fun MantelPhoneApp(vm: PhoneViewModel, initialLink: String?) {
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(initialLink) {
-        if (!initialLink.isNullOrBlank()) vm.openPairingLink(initialLink)
+        if (!initialLink.isNullOrBlank()) vm.openPairingLink(initialLink, fromIntent = true)
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     var asked by remember { mutableStateOf(false) }

@@ -38,13 +38,13 @@ ha_home.stream.set_loader(_load_config)
     "",
     summary="Rooms and everything controllable in them",
     description=(
-        "Lights, switches, fans, shades, thermostats, locks and scenes from Home Assistant, "
+        "Lights, switches, fans, shades, thermostats, TVs, locks and scenes from Home Assistant, "
         "grouped by room. Always answers 200 with a `status`: `ok`, `not_configured`, "
         "`unreachable` or `invalid_token`, and a `message` a person can act on. "
         "`rooms` is `[{area_id, name, entities}]`; `actions` are the scenes and scripts. "
         "Each entity has `state`, `on`, `level` (0-100 for dimmers, fans and shades) and "
         "`adjustable`. Favorites and hidden devices are the `home_favorites` and "
-        "`home_hidden` settings."
+        "`home_hidden` settings; how the page is arranged is `home_layout`."
     ),
 )
 async def get_home(db: Session = Depends(get_db)) -> dict:

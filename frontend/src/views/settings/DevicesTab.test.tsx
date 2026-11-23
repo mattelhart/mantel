@@ -4,6 +4,7 @@ import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { byText, click, mount, unmount } from '../../components/testDom'
 import { DevicesTab } from './DevicesTab'
+import { isLoopbackHost, qrDataUri } from './qr'
 
 const minted: string[] = []
 
@@ -55,5 +56,46 @@ describe('Devices tab', () => {
     expect(document.querySelector('.pair__code')?.textContent).toBe('K7NQ-4RMP')
     expect(document.querySelector('.pair__meta')?.textContent).toContain('On the TV')
     expect(byText('New TV code')).toBeTruthy()
+  })
+
+  it('shows the QR as an image the browser can draw', async () => {
+    await render()
+    click(byText('Pair a phone')!)
+    await settle()
+    const img = document.querySelector<HTMLImageElement>('.pair__qr')!
+    expect(img.src).toContain('data:image/svg+xml')
+    expect(decodeURIComponent(img.src)).toContain('xmlns="http://www.w3.org/2000/svg"')
+    expect(img.alt).toContain('K7NQ-4RMP')
+  })
+})
+
+describe('qrDataUri', () => {
+  const decode = (uri: string) => decodeURIComponent(uri.slice(uri.indexOf(',') + 1))
+
+  it('adds the namespace an <img> needs when the server left it out', () => {
+    const old = '<svg width="180" height="180" class="segno"><path d="M0 0h1"/></svg>'
+    const out = decode(qrDataUri(old))
+    expect(out).toContain('xmlns="http://www.w3.org/2000/svg"')
+    expect(out).toContain('viewBox="0 0 180 180"') // so CSS can size it
+    expect(out).toContain('<path d="M0 0h1"/>')
+    expect(new DOMParser().parseFromString(out, 'image/svg+xml').querySelector('parsererror')).toBeNull()
+  })
+
+  it('leaves a complete document alone', () => {
+    const full = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 53 53" width="53" height="53"><path d="M0 0"/></svg>'
+    expect(decode(qrDataUri(full))).toBe(full)
+    expect(qrDataUri(`  \n${full}\n`)).toBe(qrDataUri(full))
+  })
+
+  it('does not double the namespace on a single-quoted one', () => {
+    const q = "<svg xmlns='http://www.w3.org/2000/svg' width=\"9\" height=\"9\"/>"
+    expect(decode(qrDataUri(q)).match(/xmlns=/g)).toHaveLength(1)
+  })
+})
+
+describe('isLoopbackHost', () => {
+  it('knows the names a phone cannot reach', () => {
+    for (const h of ['localhost', 'LOCALHOST', 'wall.localhost', '127.0.0.1', '127.1.2.3', '::1', '[::1]']) expect(isLoopbackHost(h)).toBe(true)
+    for (const h of ['10.0.15.178', 'familycal.local', '192.168.1.20', 'mantel.example.com', '']) expect(isLoopbackHost(h)).toBe(false)
   })
 })

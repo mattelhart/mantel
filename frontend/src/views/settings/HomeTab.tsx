@@ -84,9 +84,9 @@ export function HomeTab() {
     <section className="panel">
       <h2>Home control</h2>
       <p className="hint">
-        Mantel controls your lights, fans, shades, locks and scenes through{' '}
+        Mantel controls your lights, fans, shades, TVs, locks and scenes through{' '}
         <strong>Home Assistant</strong>. Add Lutron Caseta, SmartThings and the rest to Home
-        Assistant, and they appear on the Home page automatically, grouped by room.
+        Assistant, and they appear on Home Control automatically, grouped by room.
       </p>
 
       <div className="row">
@@ -154,7 +154,7 @@ export function HomeTab() {
 
       {devices.length > 0 && (
         <>
-          <h2 style={{ marginTop: 24 }}>Show on the Home page</h2>
+          <h2 style={{ marginTop: 24 }}>Show on Home Control</h2>
           <p className="hint">Untick anything you don't want on the wall, such as a switch that only runs a pump.</p>
           <div className="home-settings__devices">
             {devices.map((d) => (
