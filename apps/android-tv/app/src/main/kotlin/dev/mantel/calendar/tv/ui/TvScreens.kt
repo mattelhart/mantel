@@ -167,7 +167,7 @@ private fun PairScreen(message: String?, onPair: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BigTitle("Pair this TV")
         Text(
-            "On the wall: Settings → Devices → Pair a phone. Type that code.",
+            "On the wall: Settings → Devices → Pair a phone, or on the phone app: Settings → Pair a TV. Type that code.",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 22.sp,
         )
@@ -221,7 +221,7 @@ private fun Home(state: TvState, vm: TvViewModel) {
         Text("Family calendar", color = Ink, fontSize = 30.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif)
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Column(
-                Modifier.width(116.dp).verticalScroll(rememberScrollState()).padding(6.dp),
+                Modifier.width(140.dp).verticalScroll(rememberScrollState()).padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Tab.entries.forEach { item ->
@@ -231,14 +231,14 @@ private fun Home(state: TvState, vm: TvViewModel) {
                         container = if (item == tab && stack.isEmpty()) Sun else Card,
                     ) {
                         Text(if (item == Tab.Agenda) "Schedule" else if (item == Tab.Chores) "Tasks" else item.name,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 16.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 16.dp), fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
                 SunnyButton(onClick = { push(Overlay.Rewards) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Rewards", modifier = Modifier.padding(12.dp), fontSize = 16.sp)
+                    Text("Rewards", modifier = Modifier.padding(12.dp), fontSize = 19.sp, maxLines = 1)
                 }
                 SunnyButton(onClick = { vm.forgetServer() }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Server", modifier = Modifier.padding(12.dp), fontSize = 16.sp)
+                    Text("Server", modifier = Modifier.padding(12.dp), fontSize = 19.sp, maxLines = 1)
                 }
             }
         Box(Modifier.weight(1f).fillMaxSize()) {

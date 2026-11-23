@@ -20,6 +20,8 @@ Without a computer: copy `phone-debug.apk` onto the phone and open it. Android w
 
 `./gradlew assembleDebug` in that directory also builds the TV app. `./gradlew test` runs the core and phone unit tests. The version code is the git commit count, so the checkout needs its full history. See [apps/android-tv/README.md](../apps/android-tv/README.md).
 
+**Install the phone APK, not the TV APK.** The TV app (`dev.mantel.calendar.tv`, label **Mantel TV**) is locked to landscape and built for a remote; on a phone it looks frozen. If a phone has it, uninstall it. The phone app follows the phone's rotation, portrait by default.
+
 ## Pairing
 
 The phone reaches Mantel over the home Wi-Fi, or over Tailscale or WireGuard. Do not port-forward the server. The app refuses cleartext HTTP to a public IP. It allows cleartext to private addresses (the LAN, and WireGuard's `10.x`), to Tailscale's `100.64.0.0/10` range, and to names such as `familycal.local` or a MagicDNS hostname. HTTPS is allowed anywhere.
@@ -29,6 +31,14 @@ The phone reaches Mantel over the home Wi-Fi, or over Tailscale or WireGuard. Do
 3. Tailscale addresses are not private. Add `AUTH_TRUSTED_CIDRS=100.64.0.0/10` if those phones should skip pairing. Otherwise pair once.
 4. When the server asks for a token, on the wall open **Settings → Devices → Pair a phone**. Scan the QR, or type the 8-character code. The QR is a `mantel://pair` link carrying the server address and the code. The code is single use and expires after 10 minutes. Dashes and case do not matter.
 5. The token is encrypted with an Android Keystore key before it is written. Revoke the phone from the wall. The next call asks you to pair again.
+
+### Pair a TV from the phone
+
+A paired phone can pair a TV without walking to the wall. Open **Settings → Pair a TV** (or the **Pair TV** button on the family home screen). The phone asks the server for a one-time code and shows it large, with a QR for another phone. Type the code on the TV when it says **Pair this TV**. The code works once and expires after 10 minutes; **New code** mints another. A TV on a trusted network with `AUTH_MODE=lan` is let in without a token and never asks for a code.
+
+### Home Assistant from the phone
+
+**Settings → Home control** holds the Home Assistant address and the long-lived access token. The token field is masked, is kept in memory only, is cleared after saving, and is never read back: the server reports only whether a token is set. **Test connection** saves first if needed, then shows Home Assistant's answer. **Remove token** clears it on the server. **Open lights** shows the Lights page: scenes, a switch per light, fan or switch, open/close for covers, a brightness slider, and a confirmation before any lock changes. The token is stored on the server (see `docs/home-control.md`), not on the phone.
 
 **Settings → Forget this server** drops the address and the token so you can start over.
 

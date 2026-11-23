@@ -191,3 +191,41 @@ data class ChoreDefinition(
 
 @Serializable
 data class DisplayTarget(val id: String, val name: String)
+
+/** A single-use code a phone or TV exchanges for a token. The server also returns an SVG; the app draws its own QR. */
+@Serializable
+data class PairingCode(val code: String, val expiresAt: String, val qrPayload: String = "")
+
+/** What Settings > Home needs to know. The token itself is never in this: only whether one is saved. */
+@Serializable
+data class HomeSetup(val haBaseUrl: String = "", val server: HomeSetupServer = HomeSetupServer())
+
+@Serializable
+data class HomeSetupServer(val haTokenSet: Boolean = false)
+
+@Serializable
+data class HomeTestResult(val ok: Boolean = false, val status: String = "", val message: String = "")
+
+@Serializable
+data class HomeEntity(
+    val entityId: String,
+    val domain: String,
+    val name: String,
+    val state: String = "",
+    val available: Boolean = true,
+    val on: Boolean? = null,
+    val level: Int? = null,
+    val adjustable: Boolean = false,
+)
+
+@Serializable
+data class HomeRoom(val areaId: String? = null, val name: String = "", val entities: List<HomeEntity> = emptyList())
+
+/** `GET /api/home`. [status] is ok, not_configured, unreachable or invalid_token, with a [message] a person can act on. */
+@Serializable
+data class HomeSnapshot(
+    val status: String = "ok",
+    val message: String = "",
+    val rooms: List<HomeRoom> = emptyList(),
+    val actions: List<HomeEntity> = emptyList(),
+)

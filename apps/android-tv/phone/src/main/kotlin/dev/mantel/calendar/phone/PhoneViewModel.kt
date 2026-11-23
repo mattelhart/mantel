@@ -115,6 +115,16 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun displays() = client.displays()
     suspend fun showOnDisplay(id: String, destination: String) = client.showOnDisplay(id, destination)
 
+    /** A code for a TV to type. It embeds this phone's own address, the one it already reaches the server on. */
+    suspend fun createPairingCode() = client.createPairingCode(origin.value ?: FAMILYCAL_ORIGIN)
+    suspend fun homeSetup() = client.homeSetup()
+    suspend fun saveHomeConnection(baseUrl: String?, token: String?, clearToken: Boolean = false) =
+        client.saveHomeConnection(baseUrl, token, clearToken)
+    suspend fun testHome() = client.testHome()
+    suspend fun home() = client.home()
+    suspend fun homeAction(entityId: String, action: String, value: Int? = null, confirm: Boolean = false) =
+        client.homeAction(entityId, action, value, confirm)
+
     private val client = MantelClient(CIO.create(), { origin.value ?: FAMILYCAL_ORIGIN }, { token.value })
     private val snapshots = dev.mantel.calendar.core.FileSnapshotStore(File(app.filesDir, CACHE_DIR))
     private val screenCache = ScreenCacheStore(snapshots)

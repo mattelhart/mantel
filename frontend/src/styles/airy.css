@@ -769,3 +769,24 @@ html[data-theme='airy'] .shell__nav {
   background: #f7f9fa;
   box-shadow: none;
 }
+
+/* Side menu (landscape: the wall Pi and TVs) reads from across the room, so its labels and
+   icons are about 20% larger than the phone's bottom bar. The phone layout is untouched. */
+@media (orientation: landscape) and (min-width: 700px) {
+  html[data-theme='airy'] .navbtn {
+    min-height: 64px;
+    gap: 4px;
+  }
+
+  html[data-theme='airy'] .navbtn__icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  html[data-theme='airy'] .navbtn__label {
+    font-size: 0.95rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+}

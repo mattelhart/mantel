@@ -29,6 +29,7 @@ import java.time.LocalDate
 
 private data class HomeTile(val title: String, val icon: ImageVector, val color: Color, val action: () -> Unit)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FamilyHomeScreen(state: PhoneState, vm: PhoneViewModel, selectTab: (PhoneTab) -> Unit, open: (Page) -> Unit) {
     val today = LocalDate.now(vm.zone())
@@ -61,9 +62,16 @@ fun FamilyHomeScreen(state: PhoneState, vm: PhoneViewModel, selectTab: (PhoneTab
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wraps onto a second line on a narrow phone instead of squeezing the last button.
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             OutlinedButton(onClick = { open(Page.Meals) }) { Text("Meals") }
             OutlinedButton(onClick = { open(Page.ShowOnTv) }) { Text("Show on TV") }
+            OutlinedButton(onClick = { open(Page.HomeControl) }) { Text("Lights") }
+            OutlinedButton(onClick = { open(Page.PairTv) }) { Text("Pair TV") }
         }
         Text(dayLabel(today), style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Serif)
         if (events.isEmpty()) Text("No events today. A little room to breathe.", color = MaterialTheme.colorScheme.onSurfaceVariant)
