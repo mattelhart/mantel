@@ -67,6 +67,9 @@ beforeEach(() => {
         tests.push(init?.body)
         return json({ id: 9, user_id: 3, status: 'queued' })
       }
+      if (url === '/api/messages/signal/unlinked') {
+        return json({ senders: [] })
+      }
       if (url === '/api/messages/signal/status') {
         return json({
           reachable: true,

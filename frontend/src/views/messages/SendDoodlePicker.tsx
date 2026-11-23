@@ -16,7 +16,7 @@ export interface SendResult {
 const CAPTION_MAX = 200
 
 function hasPhone(user: User): boolean {
-  return Boolean(user.phone && user.phone.trim())
+  return Boolean((user.phone && user.phone.trim()) || (user.signal_uuid && user.signal_uuid.trim()))
 }
 
 function initial(name: string): string {

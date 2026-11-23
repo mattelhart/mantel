@@ -357,5 +357,8 @@ describe('Messages page', () => {
     expect(friendlySendError(new Error('Sam does not have a phone number yet.'))).toContain(
       'Ask a grown-up to add a phone number first.',
     )
+    expect(friendlySendError(new Error('UNREGISTERED_FAILURE: +15555550123'), 'Mom')).toContain(
+      "Mom can't get Signal messages from Mantel yet",
+    )
   })
 })

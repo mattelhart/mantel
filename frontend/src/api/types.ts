@@ -7,6 +7,7 @@ export interface User {
   avatar_emoji: string | null
   sort_order: number
   phone?: string | null
+  signal_uuid?: string | null
 }
 
 /** A connected Google or iCloud account. Credentials are never sent to the client. */

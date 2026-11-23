@@ -28,6 +28,23 @@ def _validate_phone(v: str | None) -> str | None:
     return number
 
 
+def _validate_signal_uuid(v: str | None) -> str | None:
+    """Empty clears the Signal ID. Otherwise it must be a UUID (Signal ACI)."""
+    from .services.signal_messages import normalize_signal_uuid
+
+    if v is None:
+        return None
+    raw = str(v).strip()
+    if not raw:
+        return None
+    value = normalize_signal_uuid(raw)
+    if not value:
+        raise ValueError(
+            "Signal ID must be a UUID, like cbb48950-cdb9-4d42-9387-20cd9bfa3f40"
+        )
+    return value
+
+
 # ----------------------------- Users -----------------------------------------
 
 
@@ -45,6 +62,11 @@ class UserBase(BaseModel):
         description="Optional mobile number in E.164 form, used to text this person from the wall.",
         examples=["+15555550123"],
     )
+    signal_uuid: str | None = Field(
+        default=None,
+        description="Optional Signal ACI, used when this person hides their number from new chats.",
+        examples=["cbb48950-cdb9-4d42-9387-20cd9bfa3f40"],
+    )
 
     @field_validator("color")
     @classmethod
@@ -55,6 +77,11 @@ class UserBase(BaseModel):
     @classmethod
     def check_phone(cls, v: str | None) -> str | None:
         return _validate_phone(v)
+
+    @field_validator("signal_uuid")
+    @classmethod
+    def check_signal_uuid(cls, v: str | None) -> str | None:
+        return _validate_signal_uuid(v)
 
 
 class UserCreate(UserBase):
@@ -67,6 +94,7 @@ class UserUpdate(BaseModel):
     avatar_emoji: str | None = None
     sort_order: int | None = None
     phone: str | None = None
+    signal_uuid: str | None = None
 
     @field_validator("color")
     @classmethod
@@ -77,6 +105,11 @@ class UserUpdate(BaseModel):
     @classmethod
     def check_phone(cls, v: str | None) -> str | None:
         return _validate_phone(v)
+
+    @field_validator("signal_uuid")
+    @classmethod
+    def check_signal_uuid(cls, v: str | None) -> str | None:
+        return _validate_signal_uuid(v)
 
 
 class UserOut(UserBase):

@@ -276,6 +276,26 @@ html[data-theme='airy'] .messages__title {
   flex: 1 1 12rem;
 }
 
+.row__advanced {
+  flex: 1 1 12rem;
+  min-width: 12rem;
+}
+
+.row__advanced > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+}
+
+.row__advanced-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+}
+
 .messages__send-doodle {
   flex: none;
   min-height: 64px;

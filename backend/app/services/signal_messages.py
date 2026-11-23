@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -89,18 +90,54 @@ def configured(db: Session) -> bool:
     return load_config(db).configured
 
 
+def normalize_signal_uuid(raw: str | None) -> str:
+    """Return a lowercase dashed UUID, or '' if the value isn't one.
+
+    signal-cli may prefix the identifier with ACI: or PNI:.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    if ":" in text:
+        text = text.split(":")[-1].strip()
+    try:
+        return str(uuid.UUID(text))
+    except (ValueError, AttributeError, TypeError):
+        return ""
+
+
+def user_by_signal_uuid(db: Session, value: str | None) -> User | None:
+    ident = normalize_signal_uuid(value)
+    if not ident:
+        return None
+    return db.scalar(select(User).where(User.signal_uuid == ident))
+
+
+def assert_unique_signal_uuid(
+    db: Session, value: str | None, *, skip_id: int | None = None
+) -> None:
+    if not value:
+        return
+    existing = user_by_signal_uuid(db, value)
+    if existing is not None and existing.id != skip_id:
+        raise SignalError(f"{existing.name} already uses that Signal ID.")
+
+
 def _error_from(response: httpx.Response) -> str:
     try:
         body = response.json()
         message = str(body.get("error") or body.get("message") or body.get("reason") or "").strip()
         if message:
-            return message.split("\n")[0][:300]
+            short = message.split("\n")[0][:300]
+            log.warning("Signal API error %s: %s", response.status_code, short)
+            return short
     except ValueError:
         pass
     if response.status_code in (401, 403):
         return "The Signal API refused the request."
     if response.status_code == 404:
         return "The Signal API didn't have that resource."
+    log.warning("Signal API error %s", response.status_code)
     return "The Signal API didn't accept that request."
 
 
@@ -260,8 +297,12 @@ def send_to_user(
     cfg = load_config(db)
     if not cfg.configured:
         raise SignalError("Add the Signal API address and account number in Settings first.")
-    if not user.phone or not common.valid_e164(user.phone):
-        raise SignalError(f"{user.name} does not have a phone number yet.")
+    recipient = normalize_signal_uuid(user.signal_uuid) if user.signal_uuid else ""
+    if not recipient:
+        if user.phone and common.valid_e164(user.phone):
+            recipient = user.phone
+        else:
+            raise SignalError(f"{user.name} does not have a phone number yet.")
     text = (body or "").strip()
     if len(text) > common.MAX_BODY:
         raise SignalError(f"A message can be at most {common.MAX_BODY} characters.")
@@ -282,7 +323,7 @@ def send_to_user(
     payload: dict[str, Any] = {
         "message": text or " ",
         "number": cfg.account_number,
-        "recipients": [user.phone],
+        "recipients": [recipient],
         "text_mode": "normal",
     }
     if attachment:
@@ -290,7 +331,8 @@ def send_to_user(
 
     row = FamilyMessage(
         user_id=user.id,
-        phone=user.phone,
+        phone=user.phone or "",
+        signal_uuid=normalize_signal_uuid(user.signal_uuid) or None,
         direction="out",
         body=text or None,
         media_path=media_path,
@@ -349,6 +391,37 @@ def test_send(db: Session, user: User) -> FamilyMessage:
 def _envelope_source(envelope: dict[str, Any]) -> str:
     raw = str(envelope.get("sourceNumber") or envelope.get("source") or "")
     return common.normalize_e164(raw)
+
+
+def _envelope_uuid(envelope: dict[str, Any]) -> str:
+    for key in ("sourceUuid", "sourceServiceId", "sourceUuid"):
+        ident = normalize_signal_uuid(str(envelope.get(key) or ""))
+        if ident:
+            return ident
+    return ""
+
+
+def _envelope_name(envelope: dict[str, Any], data: dict[str, Any] | None = None) -> str | None:
+    for source in (envelope, data or {}):
+        name = str(source.get("sourceName") or source.get("source_name") or "").strip()
+        if name:
+            return name[:100]
+    return None
+
+
+def _match_member(db: Session, ident: str, phone: str) -> User | None:
+    member = user_by_signal_uuid(db, ident) if ident else None
+    if member is not None:
+        return member
+    if common.valid_e164(phone):
+        member = common.user_by_phone(db, phone)
+        # Remember the ACI when a known number also arrived with a UUID, so
+        # later sends still work if they hide the number. Linking the other
+        # way (UUID only, no number) stays manual.
+        if member is not None and ident and not member.signal_uuid:
+            member.signal_uuid = ident
+        return member
+    return None
 
 
 def _envelope_timestamp(envelope: dict[str, Any], data: dict[str, Any] | None = None) -> str:
@@ -451,10 +524,13 @@ def ingest_inbound(db: Session, cfg: SignalConfig) -> int:
         if _is_group(data):
             continue
         phone = _envelope_source(envelope)
-        if not common.valid_e164(phone) or phone == cfg.account_number:
+        ident = _envelope_uuid(envelope)
+        if phone == cfg.account_number:
+            continue
+        if not ident and not common.valid_e164(phone):
             continue
         timestamp = _envelope_timestamp(envelope, data) or "0"
-        sid = _sid_in(phone, timestamp)
+        sid = _sid_in(phone or ident, timestamp)
         if db.scalar(select(FamilyMessage.id).where(FamilyMessage.twilio_sid == sid)):
             continue
         body = str(data.get("message") or "").strip() or None
@@ -468,11 +544,19 @@ def ingest_inbound(db: Session, cfg: SignalConfig) -> int:
             media_path, media_type = _download_attachment(cfg, att_id, content_type)
         if not body and not media_path:
             continue
-        # Never auto-reply, including to unknown numbers.
-        member = common.user_by_phone(db, phone)
+        # Never auto-reply, including to unknown numbers. Never auto-link a
+        # UUID-only sender to a member whose number failed as unregistered.
+        member = _match_member(db, ident, phone)
+        stored_phone = ""
+        if member is not None:
+            stored_phone = member.phone or (phone if common.valid_e164(phone) else "")
+        elif common.valid_e164(phone):
+            stored_phone = phone
         row = FamilyMessage(
             user_id=member.id if member else None,
-            phone=phone,
+            phone=stored_phone,
+            signal_uuid=ident or None,
+            sender_name=None if member is not None else _envelope_name(envelope, data),
             direction="in",
             body=body,
             media_path=media_path,
@@ -491,6 +575,66 @@ def ingest_inbound(db: Session, cfg: SignalConfig) -> int:
     if added or receipts:
         db.commit()
     return added + receipts
+
+
+def list_unlinked_senders(db: Session) -> list[dict[str, Any]]:
+    """Recent inbound senders we couldn't match to a family member."""
+    rows = list(
+        db.scalars(
+            select(FamilyMessage)
+            .where(
+                FamilyMessage.user_id.is_(None),
+                FamilyMessage.signal_uuid.is_not(None),
+                FamilyMessage.direction == "in",
+            )
+            .order_by(FamilyMessage.created_at.desc(), FamilyMessage.id.desc())
+        )
+    )
+    grouped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        ident = row.signal_uuid or ""
+        if not ident:
+            continue
+        if ident in grouped:
+            grouped[ident]["message_count"] += 1
+            continue
+        created = row.created_at
+        if created is not None and getattr(created, "tzinfo", None) is None:
+            last_seen = created.isoformat() + "Z"
+        elif created is not None:
+            last_seen = created.isoformat()
+        else:
+            last_seen = None
+        grouped[ident] = {
+            "signal_uuid": ident,
+            "name": (row.sender_name or "").strip() or "Unknown",
+            "last_seen": last_seen,
+            "message_count": 1,
+        }
+    return list(grouped.values())
+
+
+def link_sender(db: Session, ident: str, user: User) -> User:
+    value = normalize_signal_uuid(ident)
+    if not value:
+        raise SignalError("That Signal ID isn't valid.")
+    assert_unique_signal_uuid(db, value, skip_id=user.id)
+    user.signal_uuid = value
+    rows = list(
+        db.scalars(
+            select(FamilyMessage).where(
+                FamilyMessage.signal_uuid == value,
+                FamilyMessage.user_id.is_(None),
+            )
+        )
+    )
+    for row in rows:
+        row.user_id = user.id
+        if not row.phone and user.phone:
+            row.phone = user.phone
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def poll_once(db: Session | None = None) -> int:

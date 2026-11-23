@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User
 from ..schemas import UserCreate, UserOut, UserUpdate
-from ..services import twilio_messages
+from ..services import signal_messages, twilio_messages
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -52,6 +52,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     data = payload.model_dump()
     try:
         twilio_messages.assert_unique_phone(db, data.get("phone"))
+        signal_messages.assert_unique_signal_uuid(db, data.get("signal_uuid"))
     except twilio_messages.TwilioError as exc:
         raise HTTPException(400, str(exc)) from exc
     if "color" not in payload.model_fields_set:
@@ -75,6 +76,13 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
     if "phone" in data:
         try:
             twilio_messages.assert_unique_phone(db, data["phone"], skip_id=user.id)
+        except twilio_messages.TwilioError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    if "signal_uuid" in data:
+        try:
+            signal_messages.assert_unique_signal_uuid(
+                db, data["signal_uuid"], skip_id=user.id
+            )
         except twilio_messages.TwilioError as exc:
             raise HTTPException(400, str(exc)) from exc
     for key, value in data.items():

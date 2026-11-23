@@ -136,6 +136,28 @@ function PeopleTab() {
               updateUser.mutate({ id: u.id, phone: next || null })
             }}
           />
+          <details className="row__advanced">
+            <summary>Advanced</summary>
+            <label className="row__advanced-label">
+              Signal ID
+              <input
+                className="row__name row__phone"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Optional, for Signal"
+                defaultValue={u.signal_uuid ?? ''}
+                key={`${u.id}-${u.signal_uuid ?? ''}`}
+                aria-label={`${u.name}'s Signal ID`}
+                onBlur={(e) => {
+                  const next = e.target.value.trim()
+                  if (next === (u.signal_uuid ?? '')) return
+                  updateUser.mutate({ id: u.id, signal_uuid: next || null })
+                }}
+              />
+            </label>
+          </details>
           <div className="palette">
             {PALETTE.map((c) => (
               <button

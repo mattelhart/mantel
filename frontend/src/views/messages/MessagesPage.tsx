@@ -42,13 +42,26 @@ export interface ConversationsResponse {
 const KEY = ['messages'] as const
 const SENT_MS = 3200
 
-export function friendlySendError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
-  if (/phone number/i.test(raw)) return 'Ask a grown-up to add a phone number first.'
-  if (/Twilio or Signal|not configured|Settings/i.test(raw)) {
+export function friendlyFailureText(raw: string, name?: string | null): string {
+  const text = raw.trim()
+  if (!text) return ''
+  if (/couldn't be sent as a picture/i.test(text)) return text
+  if (/can't get Signal messages from Mantel/i.test(text)) return text
+  if (/unregistered|isn't registered|not registered/i.test(text)) {
+    const who = name?.trim() || 'They'
+    return `${who} can't get Signal messages from Mantel yet. Ask a grown-up for help.`
+  }
+  if (/phone number/i.test(text)) return 'Ask a grown-up to add a phone number first.'
+  if (/ask a grown-up to finish Messages settings/i.test(text)) return text
+  if (/Twilio or Signal|not configured|Settings/i.test(text)) {
     return 'Ask a grown-up to finish Messages settings, then try again.'
   }
   return "Couldn't send that. Try again in a moment."
+}
+
+export function friendlySendError(error: unknown, name?: string | null): string {
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  return friendlyFailureText(raw, name) || "Couldn't send that. Try again in a moment."
 }
 
 function useConversations() {
@@ -243,7 +256,7 @@ export function MessageThreadPage() {
             <div className="messages__status">
               {formatTime(message.created_at)}
               {message.direction === 'out' ? ` · ${statusLabel(message.status)}` : ''}
-              {message.error_message ? ` · ${message.error_message}` : ''}
+              {message.error_message ? ` · ${friendlyFailureText(message.error_message, data.name)}` : ''}
             </div>
           </div>
         ))}
