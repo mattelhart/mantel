@@ -62,6 +62,15 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "google_client_id": "",
     "google_client_secret": "",
     "public_base_url": "",
+    # Family messaging via Twilio SMS/MMS or a self-hosted Signal CLI API.
+    # Twilio SID and auth token are sealed like ha_token and never returned.
+    # The From number is the toll-free number on the Twilio account.
+    "twilio_account_sid": "",
+    "twilio_auth_token": "",
+    "twilio_from_number": "",
+    "message_provider": "twilio",  # twilio | signal
+    "signal_api_url": "http://host.docker.internal:8081",
+    "signal_account_number": "",
 }
 
 

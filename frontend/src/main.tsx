@@ -14,6 +14,7 @@ import './styles/chores.css'
 import './styles/home.css'
 import './styles/games.css'
 import './styles/cameras.css'
+import './styles/messages.css'
 import '@fontsource/nunito/latin-400.css'
 import '@fontsource/nunito/latin-600.css'
 import '@fontsource/nunito/latin-700.css'
@@ -31,6 +32,7 @@ import { HomePage } from './views/home/HomePage'
 import { ListsPage } from './views/lists/ListsPage'
 import { PhotosPage } from './views/photos/PhotosPage'
 import { SettingsPage } from './views/settings/SettingsPage'
+import { MessagesPage, MessageThreadPage } from './views/messages/MessagesPage'
 import { hydrate, watchQueries } from './offline/persist'
 import './styles/airy.css'
 import './styles/tv.css'
@@ -58,6 +60,8 @@ const router = createBrowserRouter([
       { path: 'games/:id', element: <GamePlayPage /> },
       { path: 'cameras', element: <CamerasPage /> },
       { path: 'cameras/:id', element: <CameraViewPage /> },
+      { path: 'messages', element: <MessagesPage /> },
+      { path: 'messages/:id', element: <MessageThreadPage /> },
       { path: 'settings', element: <SettingsPage /> },
       // The API guide used to be its own page. Keep old bookmarks and kiosk
       // shortcuts working by sending them to the tab that replaced it.

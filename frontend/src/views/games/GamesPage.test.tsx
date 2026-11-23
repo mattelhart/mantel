@@ -1,22 +1,49 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { click, mount, unmount } from '../../components/testDom'
 import { GamePlayPage, GamesPage } from './GamesPage'
 
+const USERS = [
+  { id: 1, name: 'Austin', color: '#3b82f6', avatar_emoji: null, sort_order: 0, phone: '+15555550123' },
+  { id: 2, name: 'Sam', color: '#f97316', avatar_emoji: null, sort_order: 1, phone: null },
+]
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      if (url === '/api/users') return json(USERS)
+      if (url === '/api/settings') return json({ server: { twilio_configured: true }, screensaver_enabled: false })
+      return json({})
+    }),
+  )
+})
+
 function renderAt(path: string) {
   return mount(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/games" element={<GamesPage />} />
-        <Route path="/games/:id" element={<GamePlayPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/games" element={<GamesPage />} />
+          <Route path="/games/:id" element={<GamePlayPage />} />
+          <Route path="/settings" element={<div>Settings messages tab</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
 describe('Games page', () => {
-  afterEach(() => unmount())
+  afterEach(() => {
+    unmount()
+    vi.unstubAllGlobals()
+  })
 
   it('shows a card for every starter game', () => {
     const root = renderAt('/games')
@@ -54,6 +81,8 @@ describe('Games page', () => {
     expect(root.querySelectorAll('.doodle__size').length).toBeGreaterThan(1)
     expect(root.textContent).toContain('Undo')
     expect(root.textContent).toContain('Clear')
+    expect(root.textContent).toContain('Send to…')
+    expect(root.querySelector('.gameplay__back')?.textContent).toMatch(/Back/)
     expect(root.querySelector('.gameplay__gutter')).toBeTruthy()
   })
 

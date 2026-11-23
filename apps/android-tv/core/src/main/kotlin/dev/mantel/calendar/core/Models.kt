@@ -229,3 +229,39 @@ data class HomeSnapshot(
     val rooms: List<HomeRoom> = emptyList(),
     val actions: List<HomeEntity> = emptyList(),
 )
+
+@Serializable
+data class ConversationMessage(
+    val id: Int,
+    val userId: Int? = null,
+    val phone: String = "",
+    val direction: String = "in",
+    val body: String? = null,
+    val mediaUrl: String? = null,
+    val mediaContentType: String? = null,
+    val status: String = "",
+    val errorMessage: String? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class Conversation(
+    val id: String,
+    val userId: Int? = null,
+    val name: String,
+    val phone: String? = null,
+    val color: String = "#3b82f6",
+    val avatarEmoji: String? = null,
+    val unknown: Boolean = false,
+    val canSend: Boolean = false,
+    val lastMessage: ConversationMessage? = null,
+    val messages: List<ConversationMessage> = emptyList(),
+)
+
+@Serializable
+data class ConversationsListing(
+    val configured: Boolean = false,
+    val fromNumber: String = "",
+    val quickReplies: List<String> = emptyList(),
+    val conversations: List<Conversation> = emptyList(),
+)

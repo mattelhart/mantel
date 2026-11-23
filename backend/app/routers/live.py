@@ -43,7 +43,7 @@ def _last_id(request: Request) -> int | None:
     description=(
         "Server-Sent Events. Each `change` event lists the areas that were "
         "committed (`events`, `calendars`, `chores`, `rewards`, `lists`, "
-        "`users`, `settings`, `accounts`, `sync`, `widgets`, `photos`) so a "
+        "`users`, `settings`, `accounts`, `sync`, `widgets`, `photos`, `messages`) so a "
         "screen can refetch those and leave the rest alone. `hello` is the "
         "current id; send it back as `Last-Event-ID` on reconnect to receive "
         "only what was missed. `resync` means that id is gone (the process "

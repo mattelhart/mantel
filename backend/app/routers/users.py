@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User
 from ..schemas import UserCreate, UserOut, UserUpdate
+from ..services import twilio_messages
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -49,6 +50,10 @@ def list_users(db: Session = Depends(get_db)) -> list[User]:
 )
 def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     data = payload.model_dump()
+    try:
+        twilio_messages.assert_unique_phone(db, data.get("phone"))
+    except twilio_messages.TwilioError as exc:
+        raise HTTPException(400, str(exc)) from exc
     if "color" not in payload.model_fields_set:
         taken = set(db.scalars(select(User.color)))
         data["color"] = next((c for c in PALETTE if c not in taken), PALETTE[0])
@@ -66,7 +71,13 @@ def get_user(user_id: int, db: Session = Depends(get_db)) -> User:
 @router.patch("/{user_id}", response_model=UserOut, summary="Update a family member")
 def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)) -> User:
     user = _get(db, user_id)
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "phone" in data:
+        try:
+            twilio_messages.assert_unique_phone(db, data["phone"], skip_id=user.id)
+        except twilio_messages.TwilioError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    for key, value in data.items():
         setattr(user, key, value)
     db.commit()
     return user

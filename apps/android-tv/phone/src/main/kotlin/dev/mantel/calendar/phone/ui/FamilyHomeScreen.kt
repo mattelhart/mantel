@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ fun FamilyHomeScreen(state: PhoneState, vm: PhoneViewModel, selectTab: (PhoneTab
         HomeTile("Tasks", Icons.Default.CheckCircle, Color(0xFFE4EFD5)) { selectTab(PhoneTab.Chores) },
         HomeTile("Rewards", Icons.Default.Star, Color(0xFFFFF0CC)) { open(Page.Rewards) },
         HomeTile("Lists", Icons.Default.Checklist, Color(0xFFF5EED5)) { selectTab(PhoneTab.Lists) },
+        HomeTile("Messages", Icons.AutoMirrored.Filled.Chat, Color(0xFFE4F0FF)) { selectTab(PhoneTab.Messages) },
         HomeTile("Week", Icons.Default.DateRange, Color(0xFFDDEEF4)) { selectTab(PhoneTab.Week) },
         HomeTile("Add chore", Icons.Default.Add, Color(0xFFEDE1F4)) { open(Page.EditChore()) },
     )

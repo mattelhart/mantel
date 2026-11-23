@@ -25,6 +25,7 @@ from .routers import (
     household_display,
     lists,
     live,
+    messages,
     meta,
     photos,
     sync,
@@ -118,6 +119,7 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(photos.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(lists.router, prefix="/api")
+app.include_router(messages.router, prefix="/api")
 app.include_router(live.router, prefix="/api")
 app.include_router(home.router, prefix="/api")
 app.include_router(cameras.router, prefix="/api")

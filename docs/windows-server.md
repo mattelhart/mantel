@@ -55,3 +55,10 @@ Do not forward port 8080 on the router, and do not open it on the Public firewal
 Phones and TVs that leave home should use **Tailscale** or **WireGuard** on this PC and on the device. The app's address is then the VPN address. Tailscale's range is not a private LAN, so those phones pair once, or you can set `AUTH_TRUSTED_CIDRS=100.64.0.0/10` if those addresses should skip pairing. See [authentication.md](authentication.md).
 
 Keep the PC awake while anyone might look at the wall. Sleep hides the server. The database stays in the `mantel-data` Docker volume. Do not put that volume on OneDrive.
+
+## Optional: Signal for family messages
+
+To send notes and doodles through Signal instead of Twilio, run the
+`signal-cli-rest-api` container on this PC (localhost only) and link it in
+Settings → Messages. The exact `docker run` command, volume path and how the
+Mantel container reaches it are in [signal.md](signal.md).

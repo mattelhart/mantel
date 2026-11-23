@@ -13,6 +13,21 @@ def _validate_hex(v: str) -> str:
     return s.lower()
 
 
+def _validate_phone(v: str | None) -> str | None:
+    """Empty clears the number. Otherwise it must be E.164, with a little US slack."""
+    from .services.twilio_messages import normalize_e164, valid_e164
+
+    if v is None:
+        return None
+    raw = str(v).strip()
+    if not raw:
+        return None
+    number = normalize_e164(raw)
+    if not valid_e164(number):
+        raise ValueError("phone must be a number like +15555550123")
+    return number
+
+
 # ----------------------------- Users -----------------------------------------
 
 
@@ -25,11 +40,21 @@ class UserBase(BaseModel):
     )
     avatar_emoji: str | None = Field(default=None, max_length=16, examples=["🦊"])
     sort_order: int = Field(default=0, description="Lower numbers appear first.")
+    phone: str | None = Field(
+        default=None,
+        description="Optional mobile number in E.164 form, used to text this person from the wall.",
+        examples=["+15555550123"],
+    )
 
     @field_validator("color")
     @classmethod
     def check_color(cls, v: str) -> str:
         return _validate_hex(v)
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v: str | None) -> str | None:
+        return _validate_phone(v)
 
 
 class UserCreate(UserBase):
@@ -41,11 +66,17 @@ class UserUpdate(BaseModel):
     color: str | None = None
     avatar_emoji: str | None = None
     sort_order: int | None = None
+    phone: str | None = None
 
     @field_validator("color")
     @classmethod
     def check_color(cls, v: str | None) -> str | None:
         return None if v is None else _validate_hex(v)
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v: str | None) -> str | None:
+        return _validate_phone(v)
 
 
 class UserOut(UserBase):

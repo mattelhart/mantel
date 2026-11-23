@@ -165,10 +165,10 @@
 .ttt__mode,
 .ttt__again,
 .doodle__action {
-  min-height: 56px;
-  min-width: 140px;
+  min-height: 64px;
+  min-width: 120px;
   padding: 0 18px;
-  border: 0;
+  border: 2px solid var(--border);
   border-radius: 18px;
   background: var(--bg-elev);
   color: var(--text);
@@ -212,6 +212,14 @@
   opacity: 1;
 }
 
+.doodle-page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+
 .doodle {
   flex: 1;
   min-height: 0;
@@ -236,8 +244,8 @@
 
 .doodle__swatch,
 .doodle__size {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border: 3px solid transparent;
   border-radius: 16px;
   padding: 0;
@@ -282,3 +290,41 @@ html[data-theme='airy'] .camview__title {
   font-weight: 500;
   letter-spacing: -0.025em;
 }
+
+.doodle__action--send {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+
+.doodle__action--send:disabled {
+  opacity: 0.5;
+}
+
+.doodle__action--eraser[data-on='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+
+.doodle--simple .doodle__swatch {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+}
+
+.doodle--simple .doodle__tools {
+  gap: 12px;
+}
+
+html[data-scale='wall'] .doodle__swatch,
+html[data-scale='wall'] .doodle__size,
+html[data-scale='wall'] .doodle--simple .doodle__swatch {
+  width: 72px;
+  height: 72px;
+}
+
+html[data-scale='wall'] .doodle__action {
+  min-height: 72px;
+}
+

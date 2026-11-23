@@ -16,4 +16,6 @@ sealed interface Page {
     data object PairTv : Page
     data object HomeControl : Page
     data object Settings : Page
+    data class Thread(val id: String) : Page
+    data class Draw(val conversationId: String?) : Page
 }
