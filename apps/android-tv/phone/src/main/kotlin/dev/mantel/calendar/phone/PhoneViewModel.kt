@@ -194,10 +194,16 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private data class SendAttempt(val body: String, val media: String?, val id: String)
+    private val pendingSends = mutableMapOf<Int, SendAttempt>()
+
     fun sendMessage(userId: Int, body: String, mediaBase64: String? = null, result: (String?) -> Unit) {
         viewModelScope.launch {
             try {
-                client.sendMessage(userId, body, mediaBase64)
+                val attempt = pendingSends[userId]?.takeIf { it.body == body && it.media == mediaBase64 }
+                    ?: SendAttempt(body, mediaBase64, java.util.UUID.randomUUID().toString())
+                pendingSends[userId] = attempt
+                val row = client.sendMessage(userId, body, mediaBase64, attempt.id)
                 val listing = client.conversations()
                 val updated = _state.value.threads.mapValues { (id, current) ->
                     runCatching { client.conversation(id) }.getOrDefault(current)
@@ -211,7 +217,14 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                         loadMessageMedia(mediaId)
                     }
                 }
-                result(null)
+                if (row.status != "unconfirmed" && pendingSends[userId] == attempt) {
+                    pendingSends.remove(userId)
+                }
+                result(when (row.status) {
+                    "unconfirmed" -> "Delivery unconfirmed. Check the conversation."
+                    "failed" -> "Send failed. Try again."
+                    else -> null
+                })
             } catch (e: MantelException) {
                 result(friendlySendError(e.message))
             }

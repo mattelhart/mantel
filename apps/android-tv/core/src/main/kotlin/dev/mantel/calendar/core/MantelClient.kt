@@ -234,10 +234,12 @@ class MantelClient(
 
     suspend fun conversation(id: String): Conversation = get("/messages/conversations/$id")
 
-    suspend fun sendMessage(userId: Int, body: String, mediaBase64: String? = null): ConversationMessage =
+    suspend fun sendMessage(userId: Int, body: String, mediaBase64: String? = null,
+                            requestId: String = java.util.UUID.randomUUID().toString()): ConversationMessage =
         post(
             "/messages",
             buildJsonObject {
+                put("request_id", requestId)
                 put("user_id", userId)
                 put("body", body)
                 if (!mediaBase64.isNullOrBlank()) put("media_base64", mediaBase64)

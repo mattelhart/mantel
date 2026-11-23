@@ -941,3 +941,20 @@ a.btn {
     padding-right: 10px;
   }
 }
+
+.touch-sheet {
+  width: min(32rem, 94vw);
+  max-height: 85dvh;
+  padding: 0;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--surface, white);
+  color: var(--text);
+}
+.touch-sheet::backdrop { background: rgb(16 24 40 / 45%); }
+.touch-sheet__body { padding: 1.25rem; display: grid; gap: .75rem; }
+.touch-sheet header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.touch-sheet h2, .touch-sheet h3, .touch-sheet p { margin: 0; }
+.touch-sheet button, .touch-sheet a, button.people__name { min-height: 48px; }
+.touch-row { display: grid; text-align: start; padding: .65rem .85rem; gap: .2rem; }
+.month__more { position: relative; z-index: 1; text-align: start; }

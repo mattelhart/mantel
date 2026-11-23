@@ -251,8 +251,8 @@ actor MantelClient {
         return try await get("/messages/conversations/\(encoded)")
     }
 
-    func sendMessage(userId: Int, body: String, mediaBase64: String?) async throws -> FamilyMessage {
-        var payload: [String: Any] = ["user_id": userId, "body": body]
+    func sendMessage(userId: Int, body: String, mediaBase64: String?, requestId: String = UUID().uuidString) async throws -> FamilyMessage {
+        var payload: [String: Any] = ["user_id": userId, "body": body, "request_id": requestId]
         if let mediaBase64 { payload["media_base64"] = mediaBase64 }
         return try await send(method: "POST", path: "/messages", body: payload, expected: 201)
     }

@@ -66,24 +66,6 @@ export function installTvNavigation() {
     beforeDialog?.focus()
   }
 
-  document.addEventListener('click', event => {
-    const day = (event.target as HTMLElement).closest<HTMLButtonElement>('.month__addlayer')
-    if (!day || day.dataset.tvAdding || day.closest('[data-outside="true"]')) return
-    event.stopPropagation()
-    const events = Array.from(day.parentElement!.querySelectorAll<HTMLButtonElement>('.chip--month'))
-    openChoices(day.getAttribute('aria-label')?.replace('Add event on ', '') || 'Selected day', [
-      ...events.map(item => ({ label: item.textContent || 'View event', action: () => {
-        item.focus()
-        item.click()
-      } })),
-      { label: 'Add event', action: () => {
-        day.dataset.tvAdding = 'true'
-        day.click()
-        delete day.dataset.tvAdding
-      } },
-    ])
-  }, true)
-
   function candidates(): HTMLElement[] {
     const scope = remoteDialog || document.querySelector('[role="dialog"], dialog[open]') || document
     return Array.from(scope.querySelectorAll<HTMLElement>(selector)).filter(el => {

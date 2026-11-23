@@ -100,7 +100,7 @@ async function submit(item: OutboxItem, kv: Kv = idbKv): Promise<'sent' | 'queue
   })
 }
 
-function requestId(): string {
+export function requestId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { TouchSheet } from '../../components/TouchSheet'
 import { addDays, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns'
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -85,6 +87,7 @@ function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
   const fill = useEventColor()
   const { data: users = [] } = useUsers()
   const dayStart = startOfToday()
+  const [selected, setSelected] = useState<number | null>(null)
   const only = people(config)
   const { data: events = [] } = useEvents(dayStart, addDays(dayStart, 1), only)
 
@@ -104,9 +107,8 @@ function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
           const mine = events.filter((e) => (u.id === -1 ? true : e.user_id === u.id))
           return (
             <div key={u.id} className="people__col">
-              <div className="people__name" style={{ borderColor: u.color }}>
-                {u.name}
-              </div>
+              <button className="people__name" disabled={u.id < 0} style={{ borderColor: u.color }}
+                onClick={() => setSelected(u.id)}>{u.name}</button>
               {mine.length === 0 && <div className="people__free">Free</div>}
               {mine.map((e) => (
                 <button
@@ -123,8 +125,58 @@ function TodayAgenda({ config, onOpenEvent, onNewEvent }: WidgetProps) {
           )
         })}
       </div>
+      {shown.map(user => selected === user.id && (
+        <PersonCheckIn key={user.id} user={user} onClose={() => setSelected(null)}
+          onEvent={event => { setSelected(null); onOpenEvent(event) }} />
+      ))}
     </>
   )
+}
+
+function PersonCheckIn({ user, onClose, onEvent }: {
+  user: { id: number; name: string }
+  onClose: () => void
+  onEvent: (event: CalendarEvent) => void
+}) {
+  const start = startOfToday()
+  const events = useEvents(start, addDays(start, 30), [user.id])
+  const board = useQuery({
+    queryKey: ['chores', 'board', 'today'],
+    queryFn: () => api.get<ChoreBoard>('/chores/board'),
+  })
+  const qc = useQueryClient()
+  const [saving, setSaving] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const person = board.data?.people.find(person => person.user_id === user.id)
+  const next = events.data?.find(event => event.all_day
+    ? event.end_at.slice(0, 10) > format(start, "yyyy-MM-dd")
+    : new Date(event.end_at).getTime() > Date.now())
+  return <TouchSheet title={user.name} onClose={onClose}>
+    <h3>Up next</h3>
+    {events.isPending ? <p>Loading schedule…</p> : events.isError ? <p>Schedule unavailable.</p>
+      : next ? <button className="touch-row" onClick={() => onEvent(next)}>
+        <small>{whenLabel(next)}</small>{next.title}</button> : <p>No events in the next 30 days.</p>}
+    <h3>Today’s chores {person && <small> · {person.stars} ★</small>}</h3>
+    {board.isPending ? <p>Loading chores…</p> : board.isError ? <p>Chores unavailable.</p>
+      : !person?.chores.length && <p>Nothing due today.</p>}
+    {person?.chores.map(chore => <button key={chore.chore_id} className="touch-row"
+      disabled={saving !== null} aria-pressed={Boolean(chore.completion)}
+      onClick={async () => {
+        if (!board.data) return
+        setSaving(chore.chore_id)
+        setError('')
+        try {
+          await checkChore({ choreId: chore.chore_id, userId: user.id, on: board.data.on,
+            done: !chore.completion }, qc)
+        } catch { setError('Could not save that chore. Try again.') }
+        finally { setSaving(null) }
+      }}>
+      {chore.title}<small>{chore.completion?.status === 'pending' ? 'Waiting for approval'
+        : chore.completion ? 'Completed' : 'Mark complete'}</small>
+    </button>)}
+    {error && <p role="alert">{error}</p>}
+    <Link className="btn" to="/messages">Message family</Link>
+  </TouchSheet>
 }
 
 // ---------------------------------- Clock ------------------------------------
@@ -629,7 +681,7 @@ function atNoon(d: Date): Date {
 }
 
 function whenLabel(e: CalendarEvent): string {
-  const start = new Date(e.start_at)
+  const start = new Date(e.all_day ? e.start_at.slice(0, 10) + "T00:00:00" : e.start_at)
   const today = new Date()
   const dayPart = isSameDay(start, today)
     ? 'Today'

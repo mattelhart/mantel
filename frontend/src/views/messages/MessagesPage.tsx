@@ -1,3 +1,4 @@
+import { requestId } from '../../offline/actions'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
@@ -61,6 +62,7 @@ export function friendlyFailureText(raw: string, name?: string | null): string {
 
 export function friendlySendError(error: unknown, name?: string | null): string {
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  if (raw.startsWith('Delivery unconfirmed')) return raw
   return friendlyFailureText(raw, name) || "Couldn't send that. Try again in a moment."
 }
 
@@ -167,14 +169,17 @@ export function MessageThreadPage() {
     }
   }, [])
 
+  const attempt = useRef({ payload: "", id: "" })
   const send = useMutation({
-    mutationFn: (payload: { user_id: number; body: string; media_base64?: string }) =>
+    mutationFn: (payload: { request_id: string; user_id: number; body: string; media_base64?: string }) =>
       api.post<FamilyMessage>('/messages', payload),
-    onSuccess: async () => {
+    onSuccess: async (row) => {
+      attempt.current = { payload: "", id: "" }
       setText('')
       setError(null)
       setDrawing(false)
-      celebrateSent()
+      if (row.status === "unconfirmed" || row.status === "failed") setError(statusLabel(row.status))
+      else celebrateSent()
       await qc.invalidateQueries({ queryKey: KEY })
     },
     onError: (err: Error) => setError(friendlySendError(err)),
@@ -208,7 +213,9 @@ export function MessageThreadPage() {
     if (!data.user_id) return
     const trimmed = body.trim()
     if (!trimmed && !media) return
-    send.mutate({ user_id: data.user_id, body: trimmed, media_base64: media })
+    const signature = JSON.stringify([data.user_id, trimmed, media])
+    if (signature !== attempt.current.payload) attempt.current = { payload: signature, id: requestId() }
+    send.mutate({ request_id: attempt.current.id, user_id: data.user_id, body: trimmed, media_base64: media })
   }
 
   return (
@@ -256,7 +263,7 @@ export function MessageThreadPage() {
             <div className="messages__status">
               {formatTime(message.created_at)}
               {message.direction === 'out' ? ` · ${statusLabel(message.status)}` : ''}
-              {message.error_message ? ` · ${friendlyFailureText(message.error_message, data.name)}` : ''}
+              {message.error_message && message.status !== 'unconfirmed' ? ` · ${friendlyFailureText(message.error_message, data.name)}` : ''}
             </div>
           </div>
         ))}
@@ -273,7 +280,7 @@ export function MessageThreadPage() {
         >
           <div className="messages__chips" role="group" aria-label="Quick replies">
             {quick.map((chip) => (
-              <button key={chip} type="button" className="messages__chip" onClick={() => submit(chip)}>
+              <button key={chip} type="button" className="messages__chip" disabled={send.isPending} onClick={() => submit(chip)}>
                 {chip}
               </button>
             ))}
@@ -445,6 +452,8 @@ function preview(item: Conversation): string {
 
 function statusLabel(status: string): string {
   switch (status) {
+    case 'unconfirmed':
+      return 'Delivery unconfirmed'
     case 'queued':
     case 'accepted':
     case 'scheduled':

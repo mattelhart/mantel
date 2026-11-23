@@ -9,7 +9,7 @@ recovery to all of them. The service-specific parts live in `services/providers/
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -118,26 +118,27 @@ def pull_calendar(db: Session, cal: Calendar) -> int:
         datetime.now(UTC) - timedelta(days=get_settings().sync_past_days)
     ).isoformat()
 
+    protected = set()
+    changes = 0
     try:
         items, next_token = provider.list_events(
             cal.remote_id, sync_token=cal.sync_token, time_min=time_min
         )
     except SyncTokenExpired:
-        # The provider discarded our incremental cursor. Drop everything it gave us
-        # before and start clean -- anything created locally and not yet pushed is
-        # preserved, because it does not carry this provider's origin.
-        log.info("Sync token expired for calendar %s; doing a full resync", cal.id)
-        db.execute(
-            delete(Event).where(
-                Event.calendar_id == cal.id, Event.origin == account.provider
-            )
-        )
-        cal.sync_token = None
-        db.commit()
+        # Fetch first: an interrupted rebuild must leave the last good calendar intact.
         items, next_token = provider.list_events(cal.remote_id, time_min=time_min)
+        rows = db.scalars(select(Event).where(Event.calendar_id == cal.id)).all()
+        seen = {item.id for item in items if not item.deleted}
+        for row in rows:
+            if row.sync_state != "synced":
+                protected.add(row.remote_id)
+            elif row.origin == account.provider and row.remote_id not in seen:
+                db.delete(row)
+                changes += 1
 
-    changes = 0
     for item in items:
+        if item.id in protected:
+            continue
         changes += _apply_remote_event(db, cal, item)
     changes += _prune_stale_occurrences(db, cal, items)
 
@@ -239,6 +240,7 @@ def _forget_resource(db: Session, cal: Calendar, remote_id: str) -> int:
     rows = db.scalars(
         select(Event).where(
             Event.calendar_id == cal.id,
+            Event.sync_state == "synced",
             or_(
                 Event.google_event_id == remote_id,
                 # autoescape matters: a Google id can contain '_', which LIKE would

@@ -123,7 +123,7 @@ describe('Doodle pad send', () => {
     click(byText('Send')!)
     await settle()
 
-    expect(sent).toEqual([{ user_id: 1, body: 'For you', media_base64: PNG }])
+    expect(sent).toEqual([{ request_id: expect.any(String), user_id: 1, body: 'For you', media_base64: PNG }])
     expect(document.body.textContent).toContain('Sent to Austin')
     expect(document.querySelector('.doodle-send__thread')?.textContent).toContain('See messages')
     expect(document.querySelector('.doodle-send__back')?.textContent).toMatch(/Done/)
@@ -144,8 +144,8 @@ describe('Doodle pad send', () => {
     click(byText('Send to 2')!)
     await settle()
     expect(sent).toEqual([
-      { user_id: 1, body: '', media_base64: PNG },
-      { user_id: 3, body: '', media_base64: PNG },
+      { request_id: expect.any(String), user_id: 1, body: '', media_base64: PNG },
+      { request_id: expect.any(String), user_id: 3, body: '', media_base64: PNG },
     ])
     expect(document.body.textContent).toContain('Sent to Austin and Brooklyn')
     expect(document.querySelector('a.doodle-send__thread[href="/messages/user-1"]')?.textContent).toContain("See Austin's messages")

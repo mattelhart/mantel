@@ -324,3 +324,33 @@ def test_one_broken_account_does_not_stop_discovery_for_the_others(db, fake, gca
 
     assert google_sync.discover_all(db) == 1
     assert calls["n"] == 2
+
+
+def test_interrupted_rebuild_retains_calendar_and_pending_imported_edit(db, fake, gcal, monkeypatch):
+    rows = [gevent(key, key, "2026-08-01T13:00:00Z", "2026-08-01T14:00:00Z")
+            for key in ("g1", "g2")]
+    fake.pages = [(rows, "t1")]
+    google_sync.pull_calendar(db, gcal)
+    event = db.query(Event).filter_by(google_event_id="g1").one()
+    event.title, event.sync_state = "Changed on wall", "pending_update"
+    db.commit()
+    original = fake.list_events
+
+    def unavailable(calendar_id, sync_token=None, time_min=None):
+        if sync_token:
+            return original(calendar_id, sync_token, time_min)
+        raise google_sync.ProviderError(503, "Offline")
+
+    fake.expire_next_sync_token = True
+    with monkeypatch.context() as patch:
+        patch.setattr(fake, "list_events", unavailable)
+        with pytest.raises(google_sync.ProviderError, match="Offline"):
+            google_sync.pull_calendar(db, gcal)
+    db.rollback()
+    assert gcal.sync_token == "t1"
+    assert db.query(Event).count() == 2
+    fake.expire_next_sync_token = True
+    fake.pages = [([rows[0]], "t2")]
+    google_sync.pull_calendar(db, gcal)
+    assert db.query(Event).one().title == "Changed on wall"
+    assert event.sync_state == "pending_update"

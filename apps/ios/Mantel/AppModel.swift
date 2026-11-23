@@ -446,9 +446,27 @@ final class AppModel {
         }
     }
 
+    private struct PendingSend {
+        let body: String
+        let media: String?
+        let id: String
+    }
+    private var pendingSends: [Int: PendingSend] = [:]
+
     func sendMessage(userId: Int, body: String, mediaBase64: String?) async -> String? {
+        let prior = pendingSends[userId]
+        let id = prior?.body == body && prior?.media == mediaBase64 ? prior?.id : nil
+        let attempt = PendingSend(body: body, media: mediaBase64, id: id ?? UUID().uuidString)
+        pendingSends[userId] = attempt
         do {
-            _ = try await client.sendMessage(userId: userId, body: body, mediaBase64: mediaBase64)
+            let row = try await client.sendMessage(userId: userId, body: body,
+                                                   mediaBase64: mediaBase64, requestId: attempt.id)
+            if row.status == "unconfirmed" {
+                await reloadConversations()
+                return "Delivery unconfirmed. Check the conversation."
+            }
+            if pendingSends[userId]?.id == attempt.id { pendingSends[userId] = nil }
+            if row.status == "failed" { return "Send failed. Try again." }
             await reloadConversations()
             return nil
         } catch let error as MantelError {

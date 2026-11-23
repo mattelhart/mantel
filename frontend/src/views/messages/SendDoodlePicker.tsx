@@ -1,5 +1,6 @@
+import { requestId } from '../../offline/actions'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -66,6 +67,7 @@ export function SendDoodlePicker({
     [people, selected],
   )
 
+  const attempts = useRef(new Map<number, { body: string; png: string; id: string }>())
   const send = useMutation({
     mutationFn: async () => {
       if (!configured) {
@@ -78,11 +80,19 @@ export function SendDoodlePicker({
       const out: SendResult[] = []
       for (const user of chosen) {
         try {
-          await api.post('/messages', {
+          let attempt = attempts.current.get(user.id)
+          if (!attempt || attempt.body !== body || attempt.png !== png) {
+            attempt = { body, png, id: requestId() }
+            attempts.current.set(user.id, attempt)
+          }
+          const message = await api.post<{ status: string }>('/messages', {
+            request_id: attempt.id,
             user_id: user.id,
             body,
             media_base64: png,
           })
+          if (message.status === "unconfirmed") throw new Error("Delivery unconfirmed")
+          if (message.status === "failed") throw new Error("Send failed")
           out.push({ user, ok: true })
         } catch (err) {
           out.push({
@@ -122,7 +132,7 @@ export function SendDoodlePicker({
         <button type="button" className="doodle-send__back" onClick={results ? done : onBack}>
           <span aria-hidden>◀</span> {results ? 'Done' : 'Back'}
         </button>
-        <h1 className="doodle-send__title">{results ? 'Sent!' : 'Who should get this?'}</h1>
+        <h1 className="doodle-send__title">{results ? (failed.length ? 'Send results' : 'Sent!') : 'Who should get this?'}</h1>
       </header>
 
       {!configured ? (

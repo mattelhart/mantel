@@ -73,7 +73,7 @@ describe('MonthView', () => {
   })
 
   it('labels each add control with its date, so it works from a keyboard', () => {
-    expect(blockFor(render(), '2026-10')).toContain('aria-label="Add event on October 8"')
+    expect(blockFor(render(), '2026-10')).toContain('aria-label="View agenda for October 8"')
   })
 
   it('keeps the date visible without announcing it twice', () => {

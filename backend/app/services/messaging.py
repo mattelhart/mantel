@@ -37,6 +37,8 @@ def friendly_error_message(raw: str | None, name: str | None = None) -> str | No
     if not text:
         return None
     lowered = text.lower()
+    if lowered.startswith("delivery unconfirmed"):
+        return text
     if "couldn't be sent as a picture" in lowered:
         return text
     if "can't get signal messages from mantel" in lowered:
@@ -77,10 +79,14 @@ def from_number(db: Session) -> str:
     return cfg.from_number if cfg.configured else ""
 
 
-def send_to_user(db: Session, user: User, body: str, png: str | bytes | None = None):
-    if provider_name(db) == "signal":
-        return signal_messages.send_to_user(db, user, body, png=png)
-    return twilio_messages.send_to_user(db, user, body, png=png)
+def send_to_user(
+    db: Session, user: User, body: str, png: str | bytes | None = None,
+    *, request_id: str | None = None, request_digest: str | None = None,
+):
+    service = signal_messages if provider_name(db) == "signal" else twilio_messages
+    return service.send_to_user(
+        db, user, body, png=png, request_id=request_id, request_digest=request_digest
+    )
 
 
 def test_send(db: Session, user: User):

@@ -47,6 +47,14 @@ class SignalError(common.TwilioError):
     """Safe to show the user. Never includes credentials."""
 
 
+class AttachmentRejected(SignalError):
+    pass
+
+
+class DeliveryUnconfirmed(SignalError):
+    pass
+
+
 @dataclass(frozen=True)
 class SignalConfig:
     api_url: str
@@ -293,6 +301,8 @@ def send_to_user(
     body: str,
     *,
     png: str | bytes | None = None,
+    request_id: str | None = None,
+    request_digest: str | None = None,
 ) -> FamilyMessage:
     cfg = load_config(db)
     if not cfg.configured:
@@ -337,7 +347,9 @@ def send_to_user(
         body=text or None,
         media_path=media_path,
         media_content_type=media_type,
-        status="queued",
+        status="unconfirmed",
+        request_id=request_id,
+        request_digest=request_digest,
     )
     db.add(row)
     db.commit()
@@ -346,7 +358,7 @@ def send_to_user(
     try:
         result = _send_payload(cfg, payload)
     except SignalError as exc:
-        if attachment:
+        if attachment and isinstance(exc, AttachmentRejected):
             log.warning("Signal attachment send failed; retrying as text: %s", exc)
             fallback_note = "A drawing was made, but it couldn't be sent as a picture."
             payload.pop("base64_attachments", None)
@@ -354,14 +366,18 @@ def send_to_user(
             try:
                 result = _send_payload(cfg, payload)
             except SignalError as inner:
-                row.status = "failed"
+                row.status = "unconfirmed" if isinstance(inner, DeliveryUnconfirmed) else "failed"
                 row.error_message = str(inner)
                 db.commit()
+                if isinstance(inner, DeliveryUnconfirmed):
+                    return row
                 raise
         else:
-            row.status = "failed"
+            row.status = "unconfirmed" if isinstance(exc, DeliveryUnconfirmed) else "failed"
             row.error_message = str(exc)
             db.commit()
+            if isinstance(exc, DeliveryUnconfirmed):
+                return row
             raise
 
     timestamp = _timestamp_of(result)
@@ -375,7 +391,16 @@ def send_to_user(
 
 
 def _send_payload(cfg: SignalConfig, payload: dict[str, Any]) -> Any:
-    response = _request(cfg, "POST", "/v2/send", json=payload, timeout=REQUEST_TIMEOUT)
+    try:
+        response = _request(cfg, "POST", "/v2/send", json=payload, timeout=REQUEST_TIMEOUT)
+    except SignalError as exc:
+        raise DeliveryUnconfirmed("Delivery unconfirmed. Check the conversation.") from exc
+    if response.status_code >= 500 or response.status_code == 408:
+        raise DeliveryUnconfirmed("Delivery unconfirmed. Check the conversation.")
+    if response.status_code in (400, 413, 415, 422):
+        reason = _error_from(response)
+        if response.status_code in (413, 415) or "attachment" in reason.lower():
+            raise AttachmentRejected(reason)
     if response.status_code not in (200, 201):
         raise SignalError(_error_from(response))
     try:
@@ -448,11 +473,6 @@ def _download_attachment(
     if kind.startswith("text/html") or kind.startswith("application/json"):
         return None, None
     name, kind = common.store_inbound_media(response.content, kind)
-    try:
-        cleanup = _request(cfg, "DELETE", f"/v1/attachments/{attachment_id}", timeout=15.0)
-        _ = cleanup
-    except SignalError:
-        pass
     return name, kind
 
 
@@ -507,6 +527,7 @@ def ingest_inbound(db: Session, cfg: SignalConfig) -> int:
         return 0
 
     added = 0
+    cleanup_ids = []
     receipts = 0
     for event in events:
         if not isinstance(event, dict):
@@ -571,9 +592,16 @@ def ingest_inbound(db: Session, cfg: SignalConfig) -> int:
         except (TypeError, ValueError, OSError):
             pass
         db.add(row)
+        if media_path:
+            cleanup_ids.append(att_id)
         added += 1
     if added or receipts:
         db.commit()
+    for attachment_id in cleanup_ids:
+        try:
+            _request(cfg, "DELETE", f"/v1/attachments/{attachment_id}", timeout=15.0)
+        except SignalError:
+            pass
     return added + receipts
 
 

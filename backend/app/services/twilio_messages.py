@@ -37,7 +37,7 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -72,6 +72,10 @@ _sends_lock = threading.Lock()
 
 class TwilioError(Exception):
     """Safe to show the user. Never includes credentials."""
+
+
+class DeliveryUnconfirmed(TwilioError):
+    pass
 
 
 class RateLimitError(TwilioError):
@@ -397,6 +401,8 @@ def _create_twilio_message(
         f"{TWILIO_API}/Accounts/{cfg.account_sid}/Messages.json",
         data=form,
     )
+    if response.status_code >= 500 or response.status_code == 408:
+        raise DeliveryUnconfirmed("Delivery unconfirmed. Check the conversation.")
     if response.status_code not in (200, 201):
         raise TwilioError(_twilio_error_message(response))
     return response.json()
@@ -408,6 +414,8 @@ def send_to_user(
     body: str,
     *,
     png: str | bytes | None = None,
+    request_id: str | None = None,
+    request_digest: str | None = None,
 ) -> FamilyMessage:
     """Send an SMS, or an MMS when a doodle is provided, to a saved family member."""
     cfg = load_config(db)
@@ -449,7 +457,9 @@ def send_to_user(
         body=text or None,
         media_path=media_path,
         media_content_type=media_type,
-        status="queued",
+        status="unconfirmed",
+        request_id=request_id,
+        request_digest=request_digest,
     )
     db.add(row)
     db.commit()
@@ -469,6 +479,9 @@ def send_to_user(
             row.error_message = str(err)
         if fallback_note and not row.error_message:
             row.error_message = fallback_note
+    except (httpx.RequestError, DeliveryUnconfirmed):
+        row.status = "unconfirmed"
+        row.error_message = "Delivery unconfirmed. Check the conversation."
     except TwilioError as exc:
         row.status = "failed"
         row.error_message = str(exc)
@@ -539,15 +552,34 @@ def ingest_inbound(db: Session, cfg: TwilioConfig) -> int:
     params = {"To": cfg.from_number, "PageSize": "50"}
     if cfg.poll_since:
         params["DateSent>"] = cfg.poll_since
-    response = _request(
-        cfg,
-        "GET",
-        f"{TWILIO_API}/Accounts/{cfg.account_sid}/Messages.json",
-        params=params,
-    )
-    if response.status_code != 200:
-        raise TwilioError(_twilio_error_message(response))
-    messages = response.json().get("messages") or []
+    path = f"/2010-04-01/Accounts/{cfg.account_sid}/Messages.json"
+    url = "https://api.twilio.com" + path
+    # Keep a day of overlap for late arrivals and date-only provider filters.
+    next_since = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+    visited = set()
+    added = 0
+    while url not in visited:
+        visited.add(url)
+        response = _request(cfg, "GET", url, params=params)
+        if response.status_code != 200:
+            raise TwilioError(_twilio_error_message(response))
+        page = response.json()
+        messages = page.get("messages") or []
+        added += _store_inbound_page(db, cfg, messages)
+        next_uri = page.get("next_page_uri")
+        if not next_uri:
+            if next_since > cfg.poll_since:
+                write_setting(db, "twilio_poll_since", next_since)
+                db.commit()
+            break
+        if not next_uri.startswith(path + "?"):
+            raise TwilioError("Twilio returned an unexpected inbox page.")
+        url = "https://api.twilio.com" + next_uri
+        params = None
+    return added
+
+
+def _store_inbound_page(db: Session, cfg: TwilioConfig, messages: list[dict]) -> int:
     inbound = [m for m in messages if str(m.get("direction") or "") == "inbound" and m.get("sid")]
     known = _known_sids(db, [str(m["sid"]) for m in inbound])
     added = 0

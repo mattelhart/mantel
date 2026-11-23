@@ -449,3 +449,22 @@ def test_blank_send_rejected(client):
     person = _person(client)
     r = client.post("/api/messages", json={"user_id": person["id"], "body": "   "})
     assert r.status_code == 400
+
+
+def test_backlog_import_reads_every_page_once_per_message(client, db, monkeypatch):
+    _configure(client)
+    _person(client)
+
+    def handler(request):
+        first = "PageToken" not in request.url.params
+        indices = range(50) if first else range(49, 55)
+        return _json(request, {
+            "messages": [{"direction": "inbound", "from": AUSTIN, "sid": f"SM{i}",
+                          "body": f"Reply {i}"} for i in indices],
+            "next_page_uri": request.url.path + "?PageToken=older" if first else None,
+        })
+
+    _install(monkeypatch, handler)
+    cfg = sms.load_config(db)
+    assert sms.ingest_inbound(db, cfg) == 55
+    assert sms.ingest_inbound(db, cfg) == 0

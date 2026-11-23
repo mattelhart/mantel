@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -15,11 +19,12 @@ from ..services import signal_messages
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
-QUICK_REPLIES = ["Dinner's ready", "Call me", "On my way?"]
+QUICK_REPLIES = ["Dinner's ready", "Call me", "On my way?", "Ready for pickup", "Running late"]
 
 
 class SendPayload(BaseModel):
     user_id: int
+    request_id: str | None = Field(default=None, min_length=1, max_length=80)
     body: str = ""
     media_base64: str | None = None
 
@@ -189,8 +194,28 @@ def send_message(payload: SendPayload, db: Session = Depends(get_db)) -> dict:
     user = db.get(User, payload.user_id)
     if user is None:
         raise HTTPException(404, "Family member not found")
+    digest = hashlib.sha256(json.dumps(
+        [user.id, payload.body, payload.media_base64], separators=(",", ":")
+    ).encode()).hexdigest()
+
+    def previous():
+        row = db.scalar(select(FamilyMessage).where(FamilyMessage.request_id == payload.request_id))
+        if row and row.request_digest != digest:
+            raise HTTPException(409, "This send ID belongs to a different message.")
+        return row
+
     try:
-        row = sms.send_to_user(db, user, payload.body, png=payload.media_base64)
+        row = previous() if payload.request_id else None
+        if row is None:
+            row = sms.send_to_user(
+                db, user, payload.body, png=payload.media_base64,
+                request_id=payload.request_id, request_digest=digest,
+            )
+    except IntegrityError:
+        db.rollback()
+        row = previous() if payload.request_id else None
+        if row is None:
+            raise
     except sms.TwilioError as exc:
         raise _http(exc, user.name) from exc
     return _message_out(row, user.name)

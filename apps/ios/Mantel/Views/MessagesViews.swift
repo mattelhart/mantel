@@ -301,7 +301,9 @@ struct MessageBubble: View {
                         .foregroundStyle(message.isIncoming ? .primary : .white)
                 }
                 HStack(spacing: 6) {
-                    if message.status == "failed" {
+                    if message.status == "unconfirmed" {
+                        Text("Delivery unconfirmed").foregroundStyle(.secondary)
+                    } else if message.status == "failed" {
                         let shown = friendlyFailureText(message.errorMessage, name: name)
                         Text(shown.isEmpty ? "Didn't send" : shown)
                             .foregroundStyle(MantelTheme.danger)

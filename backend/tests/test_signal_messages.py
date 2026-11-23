@@ -10,6 +10,7 @@ import httpx
 import pytest
 from PIL import Image
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.models import FamilyMessage
 from app.services import signal_messages, twilio_messages as sms
@@ -263,6 +264,10 @@ def test_poll_inbound_stores_unknown_and_known_and_never_auto_replies(client, mo
                 request=request,
             )
         if path == "/v1/attachments/att-1" and request.method == "DELETE":
+            with Session(db.get_bind()) as reader:
+                assert reader.scalar(select(FamilyMessage.id).where(
+                    FamilyMessage.media_path.is_not(None)
+                )), "The picture must be committed before bridge cleanup"
             return _json(request, {}, 200)
         return _json(request, {"error": path}, 400)
 
@@ -556,3 +561,22 @@ def test_unlinked_uuid_sender_can_be_listed_and_linked(client, monkeypatch, db):
     # Linking stays manual: a leftover unlinked sender is not assigned automatically.
     leftover = db.scalars(select(FamilyMessage).where(FamilyMessage.signal_uuid == OTHER_UUID)).first()
     assert leftover is not None and leftover.user_id is None
+
+
+def test_uncertain_doodle_retry_keeps_one_send(client, monkeypatch):
+    person = _person(client)
+    _configure(client)
+
+    def timeout(request):
+        raise httpx.ReadTimeout("Lost the reply", request=request)
+
+    calls = _install(monkeypatch, timeout)
+    payload = {"user_id": person["id"], "body": "Pickup", "media_base64": PNG_B64,
+               "request_id": "pickup-tap"}
+    first = client.post("/api/messages", json=payload)
+    second = client.post("/api/messages", json=payload)
+    assert first.status_code == second.status_code == 201
+    assert first.json()["status"] == "unconfirmed"
+    assert first.json()["id"] == second.json()["id"]
+    assert client.post("/api/messages", json={**payload, "body": "Changed"}).status_code == 409
+    assert len(calls) == 1

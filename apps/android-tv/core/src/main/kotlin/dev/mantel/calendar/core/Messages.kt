@@ -47,6 +47,7 @@ fun messageStatusLabel(status: String): String = when (status) {
     "sent" -> "Sent"
     "delivered" -> "Delivered"
     "read" -> "Read"
+    "unconfirmed" -> "Delivery unconfirmed"
     "undelivered", "failed", "canceled" -> "Failed"
     else -> status
 }
