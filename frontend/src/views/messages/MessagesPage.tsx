@@ -1,3 +1,4 @@
+import { TouchSheet } from '../../components/TouchSheet'
 import { requestId } from '../../offline/actions'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
@@ -169,6 +170,15 @@ export function MessageThreadPage() {
     }
   }, [])
 
+  const [deleting, setDeleting] = useState<FamilyMessage | null>(null)
+  const remove = useMutation({
+    mutationFn: (messageId: number) => api.del<void>('/messages/' + messageId),
+    onSuccess: async () => {
+      setDeleting(null)
+      await qc.invalidateQueries({ queryKey: KEY })
+    },
+  })
+
   const attempt = useRef({ payload: "", id: "" })
   const send = useMutation({
     mutationFn: (payload: { request_id: string; user_id: number; body: string; media_base64?: string }) =>
@@ -261,6 +271,10 @@ export function MessageThreadPage() {
               </Link>
             )}
             <div className="messages__status">
+              <button className="messages__delete" type="button" onClick={() => {
+                remove.reset()
+                setDeleting(message)
+              }}>Delete</button>
               {formatTime(message.created_at)}
               {message.direction === 'out' ? ` · ${statusLabel(message.status)}` : ''}
               {message.error_message && message.status !== 'unconfirmed' ? ` · ${friendlyFailureText(message.error_message, data.name)}` : ''}
@@ -270,6 +284,16 @@ export function MessageThreadPage() {
         <div ref={endRef} />
       </div>
 
+      {deleting && <TouchSheet title="Delete this message?" onClose={() => {
+        if (!remove.isPending) setDeleting(null)
+      }}>
+        <p>This removes the message from all Mantel screens. The recipient keeps their copy.</p>
+        {deleting.body && <blockquote>{deleting.body}</blockquote>}
+        {remove.isError && <p role="alert">Could not delete this message. Try again.</p>}
+        <button className="btn" disabled={remove.isPending} onClick={() => remove.mutate(deleting.id)}>
+          {remove.isPending ? 'Deleting…' : 'Delete from Mantel'}
+        </button>
+      </TouchSheet>}
       {canSend ? (
         <form
           className="messages__compose"

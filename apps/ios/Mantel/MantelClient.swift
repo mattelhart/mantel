@@ -126,6 +126,10 @@ actor MantelClient {
         try await send(method: "PATCH", path: "/events/\(id)", body: body)
     }
 
+    func deleteMessage(id: Int) async throws {
+        try await sendEmpty(method: "DELETE", path: "/messages/\(id)")
+    }
+
     func deleteEvent(id: Int) async throws {
         try await sendEmpty(method: "DELETE", path: "/events/\(id)")
     }

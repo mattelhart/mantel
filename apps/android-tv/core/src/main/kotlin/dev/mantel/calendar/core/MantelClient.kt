@@ -129,6 +129,10 @@ class MantelClient(
 
     suspend fun updateEvent(id: Int, body: JsonObject): CalEvent = send(HttpMethod.Patch, "/events/$id", body)
 
+    suspend fun deleteMessage(id: Int) {
+        send<Unit>(HttpMethod.Delete, "/messages/$id", null)
+    }
+
     suspend fun deleteEvent(id: Int) {
         send<Unit>(HttpMethod.Delete, "/events/$id", null)
     }

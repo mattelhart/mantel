@@ -546,6 +546,16 @@ final class AppModel {
         }
     }
 
+    func deleteMessage(_ id: Int) async -> String? {
+        do {
+            try await client.deleteMessage(id: id)
+            await reloadConversations()
+            return nil
+        } catch {
+            return "Could not delete this message. Try again."
+        }
+    }
+
     func deleteEvent(_ id: Int) async -> String? {
         do {
             try await client.deleteEvent(id: id)

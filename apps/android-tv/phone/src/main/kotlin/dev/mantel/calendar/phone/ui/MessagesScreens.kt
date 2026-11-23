@@ -155,6 +155,23 @@ fun MessageThreadScreen(id: String, state: PhoneState, vm: PhoneViewModel, openD
     var error by remember(id) { mutableStateOf<String?>(null) }
     var justSent by remember(id) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var deleting by remember(id) { mutableStateOf<Int?>(null) }
+    deleting?.let { messageId ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { if (!busy) deleting = null },
+            title = { Text("Delete this message?") },
+            text = { Text(error ?: "This removes the message from all Mantel screens. The recipient keeps their copy.") },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { deleting = null }, enabled = !busy) { Text("Cancel") } },
+            confirmButton = { androidx.compose.material3.TextButton(enabled = !busy, onClick = {
+                busy = true
+                vm.deleteMessage(id, messageId) { failure ->
+                    busy = false
+                    error = failure
+                    if (failure == null) deleting = null
+                }
+            }) { Text("Delete from Mantel") } },
+        )
+    }
     val listState = rememberLazyListState()
     val messages = thread?.messages.orEmpty()
     val canSend = thread?.canSend == true && listingConfigured(state) && thread.userId != null
@@ -218,7 +235,12 @@ fun MessageThreadScreen(id: String, state: PhoneState, vm: PhoneViewModel, openD
                 }
             }
             items(messages, key = { it.id }) { message ->
-                MessageBubble(message, thread.name, thread.color, media, vm.zone())
+                Column {
+                    MessageBubble(message, thread.name, thread.color, media, vm.zone())
+                    androidx.compose.material3.TextButton(onClick = { error = null; deleting = message.id }) {
+                        Text("Delete")
+                    }
+                }
             }
         }
         if (canSend) {

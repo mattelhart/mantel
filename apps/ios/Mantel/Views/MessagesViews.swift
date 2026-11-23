@@ -122,6 +122,8 @@ struct ConversationView: View {
     @State private var text = ""
     @State private var error: String?
     @State private var drawing = false
+    @State private var deleting: FamilyMessage?
+    @State private var confirmDelete = false
     @State private var sending = false
 
     var body: some View {
@@ -140,6 +142,10 @@ struct ConversationView: View {
                         ForEach(thread?.messages ?? []) { message in
                             MessageBubble(message: message, name: thread?.name, color: thread?.color ?? "#3b82f6")
                                 .id(message.id)
+                            Button("Delete", role: .destructive) {
+                                deleting = message
+                                confirmDelete = true
+                            }
                         }
                     }
                     .padding(16)
@@ -174,6 +180,17 @@ struct ConversationView: View {
                     .accessibilityLabel("Draw")
                 }
             }
+        }
+        .alert("Delete this message?", isPresented: $confirmDelete, presenting: deleting) { message in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete from Mantel", role: .destructive) {
+                Task {
+                    error = await model.deleteMessage(message.id)
+                    if error == nil { await load() }
+                }
+            }
+        } message: { _ in
+            Text("This removes the message from all Mantel screens. The recipient keeps their copy.")
         }
         .task(id: conversationId) { await load() }
         .fullScreenCover(isPresented: $drawing) {

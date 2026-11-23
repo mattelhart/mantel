@@ -166,6 +166,19 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
+    fun deleteMessage(threadId: String, messageId: Int, result: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                client.deleteMessage(messageId)
+                openThread(threadId)
+                reload()
+                result(null)
+            } catch (e: MantelException) {
+                result(e.message ?: "Could not delete this message.")
+            }
+        }
+    }
+
     fun openThread(id: String) {
         viewModelScope.launch {
             try {

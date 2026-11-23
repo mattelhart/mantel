@@ -468,3 +468,22 @@ def test_backlog_import_reads_every_page_once_per_message(client, db, monkeypatc
     cfg = sms.load_config(db)
     assert sms.ingest_inbound(db, cfg) == 55
     assert sms.ingest_inbound(db, cfg) == 0
+
+
+def test_deleting_message_removes_text_picture_and_preview_but_keeps_poll_identity(client, db):
+    person = _person(client)
+    picture = sms.store_png(PNG)
+    row = FamilyMessage(user_id=person["id"], phone=AUSTIN, direction="in", body="Pickup",
+                        media_path=picture, twilio_sid="SMtest", status="received")
+    db.add(row)
+    db.commit()
+    path = f"/api/messages/{row.id}"
+    assert client.delete(path).status_code == 204
+    assert client.delete(path).status_code == 204
+    assert client.get(path + "/media").status_code == 404
+    assert not sms.media_file(picture).exists()
+    assert client.get(f"/api/messages/conversations/user-{person['id']}").json()["messages"] == []
+    assert client.get("/api/messages/conversations").json()["conversations"][0]["last_message"] is None
+    assert sms._known_sids(db, ["SMtest"]) == {"SMtest"}
+    db.refresh(row)
+    assert row.body is None

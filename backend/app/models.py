@@ -472,6 +472,7 @@ class FamilyMessage(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     request_id: Mapped[str | None] = mapped_column(String(80), unique=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     request_digest: Mapped[str | None] = mapped_column(String(64))
     # E.164 of the other party (the family member, or an unknown sender).
     # Empty when Signal hid the number and we only have a UUID.

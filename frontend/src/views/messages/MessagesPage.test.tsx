@@ -134,6 +134,10 @@ beforeEach(() => {
         const id = url.split('/').pop() as string
         return json(threads[id] ?? thread)
       }
+      if (url === '/api/messages/1' && method === 'DELETE') {
+        thread.messages = (thread.messages as { id: number }[]).filter(message => message.id !== 1)
+        return new Response(null, { status: 204 })
+      }
       if (url === '/api/users')
         return json([
           { id: 3, name: 'Austin', color: '#3b82f6', avatar_emoji: null, sort_order: 0, phone: '+15555550123' },
@@ -208,6 +212,20 @@ describe('Messages page', () => {
     await settle()
     expect(sent).toEqual([{ request_id: expect.any(String), user_id: 3, body: 'On the way' }])
     expect(document.body.textContent).toContain('Sent!')
+  })
+
+  it('keeps a message on cancel and removes only the confirmed message', async () => {
+    HTMLDialogElement.prototype.showModal = function () { this.open = true }
+    HTMLDialogElement.prototype.close = function () { this.open = false }
+    await renderList('/messages/user-3')
+    click(document.querySelector('.messages__delete')!)
+    click(byText('Close')!)
+    expect(document.querySelectorAll('.messages__bubble')).toHaveLength(2)
+    click(document.querySelector('.messages__delete')!)
+    click(byText('Delete from Mantel')!)
+    await settle()
+    expect(document.querySelectorAll('.messages__bubble')).toHaveLength(1)
+    expect(document.querySelector('.messages__bubble')?.textContent).toContain('For you')
   })
 
   it('sends a quick reply in one tap', async () => {

@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import FamilyMessage, User
+from ..models import FamilyMessage, User, utcnow
 from ..services import messaging as sms
 from ..services import signal_messages
 
@@ -99,7 +99,9 @@ def _parse_conversation(db: Session, conversation_id: str) -> tuple[User | None,
 
 
 def _last_message(db: Session, phone: str | None, user_id: int | None) -> FamilyMessage | None:
-    stmt = select(FamilyMessage).order_by(FamilyMessage.created_at.desc(), FamilyMessage.id.desc())
+    stmt = select(FamilyMessage).where(FamilyMessage.deleted_at.is_(None)).order_by(
+        FamilyMessage.created_at.desc(), FamilyMessage.id.desc()
+    )
     if user_id is not None:
         stmt = stmt.where(FamilyMessage.user_id == user_id)
     elif phone:
@@ -157,7 +159,7 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> dic
         rows = list(
             db.scalars(
                 select(FamilyMessage)
-                .where(FamilyMessage.user_id == user.id)
+                .where(FamilyMessage.user_id == user.id, FamilyMessage.deleted_at.is_(None))
                 .order_by(FamilyMessage.created_at, FamilyMessage.id)
             )
         )
@@ -167,6 +169,7 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> dic
         rows = list(
             db.scalars(
                 select(FamilyMessage)
+                .where(FamilyMessage.deleted_at.is_(None))
                 .where(FamilyMessage.phone == phone, FamilyMessage.user_id.is_(None))
                 .order_by(FamilyMessage.created_at, FamilyMessage.id)
             )
@@ -202,6 +205,8 @@ def send_message(payload: SendPayload, db: Session = Depends(get_db)) -> dict:
         row = db.scalar(select(FamilyMessage).where(FamilyMessage.request_id == payload.request_id))
         if row and row.request_digest != digest:
             raise HTTPException(409, "This send ID belongs to a different message.")
+        if row and row.deleted_at is not None:
+            raise HTTPException(410, "This message was deleted from Mantel.")
         return row
 
     try:
@@ -310,13 +315,31 @@ def link_signal_sender(payload: LinkSenderPayload, db: Session = Depends(get_db)
     }
 
 
+@router.delete("/{message_id}", status_code=204, summary="Delete a message from Mantel")
+def delete_message(message_id: int, db: Session = Depends(get_db)) -> None:
+    row = db.get(FamilyMessage, message_id)
+    if row is None or row.user_id is None:
+        raise HTTPException(404, "Message not found")
+    # Preserve provider and send IDs so polling and retries cannot recreate the text.
+    if row.deleted_at is None:
+        row.deleted_at = utcnow()
+        row.body = None
+        row.error_message = None
+        db.commit()
+    if row.media_path:
+        sms.media_file(row.media_path).unlink(missing_ok=True)
+        row.media_path = None
+        row.media_content_type = None
+        db.commit()
+
+
 @router.get(
     "/{message_id}/media",
     summary="Fetch a stored picture from a message",
 )
 def get_media(message_id: int, db: Session = Depends(get_db)):
     row = db.get(FamilyMessage, message_id)
-    if row is None or not row.media_path or row.user_id is None:
+    if row is None or row.deleted_at is not None or not row.media_path or row.user_id is None:
         # Pictures from unknown numbers stay hidden too.
         raise HTTPException(404, "Picture not found")
     try:
