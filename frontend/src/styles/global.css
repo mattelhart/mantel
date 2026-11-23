@@ -124,7 +124,7 @@
   --saver-bg: #0c1016;
   --radius: 22px;
   --touch: 56px;
-  --nav-size: 112px;
+  --nav-size: 124px;
   color-scheme: light;
 }
 
@@ -135,6 +135,14 @@
 :root[data-scale='wall'] {
   --scale: 1.45;
   --nav-size: 118px;
+}
+/* Airy already uses a wider rail; scale must not shrink it (large would
+   otherwise drop 112px to 104px) and should leave room for inset focus rings. */
+:root[data-theme='airy'][data-scale='large'] {
+  --nav-size: 128px;
+}
+:root[data-theme='airy'][data-scale='wall'] {
+  --nav-size: 136px;
 }
 
 * {
@@ -337,7 +345,13 @@ textarea:focus-visible {
     height: 100%;
     border-top: none;
     border-right: 1px solid var(--border);
-    padding: max(8px, env(safe-area-inset-top)) 6px 8px;
+    /* 10px side padding and 8px gaps keep a 2–4px focus ring plus offset
+       inside the rail, instead of clipping at the left edge or overlapping
+       the next item. */
+    padding: max(12px, env(safe-area-inset-top)) 10px 12px;
+    gap: 8px;
+    align-items: stretch;
+    overflow: visible;
   }
 }
 
@@ -382,6 +396,13 @@ textarea:focus-visible {
     padding: 14px 6px;
     font-size: var(--font-xs);
     white-space: normal;
+    /* Allow the focus ring to paint; ellipsis is portrait-only. */
+    overflow: visible;
+  }
+
+  /* Draw the ring inside the button so it cannot escape the rail. */
+  .shell__nav .navbtn:focus-visible {
+    outline-offset: -3px;
   }
 }
 

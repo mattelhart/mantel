@@ -25,6 +25,8 @@ they cannot write back.
 
 ## Unreleased
 
+- **Side-menu focus rings stay inside the rail.** The rounded outline around the selected or focused item (keyboard, mouse, or a TV remote) no longer clips at the left edge or overlaps the items above and below it, in Airy, the other themes, and `?tv=1`. The Android TV side menu gets the same treatment.
+
 - **Bigger side menu on the wall and TVs.** In landscape (the Pi kiosk, `?tv=1`, the Android TV app) the side-menu labels are about 20% larger and the icons grow with them. The phone's bottom bar is unchanged.
 
 - **Phone app fixes.** System Back now returns to the Home tab before leaving the app; text fields stay above the keyboard; the family home buttons wrap instead of squeezing "Pair TV"; rotating keeps the page you were on; landscape content stays clear of the camera cutout. The TV app is now labelled **Mantel TV** so it can't be mistaken for the phone app.

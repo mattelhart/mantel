@@ -221,23 +221,26 @@ private fun Home(state: TvState, vm: TvViewModel) {
         Text("Family calendar", color = Ink, fontSize = 30.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif)
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Column(
-                Modifier.width(140.dp).verticalScroll(rememberScrollState()).padding(6.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                // 12.dp padding and no focus scale so the 4.dp focused border stays
+                // inside the rail instead of clipping at the left edge.
+                Modifier.width(164.dp).verticalScroll(rememberScrollState()).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Tab.entries.forEach { item ->
                     SunnyButton(
                         onClick = { tab = item; stack = emptyList() },
                         modifier = Modifier.fillMaxWidth(),
                         container = if (item == tab && stack.isEmpty()) Sun else Card,
+                        focusedScale = 1f,
                     ) {
                         Text(if (item == Tab.Agenda) "Schedule" else if (item == Tab.Chores) "Tasks" else item.name,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 16.dp), fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
-                SunnyButton(onClick = { push(Overlay.Rewards) }, modifier = Modifier.fillMaxWidth()) {
+                SunnyButton(onClick = { push(Overlay.Rewards) }, modifier = Modifier.fillMaxWidth(), focusedScale = 1f) {
                     Text("Rewards", modifier = Modifier.padding(12.dp), fontSize = 19.sp, maxLines = 1)
                 }
-                SunnyButton(onClick = { vm.forgetServer() }, modifier = Modifier.fillMaxWidth()) {
+                SunnyButton(onClick = { vm.forgetServer() }, modifier = Modifier.fillMaxWidth(), focusedScale = 1f) {
                     Text("Server", modifier = Modifier.padding(12.dp), fontSize = 19.sp, maxLines = 1)
                 }
             }

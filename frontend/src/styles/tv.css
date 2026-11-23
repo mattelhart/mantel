@@ -3,6 +3,13 @@ html[data-tv='true'] :focus {
   outline-offset: 3px;
   scroll-margin: 16px;
 }
+/* Same idea as the profile-row exception below: the side rail is narrow, so a
+   4px ring with a 3px outward offset was clipped on the left and ran over
+   neighbouring items. Keep the ring inside the button. */
+html[data-tv='true'] .shell__nav .navbtn:focus {
+  outline: 4px solid var(--accent) !important;
+  outline-offset: -5px;
+}
 html[data-tv='true'] .shell { padding: 20px; }
 html[data-tv='true'] button,
 html[data-tv='true'] input,
