@@ -114,7 +114,7 @@ def test_send_rejected_when_unconfigured(client):
     _configure(client, number="")  # switch to Signal without a number
     r = client.post("/api/messages", json={"user_id": person["id"], "body": "Hi"})
     assert r.status_code == 400
-    assert "Signal" in r.json()["error"]["message"]
+    assert "Ask a grown-up to finish Messages settings" in r.json()["error"]["message"]
 
 
 def test_send_text_and_doodle_use_v2_send_with_base64(client, monkeypatch):
@@ -390,3 +390,169 @@ def test_blank_send_rejected(client):
     _configure(client)
     r = client.post("/api/messages", json={"user_id": person["id"], "body": "  "})
     assert r.status_code == 400
+
+
+MOM_UUID = "cbb48950-cdb9-4d42-9387-20cd9bfa3f40"
+OTHER_UUID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+
+
+def test_signal_uuid_round_trip_and_uniqueness(client):
+    person = _person(client)
+    saved = client.patch(f"/api/users/{person['id']}", json={"signal_uuid": MOM_UUID.upper()})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["signal_uuid"] == MOM_UUID
+    other = client.post(
+        "/api/users",
+        json={"name": "Brooklyn", "phone": "+15555550111", "color": "#f97316", "signal_uuid": MOM_UUID},
+    )
+    assert other.status_code == 400
+    cleared = client.patch(f"/api/users/{person['id']}", json={"signal_uuid": ""}).json()
+    assert cleared["signal_uuid"] is None
+    bad = client.patch(f"/api/users/{person['id']}", json={"signal_uuid": "not-a-uuid"})
+    assert bad.status_code == 422
+
+
+def test_send_uses_signal_uuid_when_saved(client, monkeypatch):
+    person = _person(client)
+    client.patch(f"/api/users/{person['id']}", json={"signal_uuid": MOM_UUID})
+    _configure(client)
+    calls = _install(monkeypatch, lambda request: _json(request, [{"timestamp": "11"}], 201))
+    r = client.post("/api/messages", json={"user_id": person["id"], "body": "Hi Mom"})
+    assert r.status_code == 201, r.text
+    payload = json.loads(calls[0].content)
+    assert payload["recipients"] == [MOM_UUID]
+    listing = client.get(f"/api/messages/conversations/user-{person['id']}").json()
+    assert listing["messages"][0]["status"] == "sent"
+
+
+def test_unregistered_failure_is_friendly_in_the_api_and_raw_in_the_db(client, monkeypatch, db):
+    person = _person(client, name="Mom")
+    _configure(client)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v2/send":
+            return _json(request, {"error": "UNREGISTERED_FAILURE: +15555550123 is not registered"}, 400)
+        return _json(request, {"error": request.url.path}, 400)
+
+    _install(monkeypatch, handler)
+    r = client.post("/api/messages", json={"user_id": person["id"], "body": "Hi"})
+    assert r.status_code == 400
+    assert "UNREGISTERED" not in r.json()["error"]["message"]
+    assert "can't get Signal messages from Mantel yet" in r.json()["error"]["message"]
+    assert "Ask a grown-up" in r.json()["error"]["message"]
+    row = db.scalars(select(FamilyMessage)).first()
+    assert row is not None
+    db.refresh(row)
+    assert "UNREGISTERED_FAILURE" in (row.error_message or "")
+    thread = client.get(f"/api/messages/conversations/user-{person['id']}").json()
+    shown = thread["messages"][0]["error_message"]
+    assert "UNREGISTERED" not in shown
+    assert "Mom can't get Signal messages from Mantel yet" in shown
+
+
+def test_ingest_matches_source_uuid_when_number_is_hidden(client, monkeypatch, db):
+    person = _person(client, name="Mom")
+    client.patch(f"/api/users/{person['id']}", json={"signal_uuid": MOM_UUID})
+    _configure(client)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/v1/receive/"):
+            return _json(
+                request,
+                [
+                    {
+                        "envelope": {
+                            "sourceUuid": MOM_UUID,
+                            "sourceServiceId": f"ACI:{MOM_UUID}",
+                            "sourceName": "Katie",
+                            "timestamp": 1700000004000,
+                            "dataMessage": {
+                                "timestamp": 1700000004000,
+                                "message": "hi",
+                            },
+                        }
+                    }
+                ],
+            )
+        return _json(request, {"error": request.url.path}, 400)
+
+    _install(monkeypatch, handler)
+    added = signal_messages.poll_once(db)
+    assert added == 1
+    row = db.scalars(select(FamilyMessage)).first()
+    assert row is not None
+    assert row.user_id == person["id"]
+    assert row.phone == AUSTIN
+    assert row.signal_uuid == MOM_UUID
+    assert row.body == "hi"
+    listing = client.get("/api/messages/conversations").json()
+    mom = next(c for c in listing["conversations"] if c["name"] == "Mom")
+    assert mom["last_message"]["body"] == "hi"
+    assert client.get("/api/messages/signal/unlinked").json()["senders"] == []
+
+
+def test_unlinked_uuid_sender_can_be_listed_and_linked(client, monkeypatch, db):
+    person = _person(client, name="Mom")
+    _configure(client)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/v1/receive/"):
+            return _json(
+                request,
+                [
+                    {
+                        "envelope": {
+                            "sourceUuid": MOM_UUID,
+                            "sourceName": "Katie",
+                            "timestamp": 1700000005000,
+                            "dataMessage": {
+                                "timestamp": 1700000005000,
+                                "message": "hi from mom",
+                            },
+                        }
+                    },
+                    {
+                        "envelope": {
+                            "sourceUuid": OTHER_UUID,
+                            "sourceName": "Stranger",
+                            "timestamp": 1700000006000,
+                            "dataMessage": {
+                                "timestamp": 1700000006000,
+                                "message": "who is this",
+                            },
+                        }
+                    },
+                ],
+            )
+        return _json(request, {"error": request.url.path}, 400)
+
+    _install(monkeypatch, handler)
+    added = signal_messages.poll_once(db)
+    assert added == 2
+    rows = list(db.scalars(select(FamilyMessage).order_by(FamilyMessage.id)))
+    assert all(row.user_id is None for row in rows)
+    assert all(row.phone == "" for row in rows)
+    listing = client.get("/api/messages/conversations").json()
+    assert all(c["name"] != "Katie" for c in listing["conversations"])
+    unlinked = client.get("/api/messages/signal/unlinked").json()["senders"]
+    uuids = {item["signal_uuid"]: item for item in unlinked}
+    assert uuids[MOM_UUID]["name"] == "Katie"
+    assert uuids[MOM_UUID]["last_seen"]
+    assert uuids[OTHER_UUID]["name"] == "Stranger"
+
+    linked = client.post(
+        "/api/messages/signal/link",
+        json={"signal_uuid": MOM_UUID, "user_id": person["id"]},
+    )
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["signal_uuid"] == MOM_UUID
+    saved = client.get(f"/api/users/{person['id']}").json()
+    assert saved["signal_uuid"] == MOM_UUID
+    thread = client.get(f"/api/messages/conversations/user-{person['id']}").json()
+    bodies = [m["body"] for m in thread["messages"]]
+    assert bodies == ["hi from mom"]
+    still = client.get("/api/messages/signal/unlinked").json()["senders"]
+    assert [item["signal_uuid"] for item in still] == [OTHER_UUID]
+    # Linking stays manual: a leftover unlinked sender is not assigned automatically.
+    leftover = db.scalars(select(FamilyMessage).where(FamilyMessage.signal_uuid == OTHER_UUID)).first()
+    assert leftover is not None and leftover.user_id is None

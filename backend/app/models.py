@@ -44,6 +44,8 @@ class User(TimestampMixin, Base):
     # Optional E.164 number used by family messaging. Nullable so existing
     # databases can gain the column automatically (see schema_sync.py).
     phone: Mapped[str | None] = mapped_column(String(20))
+    # Signal ACI, used when a member hides their number. Nullable, auto-added.
+    signal_uuid: Mapped[str | None] = mapped_column(String(36))
 
     accounts: Mapped[list["LinkedAccount"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -470,7 +472,12 @@ class FamilyMessage(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     # E.164 of the other party (the family member, or an unknown sender).
+    # Empty when Signal hid the number and we only have a UUID.
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Signal ACI of the other party, when the envelope included one.
+    signal_uuid: Mapped[str | None] = mapped_column(String(36))
+    # Profile name from an unlinked Signal sender, so a grown-up can match them.
+    sender_name: Mapped[str | None] = mapped_column(String(100))
     # "in" (they texted the wall) or "out" (the wall sent it).
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     body: Mapped[str | None] = mapped_column(Text)

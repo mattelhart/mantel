@@ -1,16 +1,32 @@
 package dev.mantel.calendar.core
 
-fun friendlySendError(raw: String?): String {
-    val text = raw.orEmpty()
+fun friendlyFailureText(raw: String?, name: String? = null): String {
+    val text = raw.orEmpty().trim()
+    if (text.isEmpty()) return ""
+    val lowered = text.lowercase()
     return when {
-        text.contains("phone number", ignoreCase = true) ->
+        lowered.contains("couldn't be sent as a picture") -> text
+        lowered.contains("can't get signal messages from mantel") -> text
+        lowered.contains("unregistered") ||
+            lowered.contains("isn't registered") ||
+            lowered.contains("not registered") -> {
+            val who = name?.trim().orEmpty().ifEmpty { "They" }
+            "$who can't get Signal messages from Mantel yet. Ask a grown-up for help."
+        }
+        lowered.contains("phone number") ->
             "Ask a grown-up to add a phone number first."
-        text.contains("Twilio or Signal", ignoreCase = true) ||
-            text.contains("not configured", ignoreCase = true) ||
-            text.contains("Settings", ignoreCase = true) ->
+        lowered.contains("ask a grown-up to finish messages settings") -> text
+        lowered.contains("twilio or signal") ||
+            lowered.contains("not configured") ||
+            lowered.contains("settings") ->
             "Ask a grown-up to finish Messages settings, then try again."
         else -> "Couldn't send that. Try again in a moment."
     }
+}
+
+fun friendlySendError(raw: String?, name: String? = null): String {
+    val mapped = friendlyFailureText(raw, name)
+    return mapped.ifEmpty { "Couldn't send that. Try again in a moment." }
 }
 
 fun conversationPreview(item: Conversation): String {

@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mantel.calendar.core.Conversation
 import dev.mantel.calendar.core.ConversationMessage
 import dev.mantel.calendar.core.conversationPreview
+import dev.mantel.calendar.core.friendlyFailureText
 import dev.mantel.calendar.core.messageMediaId
 import dev.mantel.calendar.core.messageStatusLabel
 import dev.mantel.calendar.phone.PhoneState
@@ -217,7 +218,7 @@ fun MessageThreadScreen(id: String, state: PhoneState, vm: PhoneViewModel, openD
                 }
             }
             items(messages, key = { it.id }) { message ->
-                MessageBubble(message, thread.color, media, vm.zone())
+                MessageBubble(message, thread.name, thread.color, media, vm.zone())
             }
         }
         if (canSend) {
@@ -481,6 +482,7 @@ private fun PersonAvatar(name: String, color: String, emoji: String?, size: andr
 @Composable
 private fun MessageBubble(
     message: ConversationMessage,
+    personName: String,
     personColor: String,
     media: Map<Int, ByteArray>,
     zone: ZoneId,
@@ -543,7 +545,7 @@ private fun MessageBubble(
                 }
                 val time = formatMessageTime(message.createdAt, zone)
                 val status = if (outgoing) messageStatusLabel(message.status) else ""
-                val extra = message.errorMessage.orEmpty()
+                val extra = friendlyFailureText(message.errorMessage, personName)
                 val meta = listOf(time, status, extra).filter { it.isNotBlank() }.joinToString(" · ")
                 if (meta.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))

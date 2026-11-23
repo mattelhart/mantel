@@ -31,9 +31,11 @@ class TestPayload(BaseModel):
     )
 
 
-def _http(exc: sms.TwilioError) -> HTTPException:
+def _http(exc: sms.TwilioError, name: str | None = None) -> HTTPException:
     status = 429 if isinstance(exc, sms.RateLimitError) else 400
-    return HTTPException(status, str(exc))
+    if isinstance(exc, sms.RateLimitError):
+        return HTTPException(status, str(exc))
+    return HTTPException(status, sms.friendly_error_message(str(exc), name) or str(exc))
 
 
 def _iso(value) -> str | None:
@@ -44,7 +46,7 @@ def _iso(value) -> str | None:
     return value.isoformat()
 
 
-def _message_out(row: FamilyMessage) -> dict:
+def _message_out(row: FamilyMessage, name: str | None = None) -> dict:
     return {
         "id": row.id,
         "user_id": row.user_id,
@@ -54,7 +56,7 @@ def _message_out(row: FamilyMessage) -> dict:
         "media_url": f"/api/messages/{row.id}/media" if row.media_path else None,
         "media_content_type": row.media_content_type,
         "status": row.status,
-        "error_message": row.error_message,
+        "error_message": sms.friendly_error_message(row.error_message, name),
         "created_at": _iso(row.created_at),
     }
 
@@ -125,8 +127,8 @@ def list_conversations(db: Session = Depends(get_db)) -> dict:
                 "color": user.color,
                 "avatar_emoji": user.avatar_emoji,
                 "unknown": False,
-                "can_send": bool(user.phone and cfg_ok),
-                "last_message": _message_out(last) if last else None,
+                "can_send": bool((user.phone or user.signal_uuid) and cfg_ok),
+                "last_message": _message_out(last, user.name) if last else None,
             }
         )
 
@@ -173,8 +175,8 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> dic
         "color": color,
         "avatar_emoji": emoji,
         "unknown": unknown,
-        "can_send": bool(user and user.phone and sms.configured(db)),
-        "messages": [_message_out(row) for row in rows],
+        "can_send": bool(user and (user.phone or user.signal_uuid) and sms.configured(db)),
+        "messages": [_message_out(row, name) for row in rows],
     }
 
 
@@ -190,8 +192,8 @@ def send_message(payload: SendPayload, db: Session = Depends(get_db)) -> dict:
     try:
         row = sms.send_to_user(db, user, payload.body, png=payload.media_base64)
     except sms.TwilioError as exc:
-        raise _http(exc) from exc
-    return _message_out(row)
+        raise _http(exc, user.name) from exc
+    return _message_out(row, user.name)
 
 
 @router.post(
@@ -216,8 +218,8 @@ def send_test(payload: TestPayload | None = None, db: Session = Depends(get_db))
     try:
         row = sms.test_send(db, user)
     except sms.TwilioError as exc:
-        raise _http(exc) from exc
-    return _message_out(row)
+        raise _http(exc, user.name) from exc
+    return _message_out(row, user.name)
 
 
 @router.get(
@@ -244,6 +246,43 @@ def signal_qr(db: Session = Depends(get_db)):
     except signal_messages.SignalError as exc:
         raise HTTPException(400, str(exc)) from exc
     return Response(content=png, media_type="image/png")
+
+
+class LinkSenderPayload(BaseModel):
+    signal_uuid: str
+    user_id: int
+
+
+@router.get(
+    "/signal/unlinked",
+    summary="Unlinked Signal senders",
+    description=(
+        "Senders whose messages arrived without a phone number and could not be "
+        "matched to a family member. Linking is manual."
+    ),
+)
+def list_unlinked_senders(db: Session = Depends(get_db)) -> dict:
+    return {"senders": signal_messages.list_unlinked_senders(db)}
+
+
+@router.post(
+    "/signal/link",
+    summary="Link a Signal sender to a family member",
+)
+def link_signal_sender(payload: LinkSenderPayload, db: Session = Depends(get_db)) -> dict:
+    user = db.get(User, payload.user_id)
+    if user is None:
+        raise HTTPException(404, "Family member not found")
+    try:
+        signal_messages.link_sender(db, payload.signal_uuid, user)
+    except signal_messages.SignalError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {
+        "ok": True,
+        "user_id": user.id,
+        "signal_uuid": user.signal_uuid,
+        "name": user.name,
+    }
 
 
 @router.get(

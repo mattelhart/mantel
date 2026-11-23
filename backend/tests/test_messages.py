@@ -156,7 +156,7 @@ def test_send_rejected_when_unconfigured(client):
 
     r = client.post("/api/messages", json={"user_id": person["id"], "body": "Hi"})
     assert r.status_code == 400
-    assert "Twilio" in r.json()["error"]["message"]
+    assert "Ask a grown-up to finish Messages settings" in r.json()["error"]["message"]
 
 
 def test_conversations_list_includes_family_without_a_phone(client):

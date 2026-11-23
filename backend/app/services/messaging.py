@@ -26,6 +26,39 @@ assert_unique_phone = twilio_messages.assert_unique_phone
 poll_interval_seconds = twilio_messages.poll_interval_seconds
 
 
+def friendly_error_message(raw: str | None, name: str | None = None) -> str | None:
+    """Map provider failures to a short line kids can read.
+
+    The raw text stays in the database and in logs for debugging.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if "couldn't be sent as a picture" in lowered:
+        return text
+    if "can't get signal messages from mantel" in lowered:
+        return text
+    if "a message can be at most" in lowered or "type a message or add a drawing" in lowered:
+        return text
+    if "wait a moment and try again" in lowered:
+        return text
+    if "unregistered" in lowered or "isn't registered" in lowered or "not registered" in lowered:
+        who = (name or "").strip() or "They"
+        return f"{who} can't get Signal messages from Mantel yet. Ask a grown-up for help."
+    if "phone number" in lowered:
+        return "Ask a grown-up to add a phone number first."
+    if "ask a grown-up to finish messages settings" in lowered:
+        return text
+    if "twilio or signal" in lowered or "not configured" in lowered or "in settings" in lowered:
+        return "Ask a grown-up to finish Messages settings, then try again."
+    if "couldn't send that" in lowered:
+        return "Couldn't send that. Try again in a moment."
+    return "Couldn't send that. Try again in a moment."
+
+
 def provider_name(db: Session) -> str:
     raw = str(twilio_messages._setting(db, "message_provider") or DEFAULT_PROVIDER).strip().lower()
     return raw if raw in PROVIDERS else DEFAULT_PROVIDER

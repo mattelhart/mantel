@@ -19,6 +19,13 @@ interface SignalStatus {
   account_number?: string
 }
 
+interface UnlinkedSender {
+  signal_uuid: string
+  name: string
+  last_seen: string | null
+  message_count: number
+}
+
 type Provider = 'twilio' | 'signal'
 
 /** Credentials for family texting. Twilio SID and Auth Token are write-only:
@@ -433,6 +440,8 @@ function SignalSettings({ settings }: { settings: AppSettings }) {
         </p>
       )}
 
+      <UnlinkedSenders users={users} enabled={Boolean(settings.server.signal_configured)} />
+
       {linking && (
         <SignalLinkScreen
           alreadyLinked={linked}
@@ -530,6 +539,93 @@ function SignalLinkScreen({ alreadyLinked, onBack }: { alreadyLinked: boolean; o
             Waiting for you to scan the code…
           </p>
         </>
+      )}
+    </div>
+  )
+}
+
+function formatSeen(value: string | null): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function UnlinkedSenders({ users, enabled }: { users: User[]; enabled: boolean }) {
+  const qc = useQueryClient()
+  const [choice, setChoice] = useState<Record<string, number | ''>>({})
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const listing = useQuery({
+    queryKey: ['signal-unlinked'],
+    queryFn: () => api.get<{ senders: UnlinkedSender[] }>('/messages/signal/unlinked'),
+    enabled,
+    refetchInterval: 15_000,
+  })
+  const senders = listing.data?.senders ?? []
+  if (!enabled || senders.length === 0) return null
+
+  const link = async (sender: UnlinkedSender) => {
+    const userId = choice[sender.signal_uuid]
+    if (userId === undefined || userId === '') return
+    setBusy(sender.signal_uuid)
+    setError(null)
+    try {
+      await api.post('/messages/signal/link', { signal_uuid: sender.signal_uuid, user_id: userId })
+      await qc.invalidateQueries({ queryKey: ['signal-unlinked'] })
+      await qc.invalidateQueries({ queryKey: ['users'] })
+      await qc.invalidateQueries({ queryKey: ['messages'] })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't link that sender.")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="signal-unlinked">
+      <h3>Link to family member</h3>
+      <p className="hint">
+        These people messaged Mantel, but Signal hid their number. Pick who they are.
+      </p>
+      {senders.map((sender) => (
+        <div key={sender.signal_uuid} className="row">
+          <div className="row__name row__name--static">
+            {sender.name}
+            {sender.last_seen ? <div className="hint">Last seen {formatSeen(sender.last_seen)}</div> : null}
+          </div>
+          <select
+            aria-label={`Link ${sender.name} to a family member`}
+            value={choice[sender.signal_uuid] ?? ''}
+            onChange={(e) =>
+              setChoice((current) => ({
+                ...current,
+                [sender.signal_uuid]: e.target.value === '' ? '' : Number(e.target.value),
+              }))
+            }
+          >
+            <option value="">Family member</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={busy === sender.signal_uuid || choice[sender.signal_uuid] === undefined || choice[sender.signal_uuid] === ''}
+            onClick={() => void link(sender)}
+          >
+            {busy === sender.signal_uuid ? 'Linking…' : 'Link'}
+          </button>
+        </div>
+      ))}
+      {error && (
+        <p className="banner banner--warn" role="alert">
+          {error}
+        </p>
       )}
     </div>
   )

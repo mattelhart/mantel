@@ -1,5 +1,26 @@
 import SwiftUI
 
+func friendlyFailureText(_ raw: String?, name: String? = nil) -> String {
+    let text = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    if text.isEmpty { return "" }
+    let lowered = text.lowercased()
+    if lowered.contains("couldn't be sent as a picture") { return text }
+    if lowered.contains("can't get signal messages from mantel") { return text }
+    if lowered.contains("unregistered") || lowered.contains("isn't registered") || lowered.contains("not registered") {
+        let who = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let display = who.isEmpty ? "They" : who
+        return "\(display) can't get Signal messages from Mantel yet. Ask a grown-up for help."
+    }
+    if lowered.contains("phone number") {
+        return "Ask a grown-up to add a phone number first."
+    }
+    if lowered.contains("ask a grown-up to finish messages settings") { return text }
+    if lowered.contains("twilio or signal") || lowered.contains("not configured") || lowered.contains("settings") {
+        return "Ask a grown-up to finish Messages settings, then try again."
+    }
+    return "Couldn't send that. Try again in a moment."
+}
+
 struct MessagesListView: View {
     @Environment(AppModel.self) private var model
     var openDraw: Bool = false
@@ -117,7 +138,7 @@ struct ConversationView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         ForEach(thread?.messages ?? []) { message in
-                            MessageBubble(message: message, color: thread?.color ?? "#3b82f6")
+                            MessageBubble(message: message, name: thread?.name, color: thread?.color ?? "#3b82f6")
                                 .id(message.id)
                         }
                     }
@@ -246,7 +267,7 @@ struct ConversationView: View {
         sending = true
         defer { sending = false }
         if let message = await model.sendMessage(userId: userId, body: trimmed, mediaBase64: media) {
-            error = message
+            error = friendlyFailureText(message, name: thread?.name)
         } else {
             text = ""
             await load()
@@ -257,6 +278,7 @@ struct ConversationView: View {
 struct MessageBubble: View {
     @Environment(AppModel.self) private var model
     var message: FamilyMessage
+    var name: String? = nil
     var color: String
 
     var body: some View {
@@ -280,7 +302,8 @@ struct MessageBubble: View {
                 }
                 HStack(spacing: 6) {
                     if message.status == "failed" {
-                        Text(message.errorMessage ?? "Didn't send")
+                        let shown = friendlyFailureText(message.errorMessage, name: name)
+                        Text(shown.isEmpty ? "Didn't send" : shown)
                             .foregroundStyle(MantelTheme.danger)
                     }
                     if let created = message.createdAt {
@@ -317,7 +340,7 @@ struct SendDoodleFlow: View {
                 Task {
                     sending = true
                     if let message = await model.sendMessage(userId: userId, body: "", mediaBase64: png) {
-                        error = message
+                        error = friendlyFailureText(message, name: chosen.name)
                         sending = false
                     } else {
                         onClose()

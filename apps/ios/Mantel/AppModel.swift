@@ -452,7 +452,7 @@ final class AppModel {
             await reloadConversations()
             return nil
         } catch let error as MantelError {
-            return error.message
+            return friendlyFailureText(error.message)
         } catch {
             return ServerAddress.unreachableMessage(origin ?? "the calendar server")
         }
