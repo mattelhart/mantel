@@ -436,6 +436,10 @@ Sure. It's a perfectly good family calendar in a browser tab. The wall is just w
 Those are display frameworks — they render information beautifully but are read-only. Mantel is a
 calendar you write to, with Google and iCloud sync in both directions.
 
+## iPhone app
+
+A native SwiftUI companion lives in `apps/ios`. It mirrors the Android phone app (calendar, chores, lists, meals, photos, family, lights) and adds Messages with a one-tap Draw button. Open `apps/ios/Mantel.xcodeproj` on a Mac, sign with a free Apple ID, and install on an iPhone. Details: [apps/ios/README.md](apps/ios/README.md) and [docs/ios-phone.md](docs/ios-phone.md).
+
 ## Android apps
 
 Two apps share one Kotlin core in `apps/android-tv`:
