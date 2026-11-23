@@ -20,6 +20,7 @@ from .routers import (
     dashboard,
     events,
     feeds,
+    home,
     household_display,
     lists,
     live,
@@ -33,8 +34,8 @@ from .routers import (
     settings as settings_router,
 )
 from .schema_sync import sync as sync_schema
+from .services import ha_home, scheduler
 from .services import live as live_notices
-from .services import scheduler
 from .services.device_auth import DeviceAuthMiddleware, is_public
 
 # Registers the commit listener. Importing the router is not enough if a test
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await ha_home.stream.stop()
         await scheduler.stop(tasks)
 
 
@@ -116,6 +118,7 @@ app.include_router(photos.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(lists.router, prefix="/api")
 app.include_router(live.router, prefix="/api")
+app.include_router(home.router, prefix="/api")
 app.include_router(chores.router, prefix="/api")
 app.include_router(chores.rewards_router, prefix="/api")
 app.include_router(chores.redemptions_router, prefix="/api")

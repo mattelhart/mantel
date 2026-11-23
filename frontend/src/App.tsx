@@ -28,6 +28,7 @@ const CALENDAR_VIEWS = [
 const NAV = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/lists', label: 'Lists' },
+  { to: '/home', label: 'Home' },
   { to: '/meals', label: 'Meals' },
   { to: '/show-on-tv', label: 'Show on TV' },
   { to: '/chores', label: 'Chores' },

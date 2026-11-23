@@ -87,6 +87,7 @@ const NAV = [
   { to: '/dashboard', label: 'Today', icon: 'calendar' },
   { to: '/chores', label: 'Chores', icon: 'chores' },
   { to: '/lists', label: 'Lists', icon: 'lists' },
+  { to: '/home', label: 'Home', icon: 'home' },
   { to: '/photos', label: 'Photos', icon: 'photos' },
   { to: '/meals', label: 'Meals', icon: 'lists' },
   { to: '/show-on-tv', label: 'Show on TV', icon: 'calendar' },
@@ -164,6 +165,14 @@ function paths(name: string): ReactNode {
           <rect x="3" y="5" width="18" height="14" rx="2.5" />
           <circle cx="9" cy="10" r="1.4" fill="currentColor" stroke="none" />
           <path d="M21 16.5l-5-4.5L7 19" />
+        </>
+      )
+    case 'home':
+      return (
+        <>
+          <path d="M4 11.2L12 4l8 7.2" />
+          <path d="M6 10v9.5h12V10" />
+          <path d="M10 19.5v-5h4v5" />
         </>
       )
     case 'sleep':

@@ -11,6 +11,7 @@ import './styles/settings.css'
 import './styles/dashboard.css'
 import './styles/screensaver.css'
 import './styles/chores.css'
+import './styles/home.css'
 import '@fontsource/nunito/latin-400.css'
 import '@fontsource/nunito/latin-600.css'
 import '@fontsource/nunito/latin-700.css'
@@ -22,6 +23,7 @@ import '@fontsource/nunito/latin-ext-800.css'
 import { CalendarPage } from './views/calendar/CalendarPage'
 import { ChoresPage } from './views/chores/ChoresPage'
 import { DashboardPage } from './views/dashboard/DashboardPage'
+import { HomePage } from './views/home/HomePage'
 import { ListsPage } from './views/lists/ListsPage'
 import { PhotosPage } from './views/photos/PhotosPage'
 import { SettingsPage } from './views/settings/SettingsPage'
@@ -45,6 +47,7 @@ const router = createBrowserRouter([
       { path: 'meals', element: <MealsPage /> },
       { path: 'show-on-tv', element: <ShowOnTvPage /> },
       { path: 'lists', element: <ListsPage /> },
+      { path: 'home', element: <HomePage /> },
       { path: 'chores', element: <ChoresPage /> },
       { path: 'photos', element: <PhotosPage /> },
       { path: 'settings', element: <SettingsPage /> },

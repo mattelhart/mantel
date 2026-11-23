@@ -52,6 +52,7 @@ IDs, and everyone's calendars sit side by side on the same wall.
 | 🔁 **Repeating events**     | Daily, weekly on chosen days, monthly, yearly — created on the wall, pushed as RRULEs    |
 | 👤 **Filter by person**     | Tap a family member to grey them out; remembered per device                              |
 | 🧩 **Dashboard wall**       | Build a screen from widgets: agenda, weather, lists, countdowns, clock, mini month       |
+| 💡 **Home control**         | Lights, fans, shades, locks and scenes through Home Assistant, by room (Lutron Caseta, SmartThings and more) |
 | 🛒 **Shared lists**         | Groceries and to-dos, tickable from any screen in the house                              |
 | 🌤️ **Weather, no API key**  | National Weather Service in the US (with alerts), Open-Meteo everywhere else             |
 | 📱 **Subscribe on a phone** | A read-only feed for Apple Calendar, Outlook or Google — and for Home Assistant          |
@@ -253,6 +254,15 @@ to install.
 The same feed is the **Home Assistant** integration: pair it with the push-refresh setting and a
 calendar entity in HA updates within a second instead of once a day, with no custom component.
 See [docs/sharing-and-home-assistant.md](docs/sharing-and-home-assistant.md).
+
+### 10. Control the house
+
+The **Home** page turns lights, fans, shades, thermostats, locks and scenes into touch tiles
+grouped by room. Mantel doesn't talk to each brand itself: it asks **Home Assistant**, so
+anything Home Assistant can see (Lutron Caseta, SmartThings, Hue, and the rest of its list)
+appears here once it is added there. Set it up under **Settings → Home**: the Home Assistant
+address and a long-lived access token. The token stays on the server. See
+[docs/home-control.md](docs/home-control.md).
 
 ---
 
