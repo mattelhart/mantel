@@ -148,6 +148,10 @@ async def test_scheduler_starts_the_update_loop_even_when_sync_is_off(monkeypatc
 
     tasks = scheduler.start(asyncio.get_running_loop())
     try:
-        assert len(tasks) == 1, "update check is independent of SYNC_ENABLED"
+        # Update check and the Twilio poller both run even when calendar sync is off.
+        assert len(tasks) == 2, "update check and message polling are independent of SYNC_ENABLED"
+        names = {task.get_coro().__name__ if hasattr(task.get_coro(), "__name__") else str(task) for task in tasks}
+        assert "_update_check_loop" in names
+        assert "_messages_loop" in names
     finally:
         await scheduler.stop(tasks)

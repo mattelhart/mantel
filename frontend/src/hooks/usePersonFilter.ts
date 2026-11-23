@@ -37,6 +37,13 @@ export function isPersonVisible(hidden: number[], userId: number | null | undefi
  * display in the kitchen and a phone in someone's pocket want different views.
  * It is a way of looking at the calendar, not household configuration.
  */
+/** True when the Airy header family chips have something to do: they filter
+ *  events on the Calendar, and which people are shown on the Chores page.
+ *  The Today dashboard, Lists, and the other wall pages ignore the filter. */
+export function personFilterApplies(pathname: string): boolean {
+  return pathname.startsWith('/calendar') || pathname.startsWith('/chores')
+}
+
 /** The top bar and the calendar both read this filter. `storage` events do not
  *  fire in the tab that wrote them, so subscribers keep the two copies in step. */
 const subscribers = new Set<(hidden: number[]) => void>()

@@ -104,6 +104,8 @@ def test_pairing_a_phone_and_revoking_it(client, locked):
     assert len(body["code"].replace("-", "")) == 8
     assert body["qr_payload"].startswith("mantel://pair?v=1&base=")
     assert body["qr_svg"].startswith("<svg")
+    # An <img> will not draw an SVG that does not declare its namespace.
+    assert 'xmlns="http://www.w3.org/2000/svg"' in body["qr_svg"]
     assert "192.168.1.20" in body["qr_payload"]
 
     # The internet cannot mint codes, and cannot read the calendar yet.
@@ -247,3 +249,73 @@ def test_an_expired_pairing_code_is_refused_even_with_a_stale_token(client, lock
     message = refused.json()["error"]["message"].lower()
     assert "expired" in message
     assert "device token" not in message
+
+
+def test_a_paired_phone_can_pair_a_tv_without_going_to_the_wall(client, locked):
+    """The phone app's "Pair a TV": a phone away from home, holding only its own token,
+    shows a code that a TV elsewhere exchanges for a token of its own."""
+    first = call("192.168.1.20", "POST", "/api/auth/pairing-codes").json()
+    phone = call(
+        "1.2.3.4", "POST", "/api/auth/pair", json={"code": first["code"], "name": "Matt's phone"}
+    ).json()["token"]
+    headers = {"Authorization": f"Bearer {phone}"}
+
+    minted = call(
+        "1.2.3.4",
+        "POST",
+        "/api/auth/pairing-codes",
+        params={"base_url": "http://10.0.15.178:8080"},
+        headers=headers,
+    )
+    assert minted.status_code == 200, minted.text
+    # No token, no code.
+    assert call("1.2.3.4", "POST", "/api/auth/pairing-codes").status_code == 401
+
+    tv = call(
+        "5.6.7.8",
+        "POST",
+        "/api/auth/pair",
+        json={"code": minted.json()["code"], "name": "Living room TV"},
+    )
+    assert tv.status_code == 201, tv.text
+    tv_token = tv.json()["token"]
+    assert tv_token != phone
+    tv_headers = {"Authorization": f"Bearer {tv_token}"}
+    assert call("5.6.7.8", "GET", "/api/users", headers=tv_headers).status_code == 200
+
+    # The phone can also set up Home control, and never gets the token back.
+    saved = call(
+        "1.2.3.4",
+        "PATCH",
+        "/api/settings",
+        json={"ha_base_url": "http://ha:8123", "ha_token": "secret-ha-token"},
+        headers=headers,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["server"]["ha_token_set"] is True
+    assert "secret-ha-token" not in saved.text
+    assert "secret-ha-token" not in call("1.2.3.4", "GET", "/api/settings", headers=headers).text
+
+
+def test_qr_svg_is_a_standalone_document_an_img_can_draw():
+    """The wall shows the QR in an <img>: that needs the SVG namespace, and it must be
+    readable on a dark theme (solid light background, with a quiet zone)."""
+    from xml.etree import ElementTree
+
+    from app.routers.auth import _qr_payload, _qr_svg
+
+    payload = _qr_payload("http://10.0.15.178:8080", "TFT3-L6Y7")
+    assert payload == "mantel://pair?v=1&base=http%3A%2F%2F10.0.15.178%3A8080&code=TFT3-L6Y7"
+    svg = _qr_svg(payload)
+
+    root = ElementTree.fromstring(svg)  # well-formed XML
+    assert root.tag == "{http://www.w3.org/2000/svg}svg"
+    assert 'xmlns="http://www.w3.org/2000/svg"' in svg
+    width, height = root.get("width"), root.get("height")
+    assert width == height
+    assert root.get("viewBox") == f"0 0 {width} {height}"  # CSS can size it
+    assert 'fill="#fff"' in svg  # an opaque light background, not transparent
+    assert 'stroke="#000"' in svg
+    # Quiet zone: the first dark module is at least 4 modules in from the edge.
+    first = ElementTree.fromstring(svg).find(".//{http://www.w3.org/2000/svg}path[@stroke]")
+    assert first is not None and first.get("d", "").startswith("M4 ")

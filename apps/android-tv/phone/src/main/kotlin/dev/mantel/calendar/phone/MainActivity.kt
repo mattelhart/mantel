@@ -19,6 +19,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.dataString?.let { model.openPairingLink(it) }
+        intent.dataString?.let { model.openPairingLink(it, fromIntent = true) }
     }
 }

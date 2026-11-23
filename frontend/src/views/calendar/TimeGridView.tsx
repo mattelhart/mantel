@@ -1,97 +1,13 @@
 import { format, isToday } from 'date-fns'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { CalendarEvent } from '../../api/types'
 import { useEventColor } from '../../components/eventColor'
-import { useMouseDragScroll } from '../../hooks/useLightSnap'
 import { overlapsDay, startOfLocalDay } from './overlap'
-
-interface Props {
-  days: Date[]
-  events: CalendarEvent[]
-  dayStartHour: number
-  dayEndHour: number
-  use24h: boolean
-  hourHeight: number
-  onSelectEvent: (e: CalendarEvent) => void
-  onSelectSlot: (start: Date) => void
-  /** Present on the Airy layout: a vertical drag snaps a single event by 15 minutes. */
-  onReschedule?: (event: CalendarEvent, deltaMinutes: number) => void
-}
 
 /** Below this height an event block cannot show a title and a time on separate lines.
  *  Sized for the largest text scale ("wall"), so the switch happens a little early on
  *  the smaller ones rather than too late on the display that matters most. */
 const TWO_LINES_PX = 40
-
-/** Day view: one page, one column. 3 Day and Week scroll as a continuous strip instead
- *  (TimeStripView), but draw their columns with the same pieces. */
-export function TimeGridView({
-  days,
-  events,
-  dayStartHour,
-  dayEndHour,
-  use24h,
-  hourHeight,
-  onSelectEvent,
-  onSelectSlot,
-  onReschedule,
-}: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  // Touch scrolls this natively. A mouse on a TV does not, so a vertical drag does.
-  useMouseDragScroll(scrollRef)
-  const hours = Array.from({ length: dayEndHour - dayStartHour }, (_, i) => dayStartHour + i)
-
-  useEffect(() => {
-    const now = new Date()
-    const offset = (now.getHours() - dayStartHour - 1) * hourHeight
-    if (scrollRef.current && offset > 0) scrollRef.current.scrollTop = offset
-  }, [dayStartHour, hourHeight])
-
-  const allDay = events.filter((e) => e.all_day)
-
-  return (
-    <div className="timegrid" style={{ ['--days' as string]: days.length }}>
-      <div className="timegrid__head">
-        <div className="timegrid__gutter-head" />
-        {days.map((day) => (
-          <div key={day.toISOString()} className="timegrid__dayhead" data-today={isToday(day)}>
-            <div className="timegrid__dayname">{format(day, 'EEE')}</div>
-            <div className="timegrid__daynum">{format(day, 'd')}</div>
-          </div>
-        ))}
-      </div>
-
-      {allDay.length > 0 && (
-        <div className="timegrid__allday">
-          <div className="timegrid__gutter-head">all day</div>
-          {days.map((day) => (
-            <div key={day.toISOString()} className="timegrid__alldaycell">
-              <AllDayChips day={day} events={allDay} onSelectEvent={onSelectEvent} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="timegrid__body" ref={scrollRef}>
-        <HourGutter hours={hours} hourHeight={hourHeight} use24h={use24h} />
-        {days.map((day) => (
-          <DayColumn
-            key={day.toISOString()}
-            day={day}
-            events={events}
-            hours={hours}
-            dayStartHour={dayStartHour}
-            hourHeight={hourHeight}
-            use24h={use24h}
-            onSelectEvent={onSelectEvent}
-            onSelectSlot={onSelectSlot}
-            onReschedule={onReschedule}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export function HourGutter({
   hours,

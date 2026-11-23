@@ -47,17 +47,20 @@ IDs, and everyone's calendars sit side by side on the same wall.
 
 |                            |                                                                                        |
 | -------------------------- | -------------------------------------------------------------------------------------- |
-| 📅 **Four views**           | Today, 3-day, week and month — touch-first, portrait *and* landscape                     |
+| 📅 **Two views**            | Week and month — touch-first, portrait *and* landscape                                   |
 | 🎨 **A colour per person**  | Everyone links as many Google or Apple accounts as they like and claims the ones they own |
 | 🔁 **Repeating events**     | Daily, weekly on chosen days, monthly, yearly — created on the wall, pushed as RRULEs    |
 | 👤 **Filter by person**     | Tap a family member to grey them out; remembered per device                              |
 | 🧩 **Dashboard wall**       | Build a screen from widgets: agenda, weather, lists, countdowns, clock, mini month       |
+| 💡 **Home control**         | Lights, fans, shades, locks and scenes through Home Assistant, by room (Lutron Caseta, SmartThings and more) |
 | 🛒 **Shared lists**         | Groceries and to-dos, tickable from any screen in the house                              |
 | 🌤️ **Weather, no API key**  | National Weather Service in the US (with alerts), Open-Meteo everywhere else             |
 | 📱 **Subscribe on a phone** | A read-only feed for Apple Calendar, Outlook or Google — and for Home Assistant          |
 | 🔄 **Updates itself**       | Wall tablets hard-reload on their own when you deploy; nobody hunts for a refresh button |
 | 🔌 **Works offline**        | Keeps the last calendar, chores and rewards, and replays chore taps when the link returns |
 | 🖼️ **Photo screensaver**    | With burn-in protection and an overnight blackout window                                 |
+| 🎮 **Games**                | 2048, Memory, Minesweeper, tic-tac-toe and a doodle pad, built for the wall touchscreen  |
+| 📷 **Cameras**              | A snapshot grid from UniFi Protect, with a full-screen view of one camera                |
 | 🍓 **Runs at home**         | Docker on a PC or a Pi. Images for `amd64` and `arm64`                                   |
 | 🤖 **Everything is an API** | Documented for humans *and* for AI agents                                                |
 
@@ -254,6 +257,15 @@ The same feed is the **Home Assistant** integration: pair it with the push-refre
 calendar entity in HA updates within a second instead of once a day, with no custom component.
 See [docs/sharing-and-home-assistant.md](docs/sharing-and-home-assistant.md).
 
+### 10. Control the house
+
+The **Home** page turns lights, fans, shades, thermostats, locks and scenes into touch tiles
+grouped by room. Mantel doesn't talk to each brand itself: it asks **Home Assistant**, so
+anything Home Assistant can see (Lutron Caseta, SmartThings, Hue, and the rest of its list)
+appears here once it is added there. Set it up under **Settings → Home**: the Home Assistant
+address and a long-lived access token. The token stays on the server. See
+[docs/home-control.md](docs/home-control.md).
+
 ---
 
 ## Running on a Raspberry Pi
@@ -323,6 +335,8 @@ restart containers to finish setting this up.
 | ------------ | -------------------- | ------------------------------------------------------- |
 | `PORT`       | `8080`               | Port the app is served on                               |
 | `SECRET_KEY` | *(insecure default)* | Encrypts your Google credentials, tokens and iCloud passwords — set yours |
+| `UNIFI_PROTECT_KEY_FILE` | *(unset)* | Path to a file holding a UniFi Protect Integration API key; Cameras stays off until this is set |
+| `UNIFI_PROTECT_URL` | `https://10.0.0.1/proxy/protect/integration` | Base URL of the Protect Integration API on your UniFi console |
 
 Optional tuning (sync intervals, database URL, CORS) is there too with sensible defaults, and
 every option is documented in **[docs/configuration.md](docs/configuration.md)**.
@@ -421,6 +435,10 @@ Sure. It's a perfectly good family calendar in a browser tab. The wall is just w
 **How is this different from DAKboard or MagicMirror?**
 Those are display frameworks — they render information beautifully but are read-only. Mantel is a
 calendar you write to, with Google and iCloud sync in both directions.
+
+## iPhone app
+
+A native SwiftUI companion lives in `apps/ios`. It mirrors the Android phone app (calendar, chores, lists, meals, photos, family, lights) and adds Messages with a one-tap Draw button. Open `apps/ios/Mantel.xcodeproj` on a Mac, sign with a free Apple ID, and install on an iPhone. Details: [apps/ios/README.md](apps/ios/README.md) and [docs/ios-phone.md](docs/ios-phone.md).
 
 ## Android apps
 

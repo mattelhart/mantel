@@ -243,21 +243,41 @@
   justify-content: space-between;
 }
 
-/* Dashboard widget: same sunny chip, so it still reads on a dark wall. */
+/* Dashboard widget: one column per person, matching .people on the
+   schedule card above. The grid wraps when the family is large; a long
+   chore list scrolls inside its column. */
 .chores-mini {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+}
+
+.chores-mini__people {
+  min-width: 0;
 }
 
 .chores-mini__person {
-  background: #fff7e6;
-  color: #1c2430;
-  border-radius: 14px;
-  padding: 8px 10px;
+  min-width: 0;
+  max-height: min(22rem, 50vh);
+  overflow-y: auto;
 }
 
-.chores-mini__person strong {
+.chores-mini__people .people__name {
   display: flex;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.chores-mini__people .people__name > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chores-mini__stars {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }

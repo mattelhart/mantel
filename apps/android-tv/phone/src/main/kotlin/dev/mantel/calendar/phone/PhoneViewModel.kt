@@ -6,7 +6,12 @@ import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mantel.calendar.core.CalEvent
+import dev.mantel.calendar.core.messageMediaId
+import dev.mantel.calendar.core.friendlySendError
+import dev.mantel.calendar.core.ConversationsListing
+import dev.mantel.calendar.core.Conversation
 import dev.mantel.calendar.core.CalInfo
+import dev.mantel.calendar.core.ChoreDefinition
 import dev.mantel.calendar.core.ChoreBoard
 import dev.mantel.calendar.core.FAMILYCAL_ORIGIN
 import dev.mantel.calendar.core.FamilyMember
@@ -53,12 +58,14 @@ import dev.mantel.calendar.device.SecureTokenStore
 import dev.mantel.calendar.phone.notify.UpcomingNotifier
 import dev.mantel.calendar.phone.widget.AgendaWidget
 import io.ktor.client.engine.cio.CIO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -74,7 +81,7 @@ enum class Phase { Loading, Address, Pair, Ready }
 
 enum class ThemeChoice { System, Light, Dark }
 
-enum class PhoneTab { Today, Month, Chores, Lists }
+enum class PhoneTab { Home, Today, Week, Month, Chores, Lists, Messages }
 
 data class PhoneState(
     val phase: Phase = Phase.Loading,
@@ -88,11 +95,13 @@ data class PhoneState(
     val events: List<CalEvent> = emptyList(),
     val lists: List<SharedList> = emptyList(),
     val board: ChoreBoard? = null,
+    val conversations: ConversationsListing = ConversationsListing(),
+    val threads: Map<String, Conversation> = emptyMap(),
     val anchor: LocalDate = LocalDate.now(),
     val choreDay: LocalDate = LocalDate.now(),
     val offlineDetail: String = "",
     val syncedDetail: String = "Not synced yet",
-    val theme: ThemeChoice = ThemeChoice.System,
+    val theme: ThemeChoice = ThemeChoice.Light,
     val hiddenUserIds: Set<Int> = emptySet(),
 )
 
@@ -108,6 +117,21 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("mantel_phone_ui", Context.MODE_PRIVATE)
     private val origin = MutableStateFlow<String?>(null)
     private val token = MutableStateFlow<String?>(null)
+    suspend fun mealPlan(start: LocalDate) = client.mealPlan(start.toString(), start.plusDays(6).toString())
+    suspend fun saveMeal(day: LocalDate, meal: String, title: String) = client.saveMeal(day.toString(), meal, title)
+    suspend fun displays() = client.displays()
+    suspend fun showOnDisplay(id: String, destination: String) = client.showOnDisplay(id, destination)
+
+    /** A code for a TV to type. It embeds this phone's own address, the one it already reaches the server on. */
+    suspend fun createPairingCode() = client.createPairingCode(origin.value ?: FAMILYCAL_ORIGIN)
+    suspend fun homeSetup() = client.homeSetup()
+    suspend fun saveHomeConnection(baseUrl: String?, token: String?, clearToken: Boolean = false) =
+        client.saveHomeConnection(baseUrl, token, clearToken)
+    suspend fun testHome() = client.testHome()
+    suspend fun home() = client.home()
+    suspend fun homeAction(entityId: String, action: String, value: Int? = null, confirm: Boolean = false) =
+        client.homeAction(entityId, action, value, confirm)
+
     private val client = MantelClient(CIO.create(), { origin.value ?: FAMILYCAL_ORIGIN }, { token.value })
     private val snapshots = dev.mantel.calendar.core.FileSnapshotStore(File(app.filesDir, CACHE_DIR))
     private val screenCache = ScreenCacheStore(snapshots)
@@ -122,9 +146,16 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(PhoneState(theme = loadTheme()))
     val state: StateFlow<PhoneState> = _state
+    private val _media = MutableStateFlow<Map<Int, ByteArray>>(emptyMap())
+    val media: StateFlow<Map<Int, ByteArray>> = _media
+
+    /** The start-up probe of the saved server. A pairing link must not race it: boot() would
+     *  otherwise finish later and put the screen (and the saved address) back to what it found. */
+    private var bootJob: Job? = null
+    private var linkJob: Job? = null
 
     init {
-        viewModelScope.launch { boot() }
+        bootJob = viewModelScope.launch { boot() }
         viewModelScope.launch {
             while (isActive) {
                 delay(60_000)
@@ -132,6 +163,59 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch { listen() }
+    }
+
+
+    fun openThread(id: String) {
+        viewModelScope.launch {
+            try {
+                val thread = client.conversation(id)
+                _state.update { it.copy(threads = it.threads + (id to thread), offline = false) }
+                thread.messages.forEach { message ->
+                    val mediaId = messageMediaId(message.mediaUrl) ?: return@forEach
+                    loadMessageMedia(mediaId)
+                }
+            } catch (e: MantelException) {
+                if (e.status == 404) return@launch
+                onRefreshFailed(e)
+            }
+        }
+    }
+
+    fun loadMessageMedia(id: Int) {
+        if (_media.value.containsKey(id)) return
+        viewModelScope.launch {
+            try {
+                val bytes = client.messageMedia(id)
+                _media.update { it + (id to bytes) }
+            } catch (_: Exception) {
+                /* The picture stays hidden if it cannot be fetched. */
+            }
+        }
+    }
+
+    fun sendMessage(userId: Int, body: String, mediaBase64: String? = null, result: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                client.sendMessage(userId, body, mediaBase64)
+                val listing = client.conversations()
+                val updated = _state.value.threads.mapValues { (id, current) ->
+                    runCatching { client.conversation(id) }.getOrDefault(current)
+                }
+                _state.update {
+                    it.copy(conversations = listing, threads = updated, offline = false)
+                }
+                updated.values.forEach { thread ->
+                    thread.messages.forEach { message ->
+                        val mediaId = messageMediaId(message.mediaUrl) ?: return@forEach
+                        loadMessageMedia(mediaId)
+                    }
+                }
+                result(null)
+            } catch (e: MantelException) {
+                result(friendlySendError(e.message))
+            }
+        }
     }
 
     fun refresh() {
@@ -173,8 +257,19 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { pairNormalized(normalized) }
     }
 
-    fun openPairingLink(raw: String) {
+    /**
+     * Pair from a `mantel://pair` link: the in-app scanner, or the camera app opening it.
+     * [fromIntent] is true when Android delivered it. Android hands the same intent to a
+     * recreated activity (a rotation, a theme change, the process being restored), and
+     * the code is single-use, so a link that already paired this phone is ignored then,
+     * instead of failing with "already used" and dropping a paired phone back to the code screen.
+     */
+    fun openPairingLink(raw: String, fromIntent: Boolean = false) {
         val link = parsePairingLink(raw)
+        if (link != null && fromIntent) {
+            if (prefs.getString(PAIRED_LINK_KEY, null) == raw) return
+            if (linkJob?.isActive == true) return
+        }
         if (link == null) {
             if (pairCodeComplete(raw) && !origin.value.isNullOrBlank()) pair(raw)
             else _state.update { it.copy(message = "That QR isn't a Mantel pairing code.") }
@@ -184,7 +279,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(phase = Phase.Address, origin = link.base, message = PUBLIC_HTTP) }
             return
         }
-        viewModelScope.launch {
+        linkJob = viewModelScope.launch {
+            bootJob?.cancel()
             _state.update { it.copy(phase = Phase.Loading, message = null) }
             origin.value = link.base
             store.saveOrigin(link.base)
@@ -195,7 +291,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 return@launch
             }
-            pairNormalized(link.code)
+            if (pairNormalized(link.code)) prefs.edit().putString(PAIRED_LINK_KEY, raw).apply()
         }
     }
 
@@ -216,7 +312,11 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(message = null) }
     }
 
+    private fun savedAnchor(today: LocalDate): LocalDate =
+        runCatching { LocalDate.parse(prefs.getString("calendar_anchor", null)) }.getOrDefault(today)
+
     fun setAnchor(day: LocalDate) {
+        prefs.edit().putString("calendar_anchor", day.toString()).apply()
         _state.update { it.copy(anchor = day) }
         viewModelScope.launch { reload() }
     }
@@ -333,49 +433,63 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addItem(listId: Int, text: String, onError: (String) -> Unit) {
-        if (text.isBlank()) return
+    fun createList(name: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.addList(name.trim())
+    }
+
+    fun createItem(listId: Int, text: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.addItem(listId, text.trim())
+    }
+
+    fun renameList(id: Int, name: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.renameList(id, name.trim())
+    }
+
+    fun removeList(id: Int, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.deleteList(id)
+    }
+
+    fun renameItem(listId: Int, itemId: Int, text: String, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.renameItem(listId, itemId, text.trim())
+    }
+
+    fun removeItem(listId: Int, itemId: Int, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.deleteItem(listId, itemId)
+    }
+
+    fun removeChecked(listId: Int, result: (String?) -> Unit) = saveHouseholdChange("lists", result) {
+        client.clearChecked(listId)
+    }
+
+    fun loadChores(result: (List<ChoreDefinition>?, String?) -> Unit) {
         viewModelScope.launch {
             try {
-                client.addItem(listId, text.trim())
-                refreshTopics(setOf("lists"))
+                result(client.chores(), null)
             } catch (e: MantelException) {
-                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not add that")
+                result(null, if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not load chores")
             }
         }
     }
 
-    fun addList(name: String, onError: (String) -> Unit) {
-        if (name.isBlank()) return
-        viewModelScope.launch {
-            try {
-                client.addList(name.trim())
-                refreshTopics(setOf("lists"))
-            } catch (e: MantelException) {
-                onError(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not add that")
-            }
-        }
+    fun saveChore(id: Int?, body: JsonObject, result: (String?) -> Unit) = saveHouseholdChange("chores", result) {
+        client.saveChore(id, body)
     }
 
-    fun deleteItem(listId: Int, itemId: Int) {
-        viewModelScope.launch {
-            try {
-                client.deleteItem(listId, itemId)
-                refreshTopics(setOf("lists"))
-            } catch (e: MantelException) {
-                _state.update { it.copy(message = if (e.status == 0) OFFLINE_EDIT else e.message) }
-            }
-        }
+    fun removeChore(id: Int, result: (String?) -> Unit) = saveHouseholdChange("chores", result) {
+        client.deleteChore(id)
     }
 
-    fun clearChecked(listId: Int) {
+    private fun saveHouseholdChange(topic: String, result: (String?) -> Unit, action: suspend () -> Unit) {
         viewModelScope.launch {
             try {
-                client.clearChecked(listId)
-                refreshTopics(setOf("lists"))
+                action()
             } catch (e: MantelException) {
-                _state.update { it.copy(message = if (e.status == 0) OFFLINE_EDIT else e.message) }
+                result(if (e.status == 0) OFFLINE_EDIT else e.message ?: "Could not save changes")
+                return@launch
             }
+            // A successful write must not be resubmitted because refreshing the screen failed.
+            result(null)
+            refreshTopics(setOf(topic))
         }
     }
 
@@ -452,17 +566,20 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         return mine.ifEmpty { writable }
     }
 
-    private suspend fun pairNormalized(code: String) {
+    /** True when the phone is paired (the screen after that is whatever enter() decides). */
+    private suspend fun pairNormalized(code: String): Boolean {
         _state.update { it.copy(phase = Phase.Loading, message = null) }
-        try {
+        return try {
             val paired = client.pair(code, deviceName())
             token.value = paired.token
             store.saveToken(paired.token)
             enter()
+            true
         } catch (e: MantelException) {
             _state.update {
                 it.copy(phase = Phase.Pair, origin = origin.value, message = pairingFailureMessage(e.status, e.message))
             }
+            false
         }
     }
 
@@ -535,7 +652,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             val zone = zoneOrUtc(settings.homeTimezone)
             val today = todayIn(zone)
             val first = _state.value.phase == Phase.Loading
-            val anchor = if (first) today else _state.value.anchor
+            val anchor = if (first) savedAnchor(today) else _state.value.anchor
             val choreOn = if (first && !choreTouched) today else _state.value.choreDay
             val (start, end) = fetchInstants(anchor.minusDays(7), anchor.plusDays(45), zone)
             val users = client.users()
@@ -543,6 +660,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             val events = client.events(start.toString(), end.toString())
             val lists = client.lists()
             val board = client.choreBoard(choreOn.toString())
+            val conversations = client.conversations()
             val at = Instant.now().toString()
             lastSynced = at
             _state.update {
@@ -553,6 +671,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                     events = events,
                     lists = lists,
                     board = board,
+                    conversations = conversations,
                     offline = false,
                     offlineDetail = "",
                     syncedDetail = syncedLabel(at, zone),
@@ -562,7 +681,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
             screenCache.save(
-                ScreenCache(at, settings, users, calendars, _state.value.events, lists, _state.value.board),
+                ScreenCache(at, settings, users, calendars, _state.value.events, lists, _state.value.board, conversations),
             )
             publish()
         } catch (e: MantelException) {
@@ -585,6 +704,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             var events = current.events
             var lists = current.lists
             var board = current.board
+            var conversations = current.conversations
+            var threads = current.threads
             if ("settings" in topics) settings = client.settings()
             if ("users" in topics) users = client.users()
             if ("calendars" in topics || "accounts" in topics) calendars = client.calendars()
@@ -595,6 +716,12 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             }
             if ("lists" in topics) lists = client.lists()
             if ("chores" in topics || "rewards" in topics) board = client.choreBoard(current.choreDay.toString())
+            if ("messages" in topics) {
+                conversations = client.conversations()
+                threads = threads.mapValues { (id, currentThread) ->
+                    runCatching { client.conversation(id) }.getOrDefault(currentThread)
+                }
+            }
             val at = Instant.now().toString()
             lastSynced = at
             val zone = zoneOrUtc(settings.homeTimezone)
@@ -606,12 +733,14 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                     events = events,
                     lists = lists,
                     board = board,
+                    conversations = conversations,
+                    threads = threads,
                     offline = false,
                     offlineDetail = "",
                     syncedDetail = syncedLabel(at, zone),
                 )
             }
-            screenCache.save(ScreenCache(at, settings, users, calendars, events, lists, board))
+            screenCache.save(ScreenCache(at, settings, users, calendars, events, lists, board, conversations))
             publish()
         } catch (e: MantelException) {
             onRefreshFailed(e)
@@ -625,7 +754,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(phase = Phase.Pair, message = revokedDeviceMessage(), offline = false) }
             return
         }
-        val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty()
+        val haveMemory = _state.value.events.isNotEmpty() || _state.value.board != null || _state.value.lists.isNotEmpty() || _state.value.conversations.conversations.isNotEmpty()
         if (!haveMemory) {
             val cached = screenCache.load()
             if (cached != null) showCached(cached, resetDay = _state.value.phase != Phase.Ready)
@@ -650,7 +779,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 events = cached.events,
                 lists = cached.lists,
                 board = cached.board,
-                anchor = if (resetDay) today else it.anchor,
+                conversations = cached.conversations,
+                anchor = if (resetDay) savedAnchor(today) else it.anchor,
                 choreDay = if (resetDay) chore else it.choreDay,
                 offline = true,
                 offlineDetail = offlineLabel(cached.savedAt, zone),
@@ -751,8 +881,15 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun loadTheme(): ThemeChoice =
-        runCatching { ThemeChoice.valueOf(prefs.getString("theme", "System") ?: "System") }.getOrDefault(ThemeChoice.System)
+    private fun loadTheme(): ThemeChoice {
+        // The white redesign becomes the initial appearance once; later choices remain saved.
+        if (!prefs.getBoolean("white_redesign_applied", false)) {
+            prefs.edit().putBoolean("white_redesign_applied", true).putString("theme", "Light").apply()
+            return ThemeChoice.Light
+        }
+        return runCatching { ThemeChoice.valueOf(prefs.getString("theme", "Light") ?: "Light") }
+            .getOrDefault(ThemeChoice.Light)
+    }
 
     private fun deviceName(): String {
         val maker = Build.MANUFACTURER?.takeIf { it.isNotBlank() && !it.equals("unknown", true) }.orEmpty()
@@ -766,6 +903,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        /** The last `mantel://pair` link that paired this phone (see openPairingLink). */
+        const val PAIRED_LINK_KEY = "paired_link"
         const val OFFLINE_EDIT = "Offline. The calendar on the server was kept, and this change was not saved."
     }
 }

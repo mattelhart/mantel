@@ -39,6 +39,7 @@ _TABLE_TOPICS: dict[str, tuple[str, ...]] = {
     "reward_redemptions": ("chores", "rewards"),
     "dashboard_widgets": ("widgets",),
     "photos": ("photos",),
+    "family_messages": ("messages",),
 }
 
 # Long enough to fold a multi-calendar pull into one notice, short enough that

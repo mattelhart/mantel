@@ -31,14 +31,14 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Surface
 
 val Ink = Color(0xFF1C2430)
-val Paper = Color(0xFFFFF6E4)
-val Sun = Color(0xFFFFE38A)
-val Coral = Color(0xFFFF7A45)
+val Paper = Color(0xFFFFFFFF)
+val Sun = Color(0xFFDCEFF1)
+val Coral = Color(0xFFBDE2EA)
 val Sky = Color(0xFFD7F0FF)
 val Card = Color.White
 
 /** Text on paper. Coral itself is about 2.4:1 on this paper, so it stays a button fill. */
-val Ember = Color(0xFF8C3A16)
+val Ember = Color(0xFF176B7C)
 val Danger = Color(0xFF9B1C1C)
 val Dim = Color(0xFF3D4A5C)
 val Line = Color(0xFF4E5968)
@@ -94,6 +94,7 @@ fun SunnyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     container: Color = Color.Unspecified,
+    focusedScale: Float = 1.05f,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val fill = if (container == Color.Unspecified) tvPalette().card else container
@@ -109,10 +110,10 @@ fun SunnyButton(
             contentColor = label,
             focusedContentColor = focusedLabel,
         ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = focusedScale),
         border = ClickableSurfaceDefaults.border(
             border = Border(border = BorderStroke(2.dp, tvPalette().line), shape = Round),
-            focusedBorder = Border(border = BorderStroke(5.dp, Ink), shape = Round),
+            focusedBorder = Border(border = BorderStroke(4.dp, Color(0xFF1D4ED8)), shape = Round),
         ),
         content = content,
     )
@@ -182,7 +183,7 @@ fun SunnyField(
 
 @Composable
 fun BigTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier.padding(bottom = 8.dp), color = tvPalette().ink, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Text(text, modifier = modifier.padding(bottom = 8.dp), color = tvPalette().ink, fontSize = 36.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif, fontWeight = FontWeight.Medium)
 }
 
 fun parseColor(hex: String): Color {

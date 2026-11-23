@@ -1,0 +1,908 @@
+/* Home: rooms of tiles, a scene row, and a controls sheet. Only tokens, never colours,
+   so every theme (Airy included) styles it for free. Targets are big: this is touched
+   from across a room and reached with a D-pad. */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px 24px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  /* clip, not hidden or auto: a slightly overflowing focus ring must not create a
+     horizontal scroller that can be nudged (D-pad focus, a swipe) and cut off the
+     left of the page. */
+  overflow-x: clip;
+}
+
+/* Edit mode draws 2px dashed frames, 36px Hide pills, and (on the wall) a 4px
+   focus ring with a 3px offset. The 2px side padding above is not enough, so
+   those strokes sat on the clip edge of .home and .shell__main. */
+.home[data-editing] {
+  padding: 8px 14px 24px;
+}
+
+.home__bar {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.home__title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.home__hidden {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.home__banner {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.home__banner--error {
+  background: var(--danger-soft);
+}
+
+.home__empty {
+  color: var(--text-dim);
+  padding: 24px 4px;
+}
+
+.home__setup {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 560px;
+}
+
+.home__setup h2 {
+  margin: 0 0 8px;
+}
+
+.home__setup p {
+  margin: 0 0 16px;
+  color: var(--text-dim);
+}
+
+.home__setupactions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.home__scenes {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.home-scene {
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home-scene:active,
+.home-scene[data-done='true'] {
+  background: var(--accent-soft);
+}
+
+.home-scene:disabled {
+  opacity: 0.5;
+}
+
+.home__rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  /* MasonryGrid overrides the columns and the 4px implicit rows inline, and places every
+     room explicitly so short rooms slide up under short rooms. The row gap stays zero:
+     each room's gap is counted in its row span instead. */
+  column-gap: 16px;
+  row-gap: 0;
+  align-items: start;
+}
+
+.home-masonry__cell {
+  align-self: start;
+  min-width: 0;
+}
+
+.home-room {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.home-room__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.home-room__title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.home-room__sum {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.home-room__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 10px;
+}
+
+/* Read-only room sensors: a flat status line, never a tile. No hover, press or
+   focus styles, and pointer-events: none so a swipe or D-pad cannot land on them. */
+.home-room__sensors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.home-room__sensors:last-child {
+  margin-bottom: 0;
+}
+
+.home-sensor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.home-sensor__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.45;
+  flex: 0 0 auto;
+}
+
+.home-sensor[data-active='true'] .home-sensor__dot {
+  background: var(--icon-switch);
+  opacity: 1;
+}
+
+.home-room__sensors--edit {
+  margin-top: 10px;
+}
+
+.home-sensor--edit {
+  pointer-events: auto;
+  gap: 8px;
+}
+
+.home-sensor--edit[data-hidden='true'] {
+  opacity: 0.5;
+}
+
+.home-tile {
+  position: relative;
+  display: flex;
+}
+
+.home-tile__main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'icon name' 'icon state' 'bar bar';
+  column-gap: 8px;
+  align-items: center;
+  text-align: left;
+  min-height: 76px;
+  padding: 10px 8px 10px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  /* Lets the name size itself to the tile (cqi below). Tile widths come from the
+     room grid's columns, never from their content, so containment is safe. */
+  container-type: inline-size;
+}
+
+.home-tile[data-on='true'] .home-tile__main {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.home-tile[data-unavailable='true'] .home-tile__main {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.home-tile__main:active {
+  transform: scale(0.98);
+}
+
+.home-tile__icon {
+  grid-area: icon;
+  font-size: 2rem;
+}
+
+.home-tile__name {
+  grid-area: name;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  /* Keep the name clear of the ⋯ button (or the drag handle in Edit mode) in the corner,
+     let a long one wrap onto a second line, and cut it with … after that. */
+  min-width: 0;
+  padding-right: 28px;
+  /* Shrink a long single word ("Thermostat", "Pendant") to fit a narrow tile
+     instead of splitting it mid-word; wrap only between words. */
+  font-size: min(1em, 9cqi);
+  overflow-wrap: break-word;
+  hyphens: auto;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.home-tile__state {
+  grid-area: state;
+  font-size: 0.85rem;
+}
+
+.home-tile__bar {
+  grid-area: bar;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.home-tile__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* The way into the controls without a long press: a finger can use it too. */
+.home-tile__more {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  width: 36px;
+  height: 40px;
+  /* Buttons are --touch (56px on the wall) wide by default, which put this one's left
+     edge 16px further in than the name was told to stay clear of. */
+  min-width: 0;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.home-tile__more:active {
+  background: var(--accent-soft);
+}
+
+.home-sheet__state {
+  margin: -6px 0 4px;
+  color: var(--text-dim);
+}
+
+.home-sheet__toggle {
+  min-height: 56px;
+  font-size: 1.1rem;
+}
+
+.home-sheet__slider {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-sheet__slider input[type='range'] {
+  width: 100%;
+  height: 44px;
+  accent-color: var(--accent);
+}
+
+.home-sheet__temp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.home-sheet__temp .btn {
+  width: 64px;
+  min-height: 64px;
+  font-size: 1.6rem;
+}
+
+.home-sheet__degrees {
+  font-size: 2.4rem;
+  font-weight: 800;
+  min-width: 3ch;
+  text-align: center;
+}
+
+.home-sheet__modes,
+.home-sheet__more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-sheet__modes .btn[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.home-settings__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.home-settings__devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+}
+
+.home-settings__device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+html[data-tv='true'] .home-tile__main:focus,
+html[data-tv='true'] .home-tile__more:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Edit mode: arrange rooms, devices and scenes. Every control is a real button at
+   least 44px tall, so a finger on the wall, a mouse and a D-pad all work. ---- */
+
+.home__edit {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0 20px;
+  font-weight: 700;
+}
+
+.home__hidden--link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.home__editbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+  align-self: center;
+}
+
+.home__editbar .btn {
+  min-height: 48px;
+  padding: 0 20px;
+}
+
+.home-room--edit[data-hidden='true'] .home-room__tiles,
+.home-room--edit[data-hidden='true'] .home-room__title {
+  opacity: 0.45;
+}
+
+.home-room--edit {
+  border-style: dashed;
+}
+
+.home-edit__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.home-edit__tools--room {
+  margin-bottom: 12px;
+}
+
+.home-edit__arrows {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* Secondary: the way to move one step without dragging (D-pad, keyboard, screen reader). */
+.home-edit__arrow {
+  width: 32px;
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.home-edit__arrow:active {
+  background: var(--accent-soft);
+}
+
+.home-edit__arrow:disabled {
+  opacity: 0.25;
+}
+
+.home-edit__chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.home-edit__chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* The drag handle: this is where a finger or a mouse grabs a card. */
+.home-edit__grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  flex: 0 0 auto;
+}
+
+.home-room--edit .home-room__head {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-room--edit .home-room__sum {
+  margin-left: auto;
+}
+
+.home-room--edit .home-room__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.home-tile--edit {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home-tile--edit > .home-edit__grip {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.home-tile__main--edit {
+  cursor: grab;
+}
+
+.home-tile--edit .home-edit__tools {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.home-tile--edit[data-hidden='true'] .home-tile__main {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+/* Edit mode items are grabbed, so no text selection, no iOS callout, and a long press is
+   a drag rather than a context menu. Scrolling by touch on the body still works. */
+.home-draggable {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.home-room--edit {
+  cursor: grab;
+}
+
+/* Where the card was: a dashed hollow the floating copy will drop back into. */
+.home-draggable[data-drag-state='source'] {
+  position: relative;
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.home-draggable[data-drag-state='source'] > * {
+  visibility: hidden;
+}
+
+.home-tile--edit[data-drag-state='source'] {
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.home-scene-edit[data-drag-state='source'] {
+  border-radius: 999px;
+}
+
+/* The floating copy follows the pointer: on <body> so nothing clips it. */
+.home-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0.94;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius);
+  transform-origin: center;
+  will-change: transform;
+}
+
+.home-drag-ghost > .home-room,
+.home-drag-ghost > .home-tile,
+.home-drag-ghost > .home-scene-edit {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-elev);
+  border-style: solid;
+  border-color: var(--accent);
+  margin: 0;
+}
+
+body.home-dragging,
+body.home-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.home__scenes--edit {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.home-scene-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 6px;
+  cursor: grab;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  background: var(--bg-elev);
+  font-weight: 700;
+}
+
+.home-scene-edit[data-hidden='true'] .home-scene-edit__name {
+  opacity: 0.45;
+}
+
+.home-scene-edit__name {
+  margin-right: 6px;
+}
+
+.home-scene-edit__flag {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.home-sheet__volume {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.home-sheet__volume .btn {
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 1.4rem;
+}
+
+.home-sheet__volume .btn[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+html[data-tv='true'] .home-edit__arrow:focus,
+html[data-tv='true'] .home-edit__chip:focus,
+html[data-tv='true'] .home__edit:focus,
+html[data-tv='true'] .home__editbar .btn:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* .home itself is often taller than main, so main is the scroller — clip it too. */
+.shell__main:has(.home[data-editing]) {
+  overflow-x: clip;
+}
+
+.home-scene-edit,
+.home-masonry__cell,
+.home-room--edit {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.home-scene-edit__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-edit__chip {
+  /* Global buttons are --touch wide; a nowrap Hide + arrows row must be allowed to shrink. */
+  min-width: 0;
+}
+
+/* On a phone the Done / Cancel / Reset row gets a line of its own under the title. */
+@media (max-width: 700px) {
+  .home__bar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .home__editbar {
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+
+  .home__editbar .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Icons: duotone SVGs (outline + soft fill). Off is grey; on uses a per-type accent. ---- */
+
+.home-tile__icon,
+.home-scene .home-icon,
+.home-scene-edit .home-icon {
+  color: var(--text-dim);
+  --icon-stroke: var(--icon-off-stroke);
+  --icon-fill: var(--icon-off-fill);
+}
+
+.home-tile__icon .home-icon,
+.home-scene .home-icon,
+.home-scene-edit .home-icon,
+.home-icon--photo {
+  /* 30px on the phone, 32px on the wall. */
+  width: 1.875rem;
+  height: 1.875rem;
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+html[data-scale='wall'] .home-tile__icon .home-icon,
+html[data-scale='wall'] .home-scene .home-icon,
+html[data-scale='wall'] .home-scene-edit .home-icon,
+html[data-scale='wall'] .home-icon--photo {
+  width: 2rem;
+  height: 2rem;
+}
+
+.home-icon__fill {
+  fill: var(--icon-fill);
+  stroke: none;
+  opacity: var(--icon-fill-opacity, 1);
+}
+
+.home-icon__stroke {
+  fill: none;
+  stroke: var(--icon-stroke);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-icon__solid {
+  fill: var(--icon-stroke);
+  stroke: none;
+}
+
+.home-icon--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.home-tile[data-on='true'] .home-tile__icon {
+  color: var(--text);
+}
+
+.home-tile[data-on='true'][data-domain='light'] .home-tile__icon {
+  color: var(--icon-light);
+  --icon-stroke: var(--icon-light);
+  --icon-fill: var(--icon-light-fill);
+}
+
+.home-tile[data-on='true'][data-domain='fan'] .home-tile__icon {
+  color: var(--icon-fan);
+  --icon-stroke: var(--icon-fan);
+  --icon-fill: var(--icon-fan-fill);
+}
+
+.home-tile[data-on='true'][data-domain='switch'] .home-tile__icon,
+.home-tile[data-on='true'][data-domain='input_boolean'] .home-tile__icon {
+  color: var(--icon-switch);
+  --icon-stroke: var(--icon-switch);
+  --icon-fill: var(--icon-switch-fill);
+}
+
+.home-tile[data-on='true'][data-domain='media_player'] .home-tile__icon {
+  color: var(--icon-tv);
+  --icon-stroke: var(--icon-tv);
+  --icon-fill: var(--icon-tv-fill);
+}
+
+/* Locks, covers and sensors stay slate whether they are open or closed. */
+.home-tile[data-domain='lock'] .home-tile__icon,
+.home-tile[data-domain='cover'] .home-tile__icon,
+.home-tile[data-domain='binary_sensor'] .home-tile__icon,
+.home-tile[data-domain='sensor'] .home-tile__icon {
+  color: var(--icon-slate);
+  --icon-stroke: var(--icon-slate);
+  --icon-fill: var(--icon-slate-fill);
+}
+
+.home-tile[data-domain='climate'] .home-icon[data-tone='heat'] {
+  color: var(--icon-heat);
+  --icon-stroke: var(--icon-heat);
+  --icon-fill: var(--icon-heat-fill);
+}
+
+.home-tile[data-domain='climate'] .home-icon[data-tone='cool'] {
+  color: var(--icon-cool);
+  --icon-stroke: var(--icon-cool);
+  --icon-fill: var(--icon-cool-fill);
+}
+
+.home-scene .home-icon,
+.home-scene-edit .home-icon {
+  color: var(--icon-scene);
+  --icon-stroke: var(--icon-scene);
+  --icon-fill: var(--icon-scene-fill);
+}
+
+/* A running fan turns its blades. Cheap (one transform) and off when the user
+   prefers reduced motion, so the Pi wall is not a pinwheel. */
+.home-icon--spin .home-icon__blades {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: home-fan-spin 3.2s linear infinite;
+}
+
+@keyframes home-fan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-icon--spin .home-icon__blades {
+    animation: none;
+  }
+}
+
+/* ---- On-tile brightness / fan-speed slider: the fill is the old thin bar, full height. ---- */
+
+.home-tile[data-slider='true'] .home-tile__main {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+  /* The unfilled side stays the tile background; the fill paints the level. */
+  background: var(--bg);
+}
+
+.home-tile[data-slider='true'][data-on='true'] .home-tile__main {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.home-tile__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--level, 0) * 1%);
+  background: var(--accent-soft);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-tile[data-slider='true'] .home-tile__icon,
+.home-tile[data-slider='true'] .home-tile__name,
+.home-tile[data-slider='true'] .home-tile__state {
+  position: relative;
+  z-index: 1;
+}
+
+.home-tile__state[data-drag='true'] {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.home-tile[data-sliding='true'] .home-tile__main:active {
+  transform: none;
+}
+
+.home-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

@@ -10,8 +10,10 @@ import { DevicesTab } from './DevicesTab'
 import { GoogleTab } from './GoogleTab'
 import { ICloudTab } from './ICloudTab'
 import { ScreenTab } from './ScreenTab'
+import { HomeTab } from './HomeTab'
 import { SharingTab } from './SharingTab'
 import { WeatherTab } from './WeatherTab'
+import { MessagesTab } from './MessagesTab'
 import { useEventColor } from '../../components/eventColor'
 import { THEMES } from '../../theme'
 import { PALETTE } from './palette'
@@ -26,6 +28,8 @@ const TABS = [
   'screen',
   'weather',
   'sharing',
+  'home',
+  'messages',
   'devices',
   'api',
 ] as const
@@ -41,6 +45,8 @@ const TAB_LABELS: Record<Tab, string> = {
   screen: 'Screen',
   weather: 'Weather',
   sharing: 'Sharing',
+  home: 'Home',
+  messages: 'Messages',
   devices: 'Devices',
   api: 'API',
 }
@@ -73,6 +79,8 @@ export function SettingsPage() {
         {tab === 'screen' && <ScreenTab />}
         {tab === 'weather' && <WeatherTab />}
         {tab === 'sharing' && <SharingTab />}
+        {tab === 'home' && <HomeTab />}
+        {tab === 'messages' && <MessagesTab />}
         {tab === 'devices' && <DevicesTab />}
         {tab === 'api' && <ApiTab />}
       </div>
@@ -113,6 +121,20 @@ function PeopleTab() {
             className="row__name"
             value={u.name}
             onChange={(e) => updateUser.mutate({ id: u.id, name: e.target.value })}
+          />
+          <input
+            className="row__name row__phone"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="Phone, +15555550123"
+            defaultValue={u.phone ?? ''}
+            key={`${u.id}-${u.phone ?? ''}`}
+            aria-label={`${u.name}'s phone number`}
+            onBlur={(e) => {
+              const next = e.target.value.trim()
+              if (next === (u.phone ?? '')) return
+              updateUser.mutate({ id: u.id, phone: next || null })
+            }}
           />
           <div className="palette">
             {PALETTE.map((c) => (

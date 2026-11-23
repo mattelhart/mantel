@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import { useEntityMutation } from '../../api/hooks'
+import { isLoopbackHost, qrDataUri } from './qr'
 import { timeAgo } from './timeAgo'
 
 interface Device {
@@ -23,6 +24,7 @@ interface PairingCode {
 export function DevicesTab() {
   const queryClient = useQueryClient()
   const [code, setCode] = useState<PairingCode | null>(null)
+  const [forTv, setForTv] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -36,7 +38,8 @@ export function DevicesTab() {
     ['devices'],
   )
 
-  const showCode = async () => {
+  const showCode = async (tv: boolean) => {
+    setForTv(tv)
     setBusy(true)
     setError(null)
     try {
@@ -60,13 +63,16 @@ export function DevicesTab() {
       <p className="hint">
         This screen does not ask you to log in. It is on the home network, and that is enough.
         A phone away from home pairs with a code instead of a password: show one here, then
-        enter it in the app (or scan the code). Revoke a device here any time — its token
+        enter it in the app (or scan the code). A TV pairs the same way: tap Pair a TV and type the code with its remote. Revoke a device here any time — its token
         stops working immediately.
       </p>
 
       <div className="row">
-        <button className="btn btn--primary" onClick={() => void showCode()} disabled={busy}>
-          {code ? 'New pairing code' : 'Pair a phone'}
+        <button className="btn btn--primary" onClick={() => void showCode(false)} disabled={busy}>
+          {code && !forTv ? 'New pairing code' : 'Pair a phone'}
+        </button>
+        <button className="btn" onClick={() => void showCode(true)} disabled={busy}>
+          {code && forTv ? 'New TV code' : 'Pair a TV'}
         </button>
       </div>
 
@@ -78,14 +84,22 @@ export function DevicesTab() {
           {!expired && (
             <img
               className="pair__qr"
-              alt=""
-              src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(code.qr_svg)}`}
+              alt={`QR code for pairing ${code.code}`}
+              src={qrDataUri(code.qr_svg)}
             />
+          )}
+          {!expired && isLoopbackHost(window.location.hostname) && (
+            <p className="banner banner--warn">
+              This screen is open as {window.location.hostname}, which a phone cannot reach, so the QR will not
+              work. Open Mantel here by its network address (for example http://10.0.15.178:8080) and try again.
+            </p>
           )}
           <div className="pair__meta">
             {expired
               ? 'That code has expired. Show a new one.'
-              : `Enter this in the phone app. It expires ${expiryLabel(code.expires_at)} and works once.`}
+              : forTv
+                ? `On the TV, type this code when it says “Pair this TV”. It expires ${expiryLabel(code.expires_at)} and works once.`
+                : `Enter this in the phone app. It expires ${expiryLabel(code.expires_at)} and works once.`}
           </div>
         </div>
       )}

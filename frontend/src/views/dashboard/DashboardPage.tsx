@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import { useEntityMutation } from '../../api/hooks'
 import type { CalendarEvent } from '../../api/types'
 import { EventModal } from '../../components/EventModal'
+import { useDismissGuard } from '../../components/dismissGuard'
 import { WIDGETS } from './widgets'
 
 interface Widget {
@@ -78,7 +79,7 @@ export function DashboardPage() {
   return (
     <div className="dash">
       <header className="dash__bar">
-        <h1 className="dash__title">Dashboard</h1>
+        <h1 className="dash__title">Today</h1>
         <button className="iconbtn" onClick={() => setAdding(true)}>
           + Widget
         </button>
@@ -91,14 +92,17 @@ export function DashboardPage() {
         </button>
       </header>
 
-      {widgets.length === 0 && (
-        <div className="placeholder">
-          <div style={{ fontSize: 'var(--font-lg)' }}>Your dashboard is empty</div>
-          <div style={{ fontSize: 'var(--font-sm)' }}>
-            Tap “+ Widget” to build the wall however you like.
-          </div>
-        </div>
-      )}
+      <div className="dash__grid">
+        {(['today_agenda', 'chores'] as const).map((type) => {
+          const widget = WIDGETS[type]
+          return (
+            <section key={type} className="widget" data-size="large">
+              <widget.component config={{}} onConfigChange={() => {}}
+                onOpenEvent={showEvent} onNewEvent={createAt} />
+            </section>
+          )
+        })}
+      </div>
 
       <div className="dash__grid">
         {widgets.map((w, i) => {
@@ -141,30 +145,14 @@ export function DashboardPage() {
       </div>
 
       {adding && (
-        <div className="modal" onClick={() => setAdding(false)} role="dialog">
-          <div className="modal__card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Add a widget</h2>
-            {types.map((t) => (
-              <button
-                key={t.type}
-                className="picker"
-                onClick={() => {
-                  addWidget.mutate({ widget_type: t.type, size: t.default_size })
-                  setAdding(false)
-                }}
-              >
-                <span className="picker__name">{t.name}</span>
-                <span className="picker__desc">{t.description}</span>
-              </button>
-            ))}
-            <div className="modal__actions">
-              <div className="modal__spacer" />
-              <button className="btn" onClick={() => setAdding(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddWidgetDialog
+          types={types}
+          onPick={(t) => {
+            addWidget.mutate({ widget_type: t.type, size: t.default_size })
+            setAdding(false)
+          }}
+          onClose={() => setAdding(false)}
+        />
       )}
 
       {modalOpen && (
@@ -178,6 +166,40 @@ export function DashboardPage() {
           }}
         />
       )}
+    </div>
+  )
+}
+
+/** The widget picker. Nothing to lose here, so a tap outside, Escape or Cancel just close it. */
+function AddWidgetDialog({
+  types,
+  onPick,
+  onClose,
+}: {
+  types: WidgetType[]
+  onPick: (t: WidgetType) => void
+  onClose: () => void
+}) {
+  const guard = useDismissGuard({ dirty: false, onClose })
+  return (
+    <div className="modal" role="dialog" aria-modal="true" aria-label="Add a widget" {...guard.backdropProps}>
+      <div className="modal__card">
+        <h2 className="modal__title">Add a widget</h2>
+        <div className="picker-list">
+          {types.map((t) => (
+            <button key={t.type} className="picker" onClick={() => onPick(t)}>
+              <span className="picker__name">{t.name}</span>
+              <span className="picker__desc">{t.description}</span>
+            </button>
+          ))}
+        </div>
+        <div className="modal__actions">
+          <div className="modal__spacer" />
+          <button className="btn" onClick={guard.requestClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -21,6 +21,9 @@ dependencies = [
     "python-multipart>=0.0.20",
     # Pairing QR codes, drawn on the wall. Pure Python, no system libraries.
     "segno>=1.6",
+    # The live link to Home Assistant (state changes, rooms). Already pulled in by
+    # uvicorn[standard]; named here because Mantel imports it directly.
+    "websockets>=13.0",
 ]
 
 [project.optional-dependencies]

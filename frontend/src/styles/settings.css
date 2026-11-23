@@ -164,6 +164,31 @@ code {
   font-size: 0.9em;
 }
 
+/* Raw docs/schema pages have no app chrome. On the wall they are shown as
+   copyable addresses instead of links, so a tap cannot trap the kiosk. */
+.api-tab__urls {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.api-tab__url {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.api-tab__url code {
+  flex: 1 1 220px;
+  min-width: 0;
+  word-break: break-all;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
 /* ----------------------- the API guide (Settings -> API) ------------------- */
 
 /* The guide is long-form prose inside a settings panel, so it opts out of the
@@ -595,8 +620,10 @@ code {
 }
 
 .pair__qr {
-  width: 180px;
-  height: 180px;
+  /* Big enough to scan from across a room off the wall, and never wider than the panel. */
+  width: 240px;
+  height: 240px;
+  max-width: 100%;
   background: #fff;
   padding: 8px;
   border-radius: 8px;

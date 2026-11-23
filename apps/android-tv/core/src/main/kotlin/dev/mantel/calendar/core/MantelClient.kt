@@ -12,6 +12,7 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.readBytes
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -82,6 +83,41 @@ class MantelClient(
 
     suspend fun settings(): HouseholdSettings = get("/settings")
 
+    /** Mint a code for a TV (or another phone) to type. Needs this phone's own token, or a trusted network. */
+    suspend fun createPairingCode(baseUrl: String): PairingCode =
+        post("/auth/pairing-codes?base_url=${java.net.URLEncoder.encode(baseUrl, "UTF-8")}", buildJsonObject {})
+
+    suspend fun homeSetup(): HomeSetup = get("/settings")
+
+    /**
+     * Saves the Home Assistant address and token on the server. A null argument leaves that
+     * value alone; [clearToken] removes the saved token. The token goes out once and is never
+     * read back: the server only reports whether one is saved.
+     */
+    suspend fun saveHomeConnection(baseUrl: String? = null, token: String? = null, clearToken: Boolean = false) {
+        val body = buildJsonObject {
+            if (baseUrl != null) put("ha_base_url", baseUrl.trim())
+            if (clearToken) put("ha_token", kotlinx.serialization.json.JsonNull)
+            else if (!token.isNullOrBlank()) put("ha_token", token.trim())
+        }
+        send<JsonObject>(HttpMethod.Patch, "/settings", body)
+    }
+
+    suspend fun testHome(): HomeTestResult = post("/home/test", buildJsonObject {})
+
+    suspend fun home(): HomeSnapshot = get("/home")
+
+    suspend fun homeAction(entityId: String, action: String, value: Int? = null, confirm: Boolean = false) {
+        post<JsonObject>(
+            "/home/entities/$entityId/action",
+            buildJsonObject {
+                put("action", action)
+                if (value != null) put("value", value)
+                put("confirm", confirm)
+            },
+        )
+    }
+
     suspend fun users(): List<FamilyMember> = get("/users")
 
     suspend fun calendars(): List<CalInfo> = get("/calendars")
@@ -95,6 +131,25 @@ class MantelClient(
 
     suspend fun deleteEvent(id: Int) {
         send<Unit>(HttpMethod.Delete, "/events/$id", null)
+    }
+
+    suspend fun mealPlan(start: String, end: String): Map<String, String> =
+        get("/meals?start=$start&end=$end")
+
+    suspend fun saveMeal(day: String, meal: String, title: String): Unit {
+        post<JsonObject>("/meals", buildJsonObject { put("day", day); put("meal", meal); put("title", title) })
+    }
+
+    suspend fun pollDisplay(id: String, name: String): String? =
+        post<JsonObject>("/displays/$id/poll", buildJsonObject { put("name", name) })["destination"]
+            ?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+            ?.takeUnless { it is kotlinx.serialization.json.JsonNull }
+            ?.content
+
+    suspend fun displays(): List<DisplayTarget> = get("/displays")
+
+    suspend fun showOnDisplay(id: String, destination: String): Unit {
+        post<JsonObject>("/displays/$id/show", buildJsonObject { put("destination", destination) })
     }
 
     suspend fun lists(): List<SharedList> = get("/lists")
@@ -114,6 +169,25 @@ class MantelClient(
 
     suspend fun clearChecked(listId: Int): SharedList =
         post("/lists/$listId/clear-checked", buildJsonObject {})
+
+    suspend fun renameList(id: Int, name: String): SharedList =
+        send(HttpMethod.Patch, "/lists/$id", buildJsonObject { put("name", name) })
+
+    suspend fun deleteList(id: Int) {
+        send<Unit>(HttpMethod.Delete, "/lists/$id", null)
+    }
+
+    suspend fun renameItem(listId: Int, itemId: Int, text: String): ListItem =
+        send(HttpMethod.Patch, "/lists/$listId/items/$itemId", buildJsonObject { put("text", text) })
+
+    suspend fun chores(): List<ChoreDefinition> = get("/chores")
+
+    suspend fun saveChore(id: Int?, body: JsonObject): ChoreDefinition =
+        if (id == null) post("/chores", body) else send(HttpMethod.Patch, "/chores/$id", body)
+
+    suspend fun deleteChore(id: Int) {
+        send<Unit>(HttpMethod.Delete, "/chores/$id", null)
+    }
 
     suspend fun choreBoard(on: String? = null): ChoreBoard =
         get("/chores/board", if (on == null) emptyMap() else mapOf("on" to on))
@@ -155,6 +229,40 @@ class MantelClient(
 
     suspend fun deny(redemptionId: Int): RedemptionInfo =
         post("/redemptions/$redemptionId/deny", buildJsonObject {})
+
+    suspend fun conversations(): ConversationsListing = get("/messages/conversations")
+
+    suspend fun conversation(id: String): Conversation = get("/messages/conversations/$id")
+
+    suspend fun sendMessage(userId: Int, body: String, mediaBase64: String? = null): ConversationMessage =
+        post(
+            "/messages",
+            buildJsonObject {
+                put("user_id", userId)
+                put("body", body)
+                if (!mediaBase64.isNullOrBlank()) put("media_base64", mediaBase64)
+            },
+        )
+
+    suspend fun messageMedia(id: Int): ByteArray {
+        val response = try {
+            http.get(url("/messages/$id/media")) { auth() }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            throw unreachable(e)
+        }
+        if (response.status.value !in 200..299) {
+            val text = runCatching { response.bodyAsText() }.getOrDefault("")
+            val envelope = runCatching { mantelJson.decodeFromString<ErrorEnvelope>(text) }.getOrNull()
+            throw MantelException(
+                envelope?.error?.code ?: "error",
+                envelope?.error?.message ?: "The calendar could not do that",
+                response.status.value,
+            )
+        }
+        return response.readBytes()
+    }
+
 
     /**
      * Blocks until the stream ends. Callers reconnect with [reconnectDelayMs]

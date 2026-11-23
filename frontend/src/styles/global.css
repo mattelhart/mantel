@@ -22,6 +22,28 @@
   --accent-faint: rgba(56, 189, 248, 0.05);
   --accent-wash: rgba(56, 189, 248, 0.07);
   --accent-soft: rgba(56, 189, 248, 0.15);
+  /* A lit bulb on a Home tile. Warm amber, distinct from the cool accent. */
+  --icon-light-on: #f0b429;
+  /* Duotone Home Control icons: outline + a soft fill in the same hue. */
+  --icon-light: var(--icon-light-on);
+  --icon-fan: #38bdf8;
+  --icon-heat: #f0883e;
+  --icon-cool: #5cb8ff;
+  --icon-switch: #34d399;
+  --icon-tv: #818cf8;
+  --icon-slate: #94a3b8;
+  --icon-scene: #e8b84a;
+  --icon-off-stroke: var(--text-dim);
+  --icon-fill-strength: 42%;
+  --icon-light-fill: color-mix(in srgb, var(--icon-light) var(--icon-fill-strength), transparent);
+  --icon-fan-fill: color-mix(in srgb, var(--icon-fan) var(--icon-fill-strength), transparent);
+  --icon-heat-fill: color-mix(in srgb, var(--icon-heat) var(--icon-fill-strength), transparent);
+  --icon-cool-fill: color-mix(in srgb, var(--icon-cool) var(--icon-fill-strength), transparent);
+  --icon-switch-fill: color-mix(in srgb, var(--icon-switch) var(--icon-fill-strength), transparent);
+  --icon-tv-fill: color-mix(in srgb, var(--icon-tv) var(--icon-fill-strength), transparent);
+  --icon-slate-fill: color-mix(in srgb, var(--icon-slate) var(--icon-fill-strength), transparent);
+  --icon-scene-fill: color-mix(in srgb, var(--icon-scene) var(--icon-fill-strength), transparent);
+  --icon-off-fill: color-mix(in srgb, var(--icon-off-stroke) 16%, transparent);
   --danger-soft: rgba(248, 113, 113, 0.15);
   --danger-faint: rgba(248, 113, 113, 0.12);
   /* Hour lines inside the time grid: quieter than --border so a day of events,
@@ -55,6 +77,16 @@
    not #fff, which blooms on a big panel; borders are deliberately heavier than the
    dark themes' because hairlines wash out at a distance in bright light. */
 :root[data-theme='daylight'] {
+  --icon-light-on: #c88708;
+  --icon-fan: #0369a1;
+  --icon-heat: #c2410c;
+  --icon-cool: #0369a1;
+  --icon-switch: #15803d;
+  --icon-tv: #4338ca;
+  --icon-slate: #475569;
+  --icon-scene: #a16207;
+  --icon-fill-strength: 34%;
+  --icon-off-fill: color-mix(in srgb, var(--text-dim) 12%, transparent);
   --bg: #f6f1e7;
   --bg-elev: #fcf9f2;
   --bg-elev-2: #e9e1d0;
@@ -78,6 +110,15 @@
 /* Hearth: a warm dark theme for a dim room at night. Brown-charcoal rather than the
    blue-black of Midnight, with amber standing in for the sky blue. */
 :root[data-theme='hearth'] {
+  --icon-light-on: #ffc44d;
+  --icon-fan: #7dd3fc;
+  --icon-heat: #fb923c;
+  --icon-cool: #7dd3fc;
+  --icon-switch: #4ade80;
+  --icon-tv: #a5b4fc;
+  --icon-slate: #c4b3a0;
+  --icon-scene: #e8a24a;
+  --icon-fill-strength: 44%;
   --bg: #1c1613;
   --bg-elev: #2a211c;
   --bg-elev-2: #3a2e27;
@@ -105,7 +146,17 @@
    borders dark enough to hold up in a sunlit kitchen. Grid lines are quieter
    than --border on purpose — the events should be what you see from the doorway. */
 :root[data-theme='airy'] {
-  --bg: #f3f4f6;
+  --icon-light-on: #d4940a;
+  --icon-fan: #0284c7;
+  --icon-heat: #c2410c;
+  --icon-cool: #0369a1;
+  --icon-switch: #15803d;
+  --icon-tv: #4338ca;
+  --icon-slate: #475569;
+  --icon-scene: #b45309;
+  --icon-fill-strength: 34%;
+  --icon-off-fill: color-mix(in srgb, var(--text-dim) 12%, transparent);
+  --bg: #ffffff;
   --bg-elev: #ffffff;
   --bg-elev-2: #e6e9ef;
   --border: #5c6573;
@@ -124,7 +175,7 @@
   --saver-bg: #0c1016;
   --radius: 22px;
   --touch: 56px;
-  --nav-size: 112px;
+  --nav-size: 124px;
   color-scheme: light;
 }
 
@@ -135,6 +186,14 @@
 :root[data-scale='wall'] {
   --scale: 1.45;
   --nav-size: 118px;
+}
+/* Airy already uses a wider rail; scale must not shrink it (large would
+   otherwise drop 112px to 104px) and should leave room for inset focus rings. */
+:root[data-theme='airy'][data-scale='large'] {
+  --nav-size: 128px;
+}
+:root[data-theme='airy'][data-scale='wall'] {
+  --nav-size: 136px;
 }
 
 * {
@@ -261,6 +320,7 @@ textarea:focus-visible {
 
 .shell__main {
   grid-area: main;
+  position: relative;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   /* A grid item's automatic minimum size is its content, so this needs saying too
@@ -283,6 +343,10 @@ textarea:focus-visible {
   padding: 6px max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-bottom));
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
+  /* Games and Cameras join an already-full bar; scroll rather than clipping Settings. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* --------------------------- bookmark top bar ----------------------------- */
@@ -335,15 +399,24 @@ textarea:focus-visible {
     flex-direction: column;
     width: var(--nav-size);
     height: 100%;
+    min-height: 0;
     border-top: none;
     border-right: 1px solid var(--border);
-    padding: max(8px, env(safe-area-inset-top)) 6px 8px;
+    /* 10px side padding and 8px gaps keep a 2–4px focus ring plus offset
+       inside the rail, instead of clipping at the left edge or overlapping
+       the next item. Rings are drawn inside the button, so the rail can
+       scroll on a short wall when Games and Cameras are added. */
+    padding: max(12px, env(safe-area-inset-top)) 10px 12px;
+    gap: 8px;
+    align-items: stretch;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 }
 
 .navbtn {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 0 auto;
+  min-width: 3.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -381,8 +454,25 @@ textarea:focus-visible {
     flex: 0 0 auto;
     padding: 14px 6px;
     font-size: var(--font-xs);
+    font-weight: 700;
     white-space: normal;
+    /* Allow the focus ring to paint; ellipsis is portrait-only. */
+    overflow: visible;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
   }
+
+  /* Draw the ring inside the button so it cannot escape the rail. */
+  .shell__nav .navbtn:focus-visible {
+    outline-offset: -3px;
+  }
+}
+
+/* Daylight's --text-dim is a warm grey that fades on a sunlit wall; use the
+   body ink for the rail, same idea as Airy. Selected already uses --text. */
+:root[data-theme='daylight'] .navbtn {
+  color: var(--text);
 }
 
 /* ---- Version badge ---- */

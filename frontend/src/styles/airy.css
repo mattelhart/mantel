@@ -56,11 +56,11 @@ html[data-theme='airy'] .navbtn {
   padding: 8px 4px;
   border-radius: 18px;
   font-weight: 800;
-  color: var(--text-dim);
+  /* --text-dim read as a faint grey on the Pi; use the body ink. */
+  color: var(--text);
   transition:
     background 160ms ease,
-    color 160ms ease,
-    transform 120ms ease;
+    color 160ms ease;
 }
 
 html[data-theme='airy'] .navbtn__icon {
@@ -86,10 +86,16 @@ html[data-theme='airy'] .navbtn[aria-current='page'] {
 }
 
 html[data-theme='airy'] .navbtn:active {
-  transform: scale(0.96);
+  background: var(--bg-elev-2);
 }
 
-html[data-theme='airy'] .navbtn:focus-visible,
+/* Nav rings sit inside the button so they are not clipped by the rail or
+   the next item. Other chrome keeps the outward offset. */
+html[data-theme='airy'] .navbtn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -4px;
+}
+
 html[data-theme='airy'] .airy-avatar:focus-visible,
 html[data-theme='airy'] .fab:focus-visible,
 html[data-theme='airy'] .viewtabs__tab:focus-visible {
@@ -305,8 +311,7 @@ html[data-theme='airy'] .timegrid__daynum {
 }
 
 html[data-theme='airy'] .timegrid__dayhead[data-today='true'] .timegrid__daynum,
-html[data-theme='airy'] .month__cell[data-today='true'] .month__daynum,
-html[data-theme='airy'] .schedule__date[data-today='true'] .timegrid__daynum {
+html[data-theme='airy'] .month__cell[data-today='true'] .month__daynum {
   width: 2.5rem;
   height: 2.5rem;
   min-width: 2.5rem;
@@ -325,8 +330,7 @@ html[data-theme='airy'] .month__cell {
 }
 
 html[data-theme='airy'] .event-block,
-html[data-theme='airy'] .chip,
-html[data-theme='airy'] .schedule__event {
+html[data-theme='airy'] .chip {
   border-radius: 14px;
   font-weight: 800;
   box-shadow: none;
@@ -353,8 +357,7 @@ html[data-theme='airy'] .event-block[data-dragging='true'] {
 }
 
 html[data-theme='airy'] .event-block:active,
-html[data-theme='airy'] .chip:active,
-html[data-theme='airy'] .schedule__event:active {
+html[data-theme='airy'] .chip:active {
   filter: brightness(0.97);
 }
 
@@ -729,5 +732,121 @@ html[data-theme='airy'] .move-error {
   html[data-theme='airy'] .navbtn[aria-current='page']:hover {
     background: #e8f0fe;
     color: var(--accent);
+  }
+}
+
+/* Compact family week: the full day remains readable without empty hourly rows. */
+.week-layout { display: flex; gap: 6px; padding: 0 18px 10px; }
+.week-layout button, .event-profiles button {
+  min-height: 48px; padding: 10px 18px; border: 2px solid transparent;
+  border-radius: 14px; font: inherit; color: var(--text); cursor: pointer;
+}
+.week-layout button[aria-pressed='true'], .event-profiles button[aria-pressed='true'] {
+  border-color: var(--accent); box-shadow: 0 0 0 2px var(--bg);
+}
+.week-cards { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); height: 100%; overflow: auto; padding: 0 18px 80px; gap: 8px; }
+.week-cards__day { background: #fff; border-radius: 18px; min-width: 0; }
+.week-cards__day[data-today='true'] { background: #f0f5ff; }
+.week-cards__heading { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; color: var(--text-dim); }
+.week-cards__heading strong { display: grid; place-items: center; width: 44px; height: 44px; font-size: 1.5rem; color: var(--text); }
+.week-cards__heading strong[aria-current='date'] { background: var(--accent); color: white; border-radius: 50%; }
+.week-cards__events { display: flex; flex-direction: column; gap: 10px; padding: 8px; }
+.week-cards__event { display: flex; flex-direction: column; text-align: left; gap: 5px; padding: 12px; border: 0; border-left: 4px solid; border-radius: 12px; color: #243047; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.week-cards__event span, .week-cards__event small { font-size: .85em; }
+.week-cards__add { min-height: 48px; background: transparent; border: 1px dashed #c4cedc; border-radius: 12px; color: var(--text-dim); font-size: 1.5rem; cursor: pointer; }
+.week-cards__empty { color: var(--text-dim); text-align: center; font-size: .85em; }
+.event-profiles { border: 0; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.event-profiles legend { margin-bottom: 10px; }
+html[data-theme='airy'] .airy-avatar {
+  box-sizing: border-box;
+  width: 5.75rem;
+  height: 4.5rem;
+  min-width: 5.75rem;
+  min-height: 4.5rem;
+  max-width: 5.75rem;
+  max-height: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 18px;
+  flex-shrink: 0;
+}
+.airy-avatar__name {
+  font-size: 0.8rem;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+.week-cards button:focus-visible, .event-profiles button:focus-visible, .week-layout button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+html[data-theme='airy'] .modal__card input, html[data-theme='airy'] .modal__card select { min-height: 52px; }
+
+/* Serif headings and quiet surfaces echo the family display layout. */
+html[data-theme='airy'] .airybar__date,
+html[data-theme='airy'] .calpage__title,
+html[data-theme='airy'] .lists__title,
+html[data-theme='airy'] .chores__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+html[data-theme='airy'] .shell__nav {
+  background: #f7f9fa;
+  box-shadow: none;
+}
+
+/* Side menu (landscape: the wall Pi and TVs) reads from across the room, so its labels and
+   icons are larger than the phone's bottom bar. The phone layout is untouched.
+   Focus rings stay inside the button (outline-offset: -4px above); do not shrink
+   the 8px gap or 10px side padding or the ring will clip or overlap again. */
+@media (orientation: landscape) and (min-width: 700px) {
+  html[data-theme='airy'] .shell__nav {
+    /* Every item must fit the screen height without scrolling: the buttons
+       share the rail evenly and icons/labels shrink with the viewport height,
+       capped at the sizes that read well from across the room. */
+    gap: clamp(2px, 0.6vh, 8px);
+    padding: clamp(6px, 1vh, 10px) 10px;
+    align-items: stretch;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  html[data-theme='airy'] .navbtn {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 104px;
+    padding: 2px 4px;
+    gap: clamp(1px, 0.4vh, 4px);
+    overflow: visible;
+    /* A fractional scale on press slightly blurs the type on a Pi panel. */
+    transform: none;
+  }
+
+  html[data-theme='airy'] .navbtn__icon {
+    width: clamp(22px, 3.7vh, 40px);
+    height: clamp(22px, 3.7vh, 40px);
+    flex: none;
+  }
+
+  html[data-theme='airy'] .navbtn__label {
+    /* Large for across-the-room reading, but sized so 'Calendar' fits the
+       124px rail on one line; it shrinks on short screens with the icons. */
+    font-size: clamp(0.8rem, 1.75vh, 1.05rem);
+    font-weight: 800;
+    line-height: 1.15;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    /* body uses antialiased (grayscale), which looks soft at this size on Linux. */
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
   }
 }

@@ -26,7 +26,7 @@ const event = (over: Partial<CalendarEvent>): CalendarEvent =>
 // placeholders show up, but small enough to read.
 const win = dayWindow(new Date(2026, 9, 15), 30, 30)
 
-const render = (events: CalendarEvent[] = [], kind: 'week' | '3day' = 'week') =>
+const render = (events: CalendarEvent[] = [], kind: 'week' = 'week') =>
   renderToStaticMarkup(
     <TimeStripView
       kind={kind}
@@ -56,9 +56,8 @@ describe('TimeStripView', () => {
     expect(html).toContain('--n:61')
   })
 
-  it('sizes columns for seven days in Week and three in 3 Day', () => {
+  it('sizes columns for seven days in Week', () => {
     expect(render([], 'week')).toContain('--days:7')
-    expect(render([], '3day')).toContain('--days:3')
   })
 
   it('keeps the header and all-day band in one sticky block above the hours', () => {

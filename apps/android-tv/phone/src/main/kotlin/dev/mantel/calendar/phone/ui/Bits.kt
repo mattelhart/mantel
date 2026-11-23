@@ -23,14 +23,14 @@ import androidx.compose.ui.unit.dp
 /** Near-black ink. Typed text and body copy. */
 internal val Ink = Color(0xFF1C2430)
 
-/** Warm paper behind the screens. */
-internal val Paper = Color(0xFFF6F3EE)
+/** Soft white behind the screens. */
+internal val Paper = Color(0xFFFFFFFF)
 
-/** Bright orange for a filled button. Ink on this clears 4.5:1; white does not. */
-internal val Coral = Color(0xFFE36A3A)
+/** Pastel teal action fill with dark, readable text. */
+internal val Coral = Color(0xFFC5E8ED)
 
-/** Dark rust. Primary text on paper: outlined buttons, labels, links. */
-internal val Ember = Color(0xFF8C3A16)
+/** Deep teal for primary text, labels, and links. */
+internal val Ember = Color(0xFF176B7C)
 
 /** Dark red for errors on paper. Light mode only; dark mode uses a light red. */
 internal val Danger = Color(0xFF9B1C1C)
@@ -61,7 +61,7 @@ fun Modifier.touchTarget(): Modifier = heightIn(min = 56.dp)
 @Composable
 private fun lightSurface(): Boolean = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
-/** Filled actions stay the warm orange. The scheme primary is the darker rust, because that color is also drawn as text. */
+/** Pastel actions use dark ink; dark mode follows its own color scheme. */
 @Composable
 fun WarmButton(
     onClick: () -> Unit,
@@ -96,6 +96,10 @@ fun warmOnContainer(): Color = if (lightSurface()) Ink else MaterialTheme.colorS
 fun mantelFieldColors(): TextFieldColors {
     val scheme = MaterialTheme.colorScheme
     return OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = scheme.surface,
+        unfocusedContainerColor = scheme.surface,
+        disabledContainerColor = scheme.surface,
+        errorContainerColor = scheme.surface,
         focusedTextColor = scheme.onSurface,
         unfocusedTextColor = scheme.onSurface,
         disabledTextColor = scheme.onSurface,

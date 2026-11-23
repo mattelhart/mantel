@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; background: white; color: #1c2430; font: 28px Arial, sans-serif; }
+[hidden] { display: none !important; }
+main { width: min(88vw, 1450px); margin: 5vh auto; padding: 2vw; }
+h1 { font: 64px Georgia, serif; margin-bottom: 24px; }
+form { display: flex; flex-wrap: wrap; gap: 24px; margin: 48px 0; }
+label { width: 100%; }
+input { width: 100%; background: #f5f8fa; color: #1c2430; border: 2px solid #677582; border-radius: 16px; padding: 22px; font: inherit; }
+button { font: inherit; border: 2px solid #c3d8dc; border-radius: 20px; padding: 24px 36px; color: #1c2430; background: #dceff1; }
+:focus { outline: 5px solid #176b7c; outline-offset: 5px; }
+.hint { line-height: 1.6; color: #435160; }
+#status { min-height: 36px; }
+iframe { border: 0; position: fixed; inset: 0; width: 100%; height: 100%; background: white; transform-origin: top left; }

@@ -50,6 +50,7 @@ data class ScreenCache(
     val events: List<CalEvent> = emptyList(),
     val lists: List<SharedList> = emptyList(),
     val board: ChoreBoard? = null,
+    val conversations: ConversationsListing = ConversationsListing(),
 )
 
 class ScreenCacheStore(private val store: SnapshotStore) {
