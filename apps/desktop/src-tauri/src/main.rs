@@ -1,4 +1,4 @@
-//! A window around the Mantel web app. Pairing, live updates, and offline mode
+//! A window around the Homie web app. Pairing, live updates, and offline mode
 //! stay in that app. This process only remembers where the server is, and the
 //! size of the window.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -60,14 +60,14 @@ fn probe(origin: &str) -> Result<(), String> {
     let response = client
         .get(&url)
         .send()
-        .map_err(|_| format!("Can't reach {origin}. Start Mantel, or check the address."))?;
+        .map_err(|_| format!("Can't reach {origin}. Start Homie, or check the address."))?;
     let status = response.status();
     if !status.is_success() {
-        return Err(format!("{origin} answered {status}, which is not Mantel."));
+        return Err(format!("{origin} answered {status}, which is not Homie."));
     }
     let body = response.text().unwrap_or_default();
     if !body.contains("ok") {
-        return Err(format!("{origin} answered, but it is not a Mantel server."));
+        return Err(format!("{origin} answered, but it is not a Homie server."));
     }
     Ok(())
 }
@@ -112,7 +112,7 @@ fn open_server(app: AppHandle, url: String) -> Result<(), String> {
     window
         .navigate(origin.parse().map_err(|e: url::ParseError| e.to_string())?)
         .map_err(|e| e.to_string())?;
-    let _ = window.set_title("Mantel Calendar");
+    let _ = window.set_title("Homie Calendar");
     Ok(())
 }
 
@@ -190,5 +190,5 @@ fn main() {
             open_server
         ])
         .run(tauri::generate_context!())
-        .expect("Mantel Calendar failed to start");
+        .expect("Homie Calendar failed to start");
 }

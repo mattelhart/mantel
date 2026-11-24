@@ -136,7 +136,7 @@ export function installTvNavigation() {
         return
       }
       if (window.parent !== window) openChoices('Leave the calendar?', [
-        { label: 'Keep using Mantel', action: () => {} },
+        { label: 'Keep using Homie', action: () => {} },
         { label: 'Leave calendar', action: () => window.parent.postMessage({ type: 'mantel:back' }, '*') },
       ])
       return

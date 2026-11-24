@@ -36,10 +36,12 @@ On Raspberry Pi OS with desktop, create `~/.config/autostart/familycalendar.desk
 ```ini
 [Desktop Entry]
 Type=Application
-Name=Family Calendar
-Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --check-for-update-interval=31536000 --app=http://YOUR-SERVER:8080/dashboard
+Name=Homie
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --check-for-update-interval=31536000 --app=http://YOUR-SERVER:8080/dashboard?companion=1
 X-GNOME-Autostart-enabled=true
 ```
+
+In the Airy theme, `companion=1` enables Homie in the touchscreen header. Use `companion=0` to turn it off on that display. Homie respects the browser’s reduced-motion preference.
 
 Replace `YOUR-SERVER` with the machine running the container. Useful extras:
 

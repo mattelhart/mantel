@@ -6,12 +6,12 @@ fun friendlyFailureText(raw: String?, name: String? = null): String {
     val lowered = text.lowercase()
     return when {
         lowered.contains("couldn't be sent as a picture") -> text
-        lowered.contains("can't get signal messages from mantel") -> text
+        lowered.contains("can't get signal messages from") -> text
         lowered.contains("unregistered") ||
             lowered.contains("isn't registered") ||
             lowered.contains("not registered") -> {
             val who = name?.trim().orEmpty().ifEmpty { "They" }
-            "$who can't get Signal messages from Mantel yet. Ask a grown-up for help."
+            "$who can't get Signal messages from Homie yet. Ask a grown-up for help."
         }
         lowered.contains("phone number") ->
             "Ask a grown-up to add a phone number first."

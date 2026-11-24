@@ -41,7 +41,7 @@ def friendly_error_message(raw: str | None, name: str | None = None) -> str | No
         return text
     if "couldn't be sent as a picture" in lowered:
         return text
-    if "can't get signal messages from mantel" in lowered:
+    if "can't get signal messages from" in lowered:
         return text
     if "a message can be at most" in lowered or "type a message or add a drawing" in lowered:
         return text
@@ -49,7 +49,7 @@ def friendly_error_message(raw: str | None, name: str | None = None) -> str | No
         return text
     if "unregistered" in lowered or "isn't registered" in lowered or "not registered" in lowered:
         who = (name or "").strip() or "They"
-        return f"{who} can't get Signal messages from Mantel yet. Ask a grown-up for help."
+        return f"{who} can't get Signal messages from Homie yet. Ask a grown-up for help."
     if "phone number" in lowered:
         return "Ask a grown-up to add a phone number first."
     if "ask a grown-up to finish messages settings" in lowered:

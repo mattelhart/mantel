@@ -40,7 +40,7 @@ class AgendaWidget : AppWidgetProvider() {
             if (cache == null) {
                 views.setTextViewText(R.id.widget_title, "Today")
                 views.setTextViewText(R.id.widget_status, "Not synced yet")
-                views.setTextViewText(R.id.widget_body, "Open Mantel to sync")
+                views.setTextViewText(R.id.widget_body, "Open Homie to sync")
             } else {
                 val zone = zoneOrUtc(cache.settings.homeTimezone)
                 val day = todayIn(zone)

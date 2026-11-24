@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mantel</string>
-    <string name="widget_name">Mantel today</string>
+    <string name="app_name">Homie</string>
+    <string name="widget_name">Homie today</string>
     <string name="widget_description">Today\'s agenda from the family calendar</string>
     <style name="Theme.MantelPhone" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>

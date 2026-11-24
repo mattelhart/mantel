@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Family Calendar API",
+    title="Homie Calendar API",
     version=settings.version,
     description=(
         "Self-hosted family calendar. The wall display on the home network calls this API "

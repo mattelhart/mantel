@@ -298,7 +298,7 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (link == null) {
             if (pairCodeComplete(raw) && !origin.value.isNullOrBlank()) pair(raw)
-            else _state.update { it.copy(message = "That QR isn't a Mantel pairing code.") }
+            else _state.update { it.copy(message = "That QR isn't a Homie pairing code.") }
             return
         }
         if (!cleartextPermitted(link.base)) {

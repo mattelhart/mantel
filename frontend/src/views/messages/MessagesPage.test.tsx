@@ -222,7 +222,7 @@ describe('Messages page', () => {
     click(byText('Close')!)
     expect(document.querySelectorAll('.messages__bubble')).toHaveLength(2)
     click(document.querySelector('.messages__delete')!)
-    click(byText('Delete from Mantel')!)
+    click(byText('Delete from Homie')!)
     await settle()
     expect(document.querySelectorAll('.messages__bubble')).toHaveLength(1)
     expect(document.querySelector('.messages__bubble')?.textContent).toContain('For you')
@@ -376,7 +376,7 @@ describe('Messages page', () => {
       'Ask a grown-up to add a phone number first.',
     )
     expect(friendlySendError(new Error('UNREGISTERED_FAILURE: +15555550123'), 'Mom')).toContain(
-      "Mom can't get Signal messages from Mantel yet",
+      "Mom can't get Signal messages from Homie yet",
     )
   })
 })

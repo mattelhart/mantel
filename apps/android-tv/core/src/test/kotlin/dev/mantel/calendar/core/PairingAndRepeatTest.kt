@@ -22,7 +22,7 @@ class PairingAndRepeatTest {
 
     @Test
     fun aPublicIpOverHttpIsRefused() {
-        assertFalse("a port-forward is not how a phone should reach Mantel", cleartextPermitted("http://8.8.8.8:8080"))
+        assertFalse("a port-forward is not how a phone should reach Homie", cleartextPermitted("http://8.8.8.8:8080"))
         assertFalse(cleartextPermitted("http://100.128.0.1:8080"))
         assertFalse(cleartextPermitted("http://100.63.1.1:8080"))
         assertFalse(cleartextPermitted("http://172.32.0.1:8080"))

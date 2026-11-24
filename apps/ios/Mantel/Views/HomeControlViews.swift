@@ -67,7 +67,7 @@ struct HomeControlView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                Text("The token is stored on the Mantel server, not on this iPhone. It is never shown again after you save it.")
+                Text("The token is stored on the Homie server, not on this iPhone. It is never shown again after you save it.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

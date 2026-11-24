@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mantel</string>
+	<string>Homie</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -50,7 +50,7 @@
 		<false/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Mantel looks for the family calendar on your home network or VPN. The calendar is never exposed to the public internet.</string>
+	<string>Homie looks for the family calendar on your home network or VPN. The calendar is never exposed to the public internet.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan the pairing code shown on the wall calendar.</string>
 	<key>NSBonjourServices</key>

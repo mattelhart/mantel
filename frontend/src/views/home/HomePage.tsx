@@ -126,7 +126,7 @@ export function HomePage() {
           <h2>{STATUS_HELP[data.status] ?? 'Home control is unavailable.'}</h2>
           <p>
             {data.status === 'not_configured'
-              ? 'Connect Mantel to Home Assistant to control lights, fans, shades, locks and scenes from here.'
+              ? 'Connect Homie to Home Assistant to control lights, fans, shades, locks and scenes from here.'
               : data.message}
           </p>
           <div className="home__setupactions">

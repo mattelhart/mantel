@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mantel TV</string>
-    <string name="dream_name">Mantel today</string>
+    <string name="app_name">Homie TV</string>
+    <string name="dream_name">Homie today</string>
     <style name="Theme.Mantel" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#FFF6E4</item>
     </style>

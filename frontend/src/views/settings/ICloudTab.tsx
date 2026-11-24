@@ -244,7 +244,7 @@ function Steps({ open, onToggle }: { open: boolean; onToggle: () => void }) {
           </li>
           <li>
             Press <strong>+</strong>, name it something you will recognise later like
-            “Mantel”, and Apple shows you a password in four groups, like{' '}
+            “Homie”, and Apple shows you a password in four groups, like{' '}
             <code>abcd-efgh-ijkl-mnop</code>. It is only shown once.
           </li>
           <li>

@@ -319,7 +319,7 @@ private fun titleFor(tab: PhoneTab, page: Page?): String = when (page) {
     Page.Settings -> "Settings"
     is Page.Thread -> "Messages"
     is Page.Draw -> "Draw a picture"
-    null -> if (tab == PhoneTab.Home) "Family calendar" else tab.label()
+    null -> if (tab == PhoneTab.Home) "Homie" else tab.label()
 }
 
 private fun PhoneTab.label(): String = when (this) {

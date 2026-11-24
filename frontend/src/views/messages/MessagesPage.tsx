@@ -48,10 +48,10 @@ export function friendlyFailureText(raw: string, name?: string | null): string {
   const text = raw.trim()
   if (!text) return ''
   if (/couldn't be sent as a picture/i.test(text)) return text
-  if (/can't get Signal messages from Mantel/i.test(text)) return text
+  if (/can't get Signal messages from (Mantel|Homie)/i.test(text)) return text.replace(/from Mantel/i, 'from Homie')
   if (/unregistered|isn't registered|not registered/i.test(text)) {
     const who = name?.trim() || 'They'
-    return `${who} can't get Signal messages from Mantel yet. Ask a grown-up for help.`
+    return `${who} can't get Signal messages from Homie yet. Ask a grown-up for help.`
   }
   if (/phone number/i.test(text)) return 'Ask a grown-up to add a phone number first.'
   if (/ask a grown-up to finish Messages settings/i.test(text)) return text
@@ -287,11 +287,11 @@ export function MessageThreadPage() {
       {deleting && <TouchSheet title="Delete this message?" onClose={() => {
         if (!remove.isPending) setDeleting(null)
       }}>
-        <p>This removes the message from all Mantel screens. The recipient keeps their copy.</p>
+        <p>This removes the message from all Homie screens. The recipient keeps their copy.</p>
         {deleting.body && <blockquote>{deleting.body}</blockquote>}
         {remove.isError && <p role="alert">Could not delete this message. Try again.</p>}
         <button className="btn" disabled={remove.isPending} onClick={() => remove.mutate(deleting.id)}>
-          {remove.isPending ? 'Deleting…' : 'Delete from Mantel'}
+          {remove.isPending ? 'Deleting…' : 'Delete from Homie'}
         </button>
       </TouchSheet>}
       {canSend ? (

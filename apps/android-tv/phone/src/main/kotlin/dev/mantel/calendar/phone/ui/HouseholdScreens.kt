@@ -100,7 +100,7 @@ fun ShowOnTvScreen(vm: PhoneViewModel) {
         listOf("today", "week", "month", "lists", "photos", "meals").forEach { item ->
             FilterChip(selected = destination == item, onClick = { destination = item; status = "" }, label = { Text(item.label()) })
         }
-        if (displays.isEmpty()) Text("Open Mantel on the TV and set its name under Show on TV.")
+        if (displays.isEmpty()) Text("Open Homie on the TV and set its name under Show on TV.")
         displays.forEach { device ->
             OutlinedButton(enabled = !busy, onClick = {
                 busy = true
@@ -108,7 +108,7 @@ fun ShowOnTvScreen(vm: PhoneViewModel) {
                 scope.launch {
                     try { vm.showOnDisplay(device.id, page); status = "Sent to ${device.name}." }
                     catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { status = "Could not send. Check that Mantel is open on the TV." }
+                    catch (_: Exception) { status = "Could not send. Check that Homie is open on the TV." }
                     finally { busy = false }
                 }
             }) { Text("Show on ${device.name}") }

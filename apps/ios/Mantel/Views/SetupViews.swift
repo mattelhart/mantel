@@ -9,7 +9,7 @@ struct AddressScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Connect to Mantel")
+                    Text("Connect to Homie")
                         .font(.largeTitle.weight(.semibold))
                     Text("Type the calendar server's address on your home network or VPN, such as 10.0.15.178. Don't use a public address.")
                         .foregroundStyle(.secondary)

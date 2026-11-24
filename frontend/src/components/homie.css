@@ -1,0 +1,31 @@
+/* The yard takes only spare header space. A narrow header gives it no room. */
+.airybar__spacer:has(.homie-yard) { min-width: 0; container-type: inline-size; }
+.homie-yard { height: 58px; position: relative; margin-right: 58px; }
+.homie-friend {
+  position: absolute; top: 0; left: 0; width: 58px; height: 58px;
+  border: 0; background: transparent; padding: 0; color: #253e42;
+  display: grid; place-items: center; transition: left 3s ease-in-out;
+}
+.homie-yard[data-right="true"] .homie-friend { left: 100%; }
+.homie-cottage {
+  position: relative; display: block; width: 31px; height: 25px; margin-top: 11px;
+  background: #a9ddd1; border: 2px solid currentColor; border-radius: 4px 4px 9px 9px;
+  box-shadow: -6px 11px 0 -9px currentColor, 6px 11px 0 -9px currentColor;
+}
+.homie-roof {
+  position: absolute; width: 24px; height: 24px; top: -13px; left: 2px;
+  transform: rotate(45deg); background: #e99779; border: 2px solid currentColor;
+  border-radius: 5px; clip-path: polygon(0 0, 100% 0, 0 100%); box-sizing: border-box;
+}
+.homie-eyes { position: absolute; top: 7px; left: 6px; width: 4px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 12px 0 currentColor; }
+.homie-smile { position: absolute; top: 12px; left: 11px; width: 7px; height: 5px; border-bottom: 2px solid; border-radius: 50%; }
+.homie-hand { position: absolute; top: 11px; right: -7px; width: 7px; height: 8px; border: 2px solid; background: #a9ddd1; border-radius: 50%; transform-origin: bottom left; }
+.homie-heart { position: absolute; top: -24px; right: -12px; font: bold 16px/1 system-ui; color: #a33e55; opacity: 0; }
+.homie-yard[data-hello="true"] .homie-heart { opacity: 1; }
+.homie-yard[data-hello="true"] .homie-hand { animation: homie-wave .3s ease-in-out 4 alternate; }
+@keyframes homie-wave { to { transform: rotate(-48deg); } }
+@container (max-width: 65px) { .homie-yard { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .homie-yard[data-right] .homie-friend { left: 0; transition: none; }
+  .homie-yard[data-hello] .homie-hand { animation: none; }
+}

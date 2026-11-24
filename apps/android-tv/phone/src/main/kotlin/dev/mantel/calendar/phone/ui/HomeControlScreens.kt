@@ -108,7 +108,7 @@ fun PairTvScreen(vm: PhoneViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("On the TV, open Mantel. When it says “Pair this TV”, type this code with the remote.")
+        Text("On the TV, open Homie. When it says “Pair this TV”, type this code with the remote.")
         val current = code
         if (current != null) {
             Text(
@@ -185,7 +185,7 @@ fun HomeSettingsSection(vm: PhoneViewModel, openHome: () -> Unit) {
 
     Text("Home control", fontWeight = FontWeight.Bold)
     Text(
-        "Mantel controls lights, fans, shades and locks through Home Assistant. In Home Assistant: your profile → Security → Long-lived access tokens → Create token. Paste it here.",
+        "Homie controls lights, fans, shades and locks through Home Assistant. In Home Assistant: your profile → Security → Long-lived access tokens → Create token. Paste it here.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     val current = setup
@@ -339,7 +339,7 @@ fun HomeControlScreen(vm: PhoneViewModel, onSetup: () -> Unit) {
             } catch (c: CancellationException) {
                 throw c
             } catch (e: Exception) {
-                failure = errText(e, "Could not reach Mantel.")
+                failure = errText(e, "Could not reach Homie.")
             }
             delay(4000)
         }
@@ -374,7 +374,7 @@ fun HomeControlScreen(vm: PhoneViewModel, onSetup: () -> Unit) {
                 when (snapshot.status) {
                     "not_configured" -> "Home control isn't set up yet."
                     "invalid_token" -> "Home Assistant rejected the access token."
-                    "unreachable" -> "Mantel can't reach Home Assistant."
+                    "unreachable" -> "Homie can't reach Home Assistant."
                     else -> "Home control is unavailable."
                 },
                 style = MaterialTheme.typography.titleMedium,

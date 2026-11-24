@@ -420,7 +420,7 @@ export function roomSummary(room: HomeRoom): string {
 
 export const STATUS_HELP: Record<string, string> = {
   not_configured: 'Home control is not set up yet.',
-  unreachable: "Mantel can't reach Home Assistant.",
+  unreachable: "Homie can't reach Home Assistant.",
   invalid_token: 'Home Assistant rejected the access token.',
   error: 'Home Assistant had a problem.',
 }

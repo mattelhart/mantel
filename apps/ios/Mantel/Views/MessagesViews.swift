@@ -5,11 +5,11 @@ func friendlyFailureText(_ raw: String?, name: String? = nil) -> String {
     if text.isEmpty { return "" }
     let lowered = text.lowercased()
     if lowered.contains("couldn't be sent as a picture") { return text }
-    if lowered.contains("can't get signal messages from mantel") { return text }
+    if lowered.contains("can't get signal messages from") { return text }
     if lowered.contains("unregistered") || lowered.contains("isn't registered") || lowered.contains("not registered") {
         let who = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let display = who.isEmpty ? "They" : who
-        return "\(display) can't get Signal messages from Mantel yet. Ask a grown-up for help."
+        return "\(display) can't get Signal messages from Homie yet. Ask a grown-up for help."
     }
     if lowered.contains("phone number") {
         return "Ask a grown-up to add a phone number first."
@@ -183,14 +183,14 @@ struct ConversationView: View {
         }
         .alert("Delete this message?", isPresented: $confirmDelete, presenting: deleting) { message in
             Button("Cancel", role: .cancel) {}
-            Button("Delete from Mantel", role: .destructive) {
+            Button("Delete from Homie", role: .destructive) {
                 Task {
                     error = await model.deleteMessage(message.id)
                     if error == nil { await load() }
                 }
             }
         } message: { _ in
-            Text("This removes the message from all Mantel screens. The recipient keeps their copy.")
+            Text("This removes the message from all Homie screens. The recipient keeps their copy.")
         }
         .task(id: conversationId) { await load() }
         .fullScreenCover(isPresented: $drawing) {

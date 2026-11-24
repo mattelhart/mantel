@@ -51,7 +51,7 @@ class MessagesTest {
             friendlySendError("502 Bad Gateway"),
         )
         assertEquals(
-            "Mom can't get Signal messages from Mantel yet. Ask a grown-up for help.",
+            "Mom can't get Signal messages from Homie yet. Ask a grown-up for help.",
             friendlySendError("UNREGISTERED_FAILURE: +15555550123", "Mom"),
         )
     }

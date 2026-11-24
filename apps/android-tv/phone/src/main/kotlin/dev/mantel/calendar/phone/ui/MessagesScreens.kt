@@ -160,7 +160,7 @@ fun MessageThreadScreen(id: String, state: PhoneState, vm: PhoneViewModel, openD
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { if (!busy) deleting = null },
             title = { Text("Delete this message?") },
-            text = { Text(error ?: "This removes the message from all Mantel screens. The recipient keeps their copy.") },
+            text = { Text(error ?: "This removes the message from all Homie screens. The recipient keeps their copy.") },
             dismissButton = { androidx.compose.material3.TextButton(onClick = { deleting = null }, enabled = !busy) { Text("Cancel") } },
             confirmButton = { androidx.compose.material3.TextButton(enabled = !busy, onClick = {
                 busy = true
@@ -169,7 +169,7 @@ fun MessageThreadScreen(id: String, state: PhoneState, vm: PhoneViewModel, openD
                     error = failure
                     if (failure == null) deleting = null
                 }
-            }) { Text("Delete from Mantel") } },
+            }) { Text("Delete from Homie") } },
         )
     }
     val listState = rememberLazyListState()

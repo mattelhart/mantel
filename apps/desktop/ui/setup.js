@@ -4,7 +4,7 @@ const status = document.getElementById("status")
 function invoke(command, args) {
   const core = window.__TAURI__ && window.__TAURI__.core
   if (!core) {
-    return Promise.reject("Open this page in Mantel Calendar.")
+    return Promise.reject("Open this page in Homie Calendar.")
   }
   return core.invoke(command, args)
 }

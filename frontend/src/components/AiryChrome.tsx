@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSettings, useUsers, useWeather } from '../api/hooks'
 import { personFilterApplies, usePersonFilter } from '../hooks/usePersonFilter'
+import { Homie, showHomie } from './Homie'
 import { useEventColor } from './eventColor'
 
 /** Ask the screensaver to come forward. The same control Skylight puts on the
@@ -52,7 +53,7 @@ export function AiryBar({
           {bookmarkText}
         </a>
       )}
-      <div className="airybar__spacer" />
+      <div className="airybar__spacer">{showHomie && <Homie />}</div>
       {showPeople && users.length > 0 && (
         <div className="airybar__people" role="group" aria-label="Family">
           {users.map((u) => {

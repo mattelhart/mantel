@@ -1,6 +1,6 @@
 <div align="center">
 
-# Mantel
+# Homie
 
 ### The open-source family calendar for your kitchen wall
 
@@ -30,14 +30,14 @@ a subscription, a cloud account, and a camera-equipped screen in your kitchen th
 The self-hosted alternatives mostly stop at *displaying* a calendar: they can show you what
 Google already knows, but you can't add Tuesday's dentist appointment from the wall.
 
-Mantel is the other thing. It is a calendar you **write to** from the wall, and everything you
+Homie is the other thing. It is a calendar you **write to** from the wall, and everything you
 write reaches everyone's phone.
 
 **Two-way sync is the part that's rare**, and it works with **Google Calendar and iCloud**.
 Add an event on the kitchen display and it appears on everyone's phones within seconds; change
 it on a phone and it's on the wall at the next sync. Nextcloud can't do this at all — Google
 requires OAuth, which Nextcloud's calendar subscriptions don't support. Home Assistant's CalDAV
-integration can only create events, never edit or delete them. Mantel does the full round trip
+integration can only create events, never edit or delete them. Homie does the full round trip
 for both services, including deletes and repeating events.
 
 Mix them freely: the Google half of the family links Google accounts, the Apple half links Apple
@@ -260,7 +260,7 @@ See [docs/sharing-and-home-assistant.md](docs/sharing-and-home-assistant.md).
 ### 10. Control the house
 
 The **Home** page turns lights, fans, shades, thermostats, locks and scenes into touch tiles
-grouped by room. Mantel doesn't talk to each brand itself: it asks **Home Assistant**, so
+grouped by room. Homie doesn't talk to each brand itself: it asks **Home Assistant**, so
 anything Home Assistant can see (Lutron Caseta, SmartThings, Hue, and the rest of its list)
 appears here once it is added there. Set it up under **Settings → Home**: the Home Assistant
 address and a long-lived access token. The token stays on the server. See
@@ -416,7 +416,7 @@ which needs no API key.
 **Does it work on a phone?**
 Yes. The layout is responsive and installs to a home screen as a PWA. There is also a native
 Android companion — today, month, chores, rewards, and lists — described in
-[docs/android-phone.md](docs/android-phone.md). On the Windows PC that runs the server, Mantel
+[docs/android-phone.md](docs/android-phone.md). On the Windows PC that runs the server, Homie
 Calendar is a window around this same interface: [docs/windows.md](docs/windows.md).
 
 **Can two people edit at the same time?**
@@ -433,7 +433,7 @@ twice. Event edits wait — the server's calendar wins. See
 Sure. It's a perfectly good family calendar in a browser tab. The wall is just where it's best.
 
 **How is this different from DAKboard or MagicMirror?**
-Those are display frameworks — they render information beautifully but are read-only. Mantel is a
+Those are display frameworks — they render information beautifully but are read-only. Homie is a
 calendar you write to, with Google and iCloud sync in both directions.
 
 ## iPhone app
@@ -456,7 +456,7 @@ cd apps/android-tv
 
 Both APKs are signed with the keystore in `apps/android-tv/signing/`, so a new build installs over the last one and keeps the server address and the pairing token. The version code is the git commit count. Details are in [apps/android-tv/README.md](apps/android-tv/README.md).
 
-**Mantel Calendar** for Windows is a WebView2 window around this web app. Install notes:
+**Homie Calendar** for Windows is a WebView2 window around this web app. Install notes:
 [docs/windows.md](docs/windows.md).
 
 ## Development

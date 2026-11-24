@@ -84,7 +84,7 @@ export function HomeTab() {
     <section className="panel">
       <h2>Home control</h2>
       <p className="hint">
-        Mantel controls your lights, fans, shades, TVs, locks and scenes through{' '}
+        Homie controls your lights, fans, shades, TVs, locks and scenes through{' '}
         <strong>Home Assistant</strong>. Add Lutron Caseta, SmartThings and the rest to Home
         Assistant, and they appear on Home Control automatically, grouped by room.
       </p>
@@ -92,7 +92,7 @@ export function HomeTab() {
       <div className="row">
         <div className="row__name row__name--static">
           Home Assistant address
-          <div className="hint">Where Mantel reaches it, e.g. http://10.0.15.178:8123</div>
+          <div className="hint">Where Homie reaches it, e.g. http://10.0.15.178:8123</div>
         </div>
         <input
           className="row__name"

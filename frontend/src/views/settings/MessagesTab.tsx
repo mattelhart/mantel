@@ -533,7 +533,7 @@ function SignalLinkScreen({ alreadyLinked, onBack }: { alreadyLinked: boolean; o
             </p>
           )}
           {qr && (
-            <img className="signal-link__qr" src={qr} alt="QR code to link Mantel to Signal" />
+            <img className="signal-link__qr" src={qr} alt="QR code to link Homie to Signal" />
           )}
           <p className="hint" data-testid="signal-link-state">
             Waiting for you to scan the code…
@@ -587,7 +587,7 @@ function UnlinkedSenders({ users, enabled }: { users: User[]; enabled: boolean }
     <div className="signal-unlinked">
       <h3>Link to family member</h3>
       <p className="hint">
-        These people messaged Mantel, but Signal hid their number. Pick who they are.
+        These people messaged Homie, but Signal hid their number. Pick who they are.
       </p>
       {senders.map((sender) => (
         <div key={sender.signal_uuid} className="row">

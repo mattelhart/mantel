@@ -91,7 +91,7 @@ export function DevicesTab() {
           {!expired && isLoopbackHost(window.location.hostname) && (
             <p className="banner banner--warn">
               This screen is open as {window.location.hostname}, which a phone cannot reach, so the QR will not
-              work. Open Mantel here by its network address (for example http://10.0.15.178:8080) and try again.
+              work. Open Homie here by its network address (for example http://10.0.15.178:8080) and try again.
             </p>
           )}
           <div className="pair__meta">

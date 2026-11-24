@@ -224,7 +224,7 @@ describe('Home page', () => {
     expect(world.posts).toEqual([])
   })
 
-  it('favoriting and hiding are saved in Mantel settings', async () => {
+  it('favoriting and hiding are saved in Homie settings', async () => {
     renderPage()
     await settle()
     click(document.querySelector('.home-tile__more')!)

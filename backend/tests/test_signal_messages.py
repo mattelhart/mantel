@@ -443,7 +443,7 @@ def test_unregistered_failure_is_friendly_in_the_api_and_raw_in_the_db(client, m
     r = client.post("/api/messages", json={"user_id": person["id"], "body": "Hi"})
     assert r.status_code == 400
     assert "UNREGISTERED" not in r.json()["error"]["message"]
-    assert "can't get Signal messages from Mantel yet" in r.json()["error"]["message"]
+    assert "can't get Signal messages from Homie yet" in r.json()["error"]["message"]
     assert "Ask a grown-up" in r.json()["error"]["message"]
     row = db.scalars(select(FamilyMessage)).first()
     assert row is not None
@@ -452,7 +452,7 @@ def test_unregistered_failure_is_friendly_in_the_api_and_raw_in_the_db(client, m
     thread = client.get(f"/api/messages/conversations/user-{person['id']}").json()
     shown = thread["messages"][0]["error_message"]
     assert "UNREGISTERED" not in shown
-    assert "Mom can't get Signal messages from Mantel yet" in shown
+    assert "Mom can't get Signal messages from Homie yet" in shown
 
 
 def test_ingest_matches_source_uuid_when_number_is_hidden(client, monkeypatch, db):

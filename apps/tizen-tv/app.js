@@ -27,7 +27,7 @@
   }
   function openCalendar() {
     var raw = field.value.trim();
-    if (!raw) { showSetup("Enter your Mantel server address."); return; }
+    if (!raw) { showSetup("Enter your Homie server address."); return; }
     if (!/^https?:\/\//i.test(raw)) raw = 'http://' + raw;
     try {
       var url = new URL(raw);
@@ -40,7 +40,7 @@
     // The server keeps API requests same-origin, including pairing and photo URLs.
     frame.src = serverOrigin + '/calendar/week?tv=1';
     timer = setTimeout(function () {
-      showSetup('Cannot reach Mantel. Check the server, Wi-Fi, and the desktop firewall, then retry.');
+      showSetup('Cannot reach Homie. Check the server, Wi-Fi, and the desktop firewall, then retry.');
     }, 15000);
   }
   window.addEventListener('message', function (event) {

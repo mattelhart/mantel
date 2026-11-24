@@ -15,7 +15,7 @@ struct HomeView: View {
             .padding(16)
         }
         .background(Color(.systemBackground))
-        .navigationTitle("Mantel")
+        .navigationTitle("Homie")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

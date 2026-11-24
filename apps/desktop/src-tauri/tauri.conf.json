@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Mantel Calendar",
+  "productName": "Homie Calendar",
   "version": "0.1.0",
   "identifier": "dev.mantel.calendar.desktop",
   "build": {
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Mantel Calendar",
+        "title": "Homie Calendar",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

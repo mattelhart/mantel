@@ -1,6 +1,6 @@
 {
-  "name": "Family Calendar",
-  "short_name": "Calendar",
+  "name": "Homie",
+  "short_name": "Homie",
   "description": "The family's schedule, on every screen in the house.",
   "start_url": "/",
   "scope": "/",

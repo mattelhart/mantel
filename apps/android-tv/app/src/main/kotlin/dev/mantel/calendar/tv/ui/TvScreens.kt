@@ -229,7 +229,7 @@ private fun Home(state: TvState, vm: TvViewModel) {
                 fontSize = 20.sp,
             )
         }
-        Text("Family calendar", color = tvPalette().ink, fontSize = 30.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif)
+        Text("Homie", color = tvPalette().ink, fontSize = 30.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif)
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Column(
                 // 12.dp padding and no focus scale so the 4.dp focused border stays

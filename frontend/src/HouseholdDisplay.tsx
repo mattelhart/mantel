@@ -98,13 +98,13 @@ export function ShowOnTvPage() {
     <label>What to show <select value={destination} onChange={event => { send.reset(); setDestination(event.target.value as Destination) }}>
       {Object.entries(titles).map(([value, title]) => <option key={value} value={value}>{title}</option>)}
     </select></label>
-    <p>Open Mantel on the TV and give it a name on this page.</p>
+    <p>Open Homie on the TV and give it a name on this page.</p>
     {document.documentElement.dataset.tv === 'true' && <DisplayName />}
     {devices.isSuccess && !devices.data.length && <p>No TVs are online.</p>}
     {devices.isError && <p role="alert">Could not find TVs.</p>}
     {devices.data?.map(device => <p key={device.id}><button disabled={send.isPending} onClick={() => send.mutate(device)}>Show on {device.name}</button></p>)}
     {send.isSuccess && <p role="status">Sent to {send.variables.name}.</p>}
-    {send.isError && <p role="alert">Could not send. Open Mantel on the TV and try again.</p>}
+    {send.isError && <p role="alert">Could not send. Open Homie on the TV and try again.</p>}
   </div>
 }
 

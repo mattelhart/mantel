@@ -204,7 +204,7 @@ final class AppModel {
             if ServerAddress.pairCodeComplete(raw), origin != nil {
                 pair(code: raw)
             } else {
-                message = "That QR isn't a Mantel pairing code."
+                message = "That QR isn't a Homie pairing code."
             }
             return
         }
