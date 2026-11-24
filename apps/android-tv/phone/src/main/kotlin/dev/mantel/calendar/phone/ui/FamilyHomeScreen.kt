@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.mantel.calendar.core.dayLabel
 import dev.mantel.calendar.core.eventsOn
@@ -46,22 +47,23 @@ fun FamilyHomeScreen(state: PhoneState, vm: PhoneViewModel, selectTab: (PhoneTab
     )
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         tiles.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { tile ->
                     Column(
-                        Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).clickable(onClick = tile.action).padding(vertical = 12.dp),
+                        Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).clickable(onClick = tile.action).padding(vertical = 5.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Box(Modifier.size(76.dp).background(tile.color, CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(tile.icon, contentDescription = null, tint = Ink, modifier = Modifier.size(32.dp))
+                        Box(Modifier.size(48.dp).background(tile.color, CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(tile.icon, contentDescription = null, tint = Ink, modifier = Modifier.size(24.dp))
                         }
-                        Text(tile.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(tile.title, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         // Wraps onto a second line on a narrow phone instead of squeezing the last button.

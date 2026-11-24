@@ -1,9 +1,10 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package dev.mantel.calendar.phone.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,7 +62,7 @@ fun ChoresScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                     Icon(Icons.Filled.ChevronRight, contentDescription = "Next day")
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WarmButton(onClick = { open(Page.EditChore()) }, modifier = Modifier.touchTarget()) { Text("Add chore") }
                 OutlinedButton(onClick = { open(Page.AllChores) }, modifier = Modifier.touchTarget()) { Text("All chores / edit") }
             }
@@ -82,13 +83,13 @@ fun ChoresScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                 Text("Waiting for approval", fontWeight = FontWeight.Bold)
                 waiting.forEach { item ->
                     Text("${item.userName} · ${item.title} · ${item.points} stars · ${item.on}", fontWeight = FontWeight.SemiBold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         WarmButton(onClick = { vm.approve(item.completionId) }, modifier = Modifier.touchTarget()) { Text("Approve") }
                         OutlinedButton(onClick = { vm.reject(item.completionId) }, modifier = Modifier.touchTarget()) { Text("Not yet") }
                     }
                 }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 people.forEach { member ->
                     FilterChip(
                         selected = person?.userId == member.userId,
@@ -138,7 +139,7 @@ fun RewardsScreen(state: PhoneState, vm: PhoneViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             people.forEach { member ->
                 FilterChip(
                     selected = person?.userId == member.userId,
@@ -171,7 +172,7 @@ fun RewardsScreen(state: PhoneState, vm: PhoneViewModel) {
         if (state.board?.rewards.isNullOrEmpty()) Text("No rewards yet. Add them on the wall.")
         state.board?.pendingRedemptions?.forEach { row ->
             Text("${row.userName} wants ${row.rewardTitle}", fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WarmButton(onClick = { vm.fulfill(row.id) }, modifier = Modifier.touchTarget()) { Text("Given") }
                 OutlinedButton(onClick = { vm.deny(row.id) }, modifier = Modifier.touchTarget()) { Text("Send back") }
             }

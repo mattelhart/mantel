@@ -1,7 +1,6 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 package dev.mantel.calendar.phone.ui
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -90,13 +89,13 @@ fun ChoreEditor(chore: ChoreDefinition?, state: PhoneState, vm: PhoneViewModel, 
             }
         }
         Text("Schedule", fontWeight = FontWeight.Bold)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("daily" to "Daily", "weekly" to "Choose days", "once" to "Once").forEach { (value, label) ->
                 FilterChip(selected = schedule == value, enabled = !busy, onClick = { schedule = value }, label = { Text(label) }, modifier = Modifier.touchTarget())
             }
         }
         if (schedule == "weekly") {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEachIndexed { index, label ->
                     FilterChip(selected = index in weekdays, enabled = !busy, onClick = {
                         weekdays = if (index in weekdays) weekdays - index else weekdays + index

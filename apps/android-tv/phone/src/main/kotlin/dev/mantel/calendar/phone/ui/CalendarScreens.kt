@@ -1,18 +1,19 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package dev.mantel.calendar.phone.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -94,7 +99,6 @@ fun TodayScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
         ) {
             DayStrip(state, vm)
             PersonStrip(state, vm)
-            Text(dayLabel(day), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             if (events.isEmpty()) Text("Nothing on this day.", style = MaterialTheme.typography.titleMedium)
             events.forEach { event ->
                 EventRow(event, state, vm) { open(Page.Event(event)) }
@@ -156,7 +160,7 @@ fun MonthScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
                         Column(
                             Modifier
                                 .weight(1f)
-                                .height(64.dp)
+                                .heightIn(min = 48.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable { vm.setAnchor(day) }
                                 .background(if (day == state.anchor) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
@@ -191,23 +195,40 @@ fun MonthScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
 @Composable
 private fun DayStrip(state: PhoneState, vm: PhoneViewModel) {
     val days = weekDays(state.anchor, state.settings.firstDayOfWeek)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { vm.setAnchor(step(ViewKind.AGENDA, state.anchor, -1)) }, modifier = Modifier.touchTarget()) {
-            Icon(Icons.Filled.ChevronLeft, contentDescription = "Previous day")
-        }
-        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            days.forEach { day ->
-                val selected = day == state.anchor
-                FilterChip(
-                    selected = selected,
-                    onClick = { vm.setAnchor(day) },
-                    label = { Text("${day.dayOfWeek.name.take(1)} ${day.dayOfMonth}") },
-                    modifier = Modifier.touchTarget(),
-                )
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { vm.setAnchor(state.anchor.minusWeeks(1)) }) {
+                Icon(Icons.Filled.ChevronLeft, contentDescription = "Previous week")
+            }
+            Text(
+                dayLabel(state.anchor),
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            IconButton(onClick = { vm.setAnchor(state.anchor.plusWeeks(1)) }) {
+                Icon(Icons.Filled.ChevronRight, contentDescription = "Next week")
             }
         }
-        IconButton(onClick = { vm.setAnchor(step(ViewKind.AGENDA, state.anchor, 1)) }, modifier = Modifier.touchTarget()) {
-            Icon(Icons.Filled.ChevronRight, contentDescription = "Next day")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            days.forEach { day ->
+                val selected = day == state.anchor
+                val shape = RoundedCornerShape(12.dp)
+                Column(
+                    Modifier.weight(1f).heightIn(min = 48.dp).clip(shape)
+                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant)
+                        .selectable(selected = selected, role = Role.Tab, onClick = { vm.setAnchor(day) })
+                        .semantics { contentDescription = dayLabel(day) }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(day.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                        style = MaterialTheme.typography.labelSmall)
+                    Text(day.dayOfMonth.toString(), style = MaterialTheme.typography.labelLarge)
+                }
+            }
         }
     }
 }
@@ -215,7 +236,7 @@ private fun DayStrip(state: PhoneState, vm: PhoneViewModel) {
 @Composable
 fun PersonStrip(state: PhoneState, vm: PhoneViewModel) {
     if (state.users.isEmpty()) return
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         state.users.forEach { user ->
             val hidden = user.id in state.hiddenUserIds
             val color = parseHex(user.color)
@@ -379,7 +400,7 @@ fun EditEvent(existing: CalEvent?, day0: LocalDate, state: PhoneState, vm: Phone
         }
         if (kind != dev.mantel.calendar.core.EventEditKind.Occurrence && kind != dev.mantel.calendar.core.EventEditKind.ReadOnly) {
             Text("Repeats", fontWeight = FontWeight.Bold)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
                     RepeatFreq.NONE to "Once",
                     RepeatFreq.DAILY to "Daily",
@@ -399,7 +420,7 @@ fun EditEvent(existing: CalEvent?, day0: LocalDate, state: PhoneState, vm: Phone
                 }
             }
             if (repeat.freq == RepeatFreq.WEEKLY) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     WEEKDAY_CODES.forEach { code ->
                         FilterChip(
                             selected = code in repeat.byday,
@@ -424,7 +445,7 @@ fun EditEvent(existing: CalEvent?, day0: LocalDate, state: PhoneState, vm: Phone
             }
         }
         if (kind != dev.mantel.calendar.core.EventEditKind.Occurrence) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.users.forEach { user ->
                     val color = parseHex(user.color)
                     FilterChip(
@@ -438,7 +459,7 @@ fun EditEvent(existing: CalEvent?, day0: LocalDate, state: PhoneState, vm: Phone
                     )
                 }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 calendars.forEach { cal ->
                     FilterChip(
                         selected = calendarId == cal.id,
@@ -540,40 +561,26 @@ fun WeekScreen(state: PhoneState, vm: PhoneViewModel, open: (Page) -> Unit) {
             ) { Icon(Icons.Filled.ChevronRight, contentDescription = "Next week") }
         }
         PersonStrip(state, vm)
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val dayWidth = maxOf(164.dp, (maxWidth - 48.dp) / 7)
-            Row(
-                Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                days.forEach { day ->
-                    Column(
-                        Modifier.width(dayWidth).fillMaxSize()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(if (day == today) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()))
-                            Text(day.dayOfMonth.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        }
-                        Column(
-                            Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            val events = eventsOn(shown, day, vm.zone())
-                            if (events.isEmpty()) Text("Nothing planned", style = MaterialTheme.typography.bodyMedium)
-                            events.forEach { event -> EventRow(event, state, vm) { open(Page.Event(event)) } }
-                            TextButton(
-                                onClick = { open(Page.Edit(null, day)) },
-                                modifier = Modifier.fillMaxWidth().touchTarget(),
-                            ) {
-                                Icon(Icons.Filled.Add, contentDescription = null)
-                                Text("Add event")
-                            }
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            days.forEach { day ->
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                        .background(if (day == today) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(dayLabel(day), modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { open(Page.Edit(null, day)) }) {
+                            Icon(Icons.Filled.Add, contentDescription = "Add event on " + dayLabel(day))
                         }
                     }
+                    val events = eventsOn(shown, day, vm.zone())
+                    if (events.isEmpty()) Text("Nothing planned", modifier = Modifier.padding(bottom = 8.dp))
+                    events.forEach { event -> EventRow(event, state, vm) { open(Page.Event(event)) } }
                 }
             }
         }
