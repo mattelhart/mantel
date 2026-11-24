@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
+import * as pushEffects from './homiePush'
 import { Homie } from './Homie'
 import { click, mount, unmount } from './testDom'
 
@@ -77,5 +78,26 @@ it('visits an open patch and retreats on the first pointer press without consumi
     Reflect.deleteProperty(document, 'elementFromPoint')
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  }
+})
+
+it('drops one envelope after a hard push and retrieves it before returning home', () => {
+  vi.useFakeTimers()
+  const host = mount(<Homie />)
+  const watch = vi.spyOn(pushEffects, 'watchForPush').mockImplementation((_button, react) => {
+    react({ kind: 'roll', direction: 'right' }, new DOMRect(20, 20, 58, 58))
+    return () => {}
+  })
+  try {
+    act(() => { document.dispatchEvent(new Event('pointerdown')) })
+    expect(document.querySelector('.homie-dropped-letter')).toBeTruthy()
+    expect(document.querySelector('.homie-grumble')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(1200))
+    expect(document.querySelector('.homie-dropped-letter')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(800))
+    expect(document.querySelector('.homie-dropped-letter')).toBeNull()
+    expect(host.querySelector('.homie-hand .homie-letter')).toBeTruthy()
+  } finally {
+    watch.mockRestore()
   }
 })

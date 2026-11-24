@@ -36,7 +36,7 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
 .homie-leg--far { left: 19px; }
 .homie-arm { height: 10px; left: -5px; top: 10px; transform: rotate(35deg); }
 .homie-gnome .homie-hand { z-index: 2; height: 12px; top: 0; right: -5px; transform: rotate(25deg); transform-origin: bottom center; animation: homie-post 6s ease-in-out infinite; }
-.homie-letter {
+.homie-letter, .homie-dropped-letter {
   position: absolute; display: grid; place-items: center; top: -6px; left: -6px;
   width: 17px; height: 12px; color: #754923; background: #ffedac; border-radius: 2px;
   font: 700 18px/12px system-ui;
@@ -110,3 +110,65 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
 @keyframes homie-outing { from { transform: translate(var(--dock-x),var(--dock-y)); opacity: .5; } to { transform: none; opacity: 1; } }
 @keyframes homie-home { from { transform: none; } to { transform: translate(var(--dock-x),var(--dock-y)); } }
 @keyframes homie-land { from { pointer-events: none; } to { pointer-events: auto; } }
+
+.homie-yard[data-push] { animation: none; transition: none; }
+.homie-yard[data-push] .homie-friend { animation: none; pointer-events: none; }
+.homie-yard[data-push="left"] { --shove-x: -33px; --shove-y: -5px; --roll: -285deg; }
+.homie-yard[data-push="right"] { --shove-x: 33px; --shove-y: -5px; --roll: 285deg; }
+.homie-yard[data-push="up"] { --shove-x: 7px; --shove-y: -30px; --roll: 155deg; }
+.homie-yard[data-push="down"] { --shove-x: -7px; --shove-y: 30px; --roll: -155deg; }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-yard[data-reaction="roll"] .homie-friend .homie-gnome { animation: homie-tumble .64s ease-out both, homie-retrieve .75s .93s ease-in-out; }
+}
+@keyframes homie-tumble {
+  0% { transform: none; }
+  12% { transform: rotate(calc(var(--roll) * -.06)) scale(1.12,.85); }
+  57% { transform: translate(var(--shove-x),var(--shove-y)) rotate(var(--roll)); }
+  82% { transform: translate(calc(var(--shove-x) * .45),2px) rotate(calc(var(--roll) * 1.29)); }
+  100% { transform: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homie-yard[data-reaction="breeze"] .homie-friend .homie-gnome { animation: homie-sway .64s ease-out; }
+  .homie-yard[data-reaction="breeze"] .homie-friend .homie-cap { animation: homie-flutter .32s ease-in-out 2; }
+}
+@keyframes homie-sway {
+  32% { transform: translate(calc(var(--shove-x) * .15),calc(var(--shove-y) * .15)) rotate(calc(var(--roll) * .035)); }
+  70% { transform: rotate(calc(var(--roll) * -.012)); }
+}
+@keyframes homie-flutter {
+  35% { transform: translateY(-2px) rotate(calc(var(--roll) * .05)); }
+  75% { transform: rotate(calc(var(--roll) * -.015)); }
+}
+
+.homie-dropped-letter { left: calc(50% + 13px); top: 8px; z-index: 3; pointer-events: none; }
+.homie-yard[data-reaction="roll"] .homie-letter { visibility: hidden; }
+.homie-yard[data-reaction="roll"] .homie-friend .homie-hand { animation: homie-grab .75s .93s ease-in-out; }
+@keyframes homie-retrieve {
+  40%, 55% { transform: translate(4px,6px) rotate(18deg); }
+  80% { transform: translate(1px,2px) rotate(6deg); }
+}
+@keyframes homie-grab { 45%, 56% { transform: rotate(135deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-dropped-letter { animation: homie-fumble 1.7s linear both; }
+  .homie-grumble { animation: homie-scowl 1.7s linear both; }
+}
+@keyframes homie-fumble {
+  0% { transform: translate(0,0) rotate(10deg); }
+  17% { transform: translate(8px,-8px) rotate(65deg); }
+  39% { transform: translate(4px,36px) rotate(-17deg); }
+  46% { transform: translate(4px,32px) rotate(-6deg); }
+  52%, 77% { transform: translate(4px,36px) rotate(-10deg); }
+  91% { transform: translate(1px,9px) rotate(15deg); }
+  100% { transform: translate(0,0) rotate(10deg); }
+}
+@keyframes homie-scowl { 0%,30%,100% { opacity: 0; } 39%,84% { opacity: 1; } }
+.homie-dock { position: relative; }
+.homie-chore-note {
+  position: absolute; left: 64px; right: 64px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center; gap: .4em;
+  border: 1px solid #a88555; border-radius: 9px; padding: 3px 8px;
+  background: #f8ebce; color: #473a27; font: 500 14px/1.2 system-ui; text-align: left;
+}
+.homie-chore-note span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@container (max-width: 260px) { .homie-chore-note { display: none; } }

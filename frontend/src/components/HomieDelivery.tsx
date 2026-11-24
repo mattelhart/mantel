@@ -21,6 +21,28 @@ export function HomieDelivery({ day = new Date().toLocaleDateString('sv-SE') }: 
     queryKey: ['chores', 'board', 'today'],
     queryFn: () => api.get<ChoreBoard>('/chores/board'),
   })
+  const jobs = (board.data?.people ?? []).flatMap(person =>
+    (person.chores ?? []).filter(chore => !chore.completion).map(chore => ({
+      name: person.name, title: chore.title,
+    })),
+  )
+  const [turn, setTurn] = useState(-1)
+  const [showJob, setShowJob] = useState(false)
+  useEffect(() => {
+    if (!jobs.length || pathname.startsWith('/chores')) return
+    let hide: number
+    function offerJob() {
+      if (document.hidden || document.querySelector('.saver, dialog[open], [role="dialog"]')
+          || document.activeElement?.matches('input,textarea,[contenteditable="true"]')) return
+      setTurn(n => n + 1)
+      setShowJob(true)
+      hide = window.setTimeout(() => setShowJob(false), 15000)
+    }
+    const first = window.setTimeout(offerJob, 12000)
+    const again = window.setInterval(offerJob, 180000)
+    return () => { clearTimeout(first); clearInterval(again); clearTimeout(hide); setShowJob(false) }
+  }, [Boolean(jobs.length), pathname])
+  const job = showJob && jobs.length && turn >= 0 ? jobs[turn % jobs.length] : undefined
   const previous = useRef(new Map<number, number>())
   const [stars, setStars] = useState<Star[]>([])
   useEffect(() => {
@@ -68,5 +90,5 @@ export function HomieDelivery({ day = new Date().toLocaleDateString('sv-SE') }: 
       ? doodleHref(message.media_url, mail.user_id)
       : '/messages/' + mail.id)
   }
-  return <Homie onDeliver={deliver} mailFrom={mail?.name} star={star} holiday={holidays.join(' · ')} />
+  return <Homie job={star ? undefined : job} onChores={() => navigate('/chores')} onDeliver={deliver} mailFrom={mail?.name} star={star} holiday={holidays.join(' · ')} />
 }
