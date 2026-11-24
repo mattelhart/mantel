@@ -30,9 +30,29 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const [trick, setTrick] = useState<typeof outings[number]>('rest')
   const [guest, setGuest] = useState<'robin' | 'neighbour'>('robin')
   const [perch, setPerch] = useState<{ left: number; top: number } | null>(null)
+  const [borrowed, setBorrowed] = useState<{ text: string; style: CSSProperties; carry: boolean } | null>(null)
+  const mischiefTurn = useRef(0)
   const visitCount = useRef(0)
   useEffect(() => {
     if (trick !== 'visitor') return
+    // Alternate ordinary visits with a pair of glyph routines.
+    const playful = Math.floor(mischiefTurn.current++ / 2) % 2 === 1
+    const carry = guest === 'robin'
+    const glyph = document.querySelector<HTMLElement>(carry ? '[data-homie-glyph="digit"]' : '[data-homie-glyph="letter"]')
+    if (playful && glyph && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const r = glyph.getBoundingClientRect()
+      if (r.width && r.height && r.left >= 2 && r.right < innerWidth - 4 && r.top >= 4 && r.bottom < innerHeight - 16) {
+        const font = getComputedStyle(glyph)
+        const dx = r.right + 54 < innerWidth ? 42 : -42
+        setBorrowed({ text: glyph.textContent ?? '', carry, style: {
+          left: r.left, top: r.top, width: r.width, height: r.height, color: font.color,
+          fontFamily: font.fontFamily, fontSize: font.fontSize, fontWeight: font.fontWeight,
+          letterSpacing: font.letterSpacing, '--flight-x': dx + 'px',
+        } as CSSProperties })
+        glyph.classList.add('homie-glyph-away')
+        return () => { glyph.classList.remove('homie-glyph-away'); setBorrowed(null) }
+      }
+    }
     const selector = guest === 'robin' ? '.airy-avatar' : '.shell__nav a[href="/chores"]'
     const choices = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => {
       const r = el.getBoundingClientRect()
@@ -190,7 +210,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
               <path fill="none" strokeLinecap="round" d="M17 35 Q20 38 23 34" />
             </g>
           </svg>
-          {!perch && visitor}
+          {!perch && !borrowed && visitor}
           {trick === 'chase' && <svg className="homie-beetle" viewBox="0 0 22 15" focusable="false">
             <g stroke="#48382d" strokeWidth="1.5" strokeLinecap="round">
               <path fill="none" d="m6 9-3 3m7-2-1 3m5-4 2 3m2-7 2-3" />
@@ -215,6 +235,10 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     </div>
   )
   return <div ref={dock} className="homie-dock">{away ? createPortal(actor, document.body) : actor}
+    {visitor && borrowed && createPortal(<span className="homie-glyph-scene" data-carry={borrowed.carry}
+      aria-hidden="true" style={borrowed.style}>
+      <span className="homie-loose-glyph">{borrowed.text}</span><span className="homie-glyph-guest">{visitor}</span>
+    </span>, document.body)}
     {visitor && perch && createPortal(<span className="homie-perch" style={perch}>{visitor}</span>, document.body)}
     {job && <button type="button" className="homie-chore-note" onClick={onChores}
       aria-label={`Open chores: ${job.name}, ${job.title}`}>

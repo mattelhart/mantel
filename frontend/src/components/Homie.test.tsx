@@ -132,3 +132,24 @@ it('perches on a visible profile and leaves the profile action available', () =>
     expect(document.querySelector('.homie-perch')).toBeNull()
   } finally { vi.unstubAllGlobals(); vi.restoreAllMocks() }
 })
+
+it('returns the borrowed digit on touch and straightens the letter when the visit ends', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  try {
+    const host = mount(<><Homie /><span data-homie-glyph="digit">7</span><span data-homie-glyph="letter">s</span></>)
+    const [digit, letter] = host.querySelectorAll('[data-homie-glyph]')
+    for (const el of [digit, letter]) vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(new DOMRect(55, 45, 12, 20))
+    for (let i = 0; i < 17; i++) act(() => vi.advanceTimersByTime(75000))
+    expect(digit.textContent).toBe('7')
+    expect(digit.classList.contains('homie-glyph-away')).toBe(true)
+    expect(document.querySelector('.homie-loose-glyph')?.textContent).toBe('7')
+    click(digit)
+    expect(digit.classList.contains('homie-glyph-away')).toBe(false)
+    for (let i = 0; i < 6; i++) act(() => vi.advanceTimersByTime(75000))
+    expect(letter.classList.contains('homie-glyph-away')).toBe(true)
+    act(() => vi.advanceTimersByTime(5600))
+    expect(letter.classList.contains('homie-glyph-away')).toBe(false)
+    expect(document.querySelector('.homie-glyph-scene')).toBeNull()
+  } finally { vi.unstubAllGlobals(); vi.restoreAllMocks() }
+})

@@ -186,3 +186,31 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
 .homie-perch { position: fixed; width: 21px; height: 24px; z-index: 9; pointer-events: none; }
 .homie-perch .homie-visitor { left: 0; bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .homie-perch .homie-visitor { animation: none; } }
+
+/* Keep the real glyph's space, text and hit target while its visual double travels. */
+.homie-glyph-away { opacity: 0; }
+.homie-glyph-scene { position: fixed; z-index: 10; pointer-events: none; line-height: 1; }
+.homie-loose-glyph { position: absolute; inset: 0; display: grid; place-items: center; }
+.homie-glyph-guest { position: absolute; bottom: 50%; right: calc(100% - 3px); width: 20px; height: 24px; }
+.homie-glyph-guest .homie-visitor { left: 0; bottom: 0; }
+.homie-glyph-scene[data-carry="true"] { animation: homie-borrow 5.2s ease-in-out both; }
+.homie-glyph-scene[data-carry="false"] .homie-loose-glyph { animation: homie-skew-letter 5.2s ease-in-out both; }
+.homie-glyph-scene[data-carry="false"] .homie-glyph-guest { animation: homie-straighten 5.2s ease-in-out both; }
+@keyframes homie-borrow {
+  0%,18%,90%,100% { transform: none; }
+  42%,56% { transform: translate(var(--flight-x),-8px) rotate(-9deg); }
+  70% { transform: translate(calc(var(--flight-x) * .7),-13px) rotate(5deg); }
+}
+@keyframes homie-skew-letter {
+  0%,22%,85%,100% { transform: none; }
+  35%,65% { transform: translate(4px,5px) rotate(32deg); }
+  76% { transform: translateY(-1px) rotate(-6deg); }
+}
+@keyframes homie-straighten {
+  20%,60% { transform: translateX(4px); }
+  70%,76% { transform: translate(8px,3px) rotate(10deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .homie-glyph-away { opacity: 1; }
+  .homie-glyph-scene { display: none; }
+}

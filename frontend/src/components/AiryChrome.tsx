@@ -36,7 +36,7 @@ export function AiryBar({
   return (
     <header className="airybar">
       <div className="airybar__when">
-        <div className="airybar__date">{format(now, 'EEEE, MMMM d')}</div>
+        <div className="airybar__date">{format(now, 'EEEE, MMMM ')}{String(now.getDate()).slice(0, -1)}<span data-homie-glyph="digit">{String(now.getDate()).slice(-1)}</span></div>
         <div className="airybar__meta">
           <span className="airybar__time">{time}</span>
           {showWeather && (
@@ -117,7 +117,7 @@ export function AiryNav({ onCalendar }: { onCalendar: boolean }) {
       {NAV.map((item) => (
         <NavLink key={item.to} to={item.to} className="navbtn">
           <NavIcon name={item.icon} />
-          <span className="navbtn__label">{item.label}</span>
+          <span className="navbtn__label">{item.to === '/chores' ? <>Chore<span data-homie-glyph="letter">s</span></> : item.label}</span>
         </NavLink>
       ))}
       <button type="button" className="navbtn" onClick={showScreensaver}>
