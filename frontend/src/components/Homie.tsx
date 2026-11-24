@@ -12,7 +12,7 @@ export const showHomie = choice === null
   : choice === '1'
 if (choice !== null) sessionStorage.setItem('homie.companion', showHomie ? '1' : '0')
 
-const outings = ['bike', 'plane', 'garden', 'chase', 'rest'] as const
+const outings = ['bike', 'plane', 'garden', 'chase', 'visitor', 'rest'] as const
 
 type Props = {
   job?: { name: string; title: string }
@@ -28,6 +28,28 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const congrats = star && "Nice work, " + star.name + "! +" + star.earned + " ★"
   const [right, setRight] = useState(false)
   const [trick, setTrick] = useState<typeof outings[number]>('rest')
+  const [guest, setGuest] = useState<'robin' | 'neighbour'>('robin')
+  const [perch, setPerch] = useState<{ left: number; top: number } | null>(null)
+  const visitCount = useRef(0)
+  useEffect(() => {
+    if (trick !== 'visitor') return
+    const selector = guest === 'robin' ? '.airy-avatar' : '.shell__nav a[href="/chores"]'
+    const choices = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => {
+      const r = el.getBoundingClientRect()
+      return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight
+    })
+    if (!choices.length) return
+    const target = guest === 'robin' ? choices[visitCount.current++ % choices.length] : choices[0]
+    const rect = target.getBoundingClientRect()
+    setPerch({ left: Math.max(1, rect.right - 21), top: Math.max(1, rect.top - 17) })
+    const icon = target.querySelector('svg, [aria-hidden="true"]') ?? target
+    const animation = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? undefined
+      : icon.animate(guest === 'robin'
+        ? [{transform:'translateY(0)'}, {transform:'translateY(2px)'}, {transform:'translateY(0)'}]
+        : [{transform:'rotate(0)'}, {transform:'rotate(-6deg)'}, {transform:'rotate(4deg)'}, {transform:'rotate(0)'}],
+      {duration: 320, delay: 1100, iterations: guest === 'robin' ? 1 : 2})
+    return () => { animation?.cancel(); setPerch(null) }
+  }, [trick, guest])
   const [hello, setHello] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
   const dock = useRef<HTMLDivElement>(null)
@@ -69,6 +91,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     }
     function retreat(event: Event) {
       if (event.target instanceof Element && event.target.closest('.homie-friend')) return
+      setTrick(current => current === 'visitor' ? 'rest' : current)
       quietSince = Date.now()
       if (tumbling) return
       if (button.current && event.type !== 'visibilitychange' && Date.now() >= watchingUntil) {
@@ -92,6 +115,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
           || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
       const move = outings[visit % outings.length]
+      if (move === 'visitor') setGuest(Math.floor(visit / outings.length) % 2 === 0 ? 'robin' : 'neighbour')
       visit += 1
       const home = dock.current?.getBoundingClientRect()
       if (home?.width && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -104,7 +128,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       }
       setTrick(move)
       if (move === 'bike' || move === 'chase' || move === 'rest') setRight(previous => !previous)
-      land = window.setTimeout(() => setTrick('rest'), 3400)
+      land = window.setTimeout(() => setTrick('rest'), move === 'visitor' ? 5600 : 3400)
     }, 75000)
     let reset: number
     function greet(event: Event) {
@@ -129,6 +153,21 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       document.removeEventListener('click', greet, true)
     }
   }, [])
+  const visitor = trick === 'visitor' && <svg className="homie-visitor" data-guest={guest} viewBox="0 0 28 32" aria-hidden="true" focusable="false">
+            {guest === 'robin' ? <g stroke="#473c35" strokeWidth="1.3" strokeLinejoin="round">
+              <path fill="none" d="m12 24-1 4-3 1m10-6-1 5 3 1" />
+              <path fill="#987557" d="M3 16 1 11l8 4q3-5 8-5 0-7 6-5 5 3 1 9-2 10-10 11-7 0-11-9Z" />
+              <path fill="#db8053" stroke="none" d="M23 12q2 8-6 11-6 1-7-3 7 0 8-9Z" />
+              <circle cx="22" cy="8" r="1" /><path fill="#dda041" d="m25 9 3 2-4 1Z" />
+            </g> : <g stroke="#364b54" strokeWidth="1.3" strokeLinejoin="round">
+              <path fill="none" strokeWidth="3" d="m10 25-1 5H6m12-5 1 5h3" />
+              <path fill="#678b85" d="m9 16-3 11h17l-5-12Z" />
+              <path fill="#f5e8d3" d="M6 14q6-6 15-1 0 9-9 12l1-3q-6 0-7-8Z" />
+              <path fill="#5685ae" d="M3 14Q8 8 9 3q1-4 10-1-6 2-3 6l7 6q-10-3-20 0Z" />
+              <ellipse fill="#e5a387" cx="17" cy="15" rx="4" ry="2.8" />
+              <path fill="none" strokeLinecap="round" d="m20 21 4-4" />
+            </g>}
+          </svg>
   const actor = (
     <div className="homie-yard" data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
       style={away ? { left: away.x, top: away.y, '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
@@ -151,6 +190,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
               <path fill="none" strokeLinecap="round" d="M17 35 Q20 38 23 34" />
             </g>
           </svg>
+          {!perch && visitor}
           {trick === 'chase' && <svg className="homie-beetle" viewBox="0 0 22 15" focusable="false">
             <g stroke="#48382d" strokeWidth="1.5" strokeLinecap="round">
               <path fill="none" d="m6 9-3 3m7-2-1 3m5-4 2 3m2-7 2-3" />
@@ -175,6 +215,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     </div>
   )
   return <div ref={dock} className="homie-dock">{away ? createPortal(actor, document.body) : actor}
+    {visitor && perch && createPortal(<span className="homie-perch" style={perch}>{visitor}</span>, document.body)}
     {job && <button type="button" className="homie-chore-note" onClick={onChores}
       aria-label={`Open chores: ${job.name}, ${job.title}`}>
       <span aria-hidden="true">🌱</span>

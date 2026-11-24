@@ -101,3 +101,34 @@ it('drops one envelope after a hard push and retrieves it before returning home'
     watch.mockRestore()
   }
 })
+
+it('welcomes alternating garden visitors and clears the visit on interaction', () => {
+  vi.useFakeTimers()
+  const host = mount(<Homie />)
+  act(() => vi.advanceTimersByTime(5 * 75000))
+  expect(host.querySelector('.homie-visitor')?.getAttribute('data-guest')).toBe('robin')
+  act(() => { document.dispatchEvent(new Event('pointerdown')) })
+  expect(host.querySelector('.homie-visitor')).toBeNull()
+  act(() => vi.advanceTimersByTime(6 * 75000))
+  expect(host.querySelector('.homie-visitor')?.getAttribute('data-guest')).toBe('neighbour')
+  act(() => vi.advanceTimersByTime(5600))
+  expect(host.querySelector('.homie-visitor')).toBeNull()
+})
+
+it('perches on a visible profile and leaves the profile action available', () => {
+  vi.useFakeTimers()
+  const select = vi.fn()
+  vi.stubGlobal('matchMedia', () => ({ matches: true }))
+  try {
+    const host = mount(<><Homie /><button className="airy-avatar" onClick={select}>Dad</button></>)
+    const profile = host.querySelector('.airy-avatar')!
+    vi.spyOn(profile, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 60, 64, 60))
+    act(() => vi.advanceTimersByTime(5 * 75000))
+    const perch = document.querySelector<HTMLElement>('.homie-perch')!
+    expect(perch.style.left).toBe('243px')
+    expect(perch.querySelector('[data-guest="robin"]')).toBeTruthy()
+    click(profile)
+    expect(select).toHaveBeenCalledOnce()
+    expect(document.querySelector('.homie-perch')).toBeNull()
+  } finally { vi.unstubAllGlobals(); vi.restoreAllMocks() }
+})
