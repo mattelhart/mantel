@@ -7,23 +7,15 @@
   display: grid; place-items: center; transition: left 3s ease-in-out;
 }
 .homie-yard[data-right="true"] .homie-friend { left: 100%; }
-.homie-cottage {
-  position: relative; display: block; width: 31px; height: 25px; margin-top: 11px;
-  background: #a9ddd1; border: 2px solid currentColor; border-radius: 4px 4px 9px 9px;
-  box-shadow: -6px 11px 0 -9px currentColor, 6px 11px 0 -9px currentColor;
-}
-.homie-roof {
-  position: absolute; width: 24px; height: 24px; top: -13px; left: 2px;
-  transform: rotate(45deg); background: #e99779; border: 2px solid currentColor;
-  border-radius: 5px; clip-path: polygon(0 0, 100% 0, 0 100%); box-sizing: border-box;
-}
-.homie-eyes { position: absolute; top: 7px; left: 6px; width: 4px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 12px 0 currentColor; }
-.homie-smile { position: absolute; top: 12px; left: 11px; width: 7px; height: 5px; border-bottom: 2px solid; border-radius: 50%; }
-.homie-hand { position: absolute; top: 11px; right: -7px; width: 7px; height: 8px; border: 2px solid; background: #a9ddd1; border-radius: 50%; transform-origin: bottom left; }
-.homie-heart { position: absolute; top: -24px; right: -12px; font: bold 16px/1 system-ui; color: #a33e55; opacity: 0; }
-.homie-yard[data-hello="true"] .homie-heart { opacity: 1; }
-.homie-yard[data-hello="true"] .homie-hand { animation: homie-wave .3s ease-in-out 4 alternate; }
-@keyframes homie-wave { to { transform: rotate(-48deg); } }
+.homie-gnome { position: relative; display: block; width: 31px; height: 25px; margin-top: 9px; }
+.homie-portrait { position: absolute; width: 37px; height: 47px; left: -3px; bottom: -1px; z-index: 1; overflow: visible; }
+.homie-cap { transform-origin: 10px 24px; }
+.homie-yard[data-hello="true"] .homie-cap { animation: homie-tip 1s ease-in-out; }
+@keyframes homie-tip { 35%, 55% { transform: translateY(-2px) rotate(-10deg); } }
+.homie-sprout { position: absolute; left: -12px; bottom: -6px; width: 17px; height: 20px; transform-origin: center bottom; animation: homie-bloom 3.4s ease-in-out both; }
+.homie-yard[data-trick="garden"] .homie-portrait { transform-origin: center bottom; animation: homie-tend 3.4s ease-in-out; }
+@keyframes homie-bloom { 0%, 15% { transform: scale(.12); opacity: 0; } 65% { transform: scale(1.08); } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes homie-tend { 15%, 40% { transform: rotate(-12deg) translateY(2px); } }
 @container (max-width: 65px) { .homie-yard { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .homie-yard[data-right] .homie-friend { left: 0; transition: none; }
@@ -34,26 +26,26 @@
 html .homie-yard .homie-friend:is(:focus, :focus-visible) {
   outline: none !important; box-shadow: none; background: transparent;
 }
-.homie-friend:focus-visible .homie-cottage { filter: drop-shadow(0 0 2px #155bdd) drop-shadow(0 0 1px #155bdd); }
-.homie-cottage { box-shadow: none; margin-top: 5px; }
+.homie-friend:focus-visible .homie-gnome { filter: drop-shadow(0 0 2px #155bdd) drop-shadow(0 0 1px #155bdd); }
+
 .homie-leg, .homie-arm, .homie-hand {
   position: absolute; width: 4px; border: 0; border-radius: 4px; background: currentColor;
 }
 .homie-leg { height: 7px; bottom: -7px; left: 5px; transform-origin: top; }
-.homie-leg::after { content: ''; position: absolute; bottom: -1px; left: -2px; width: 7px; height: 3px; border-radius: 3px; background: currentColor; }
+.homie-leg::after { content: ''; position: absolute; bottom: -1px; left: -3px; width: 9px; height: 5px; border-radius: 3px; background: currentColor; }
 .homie-leg--far { left: 19px; }
 .homie-arm { height: 10px; left: -5px; top: 10px; transform: rotate(35deg); }
-.homie-cottage .homie-hand { height: 12px; top: 0; right: -5px; transform: rotate(25deg); transform-origin: bottom center; animation: homie-post 6s ease-in-out infinite; }
+.homie-gnome .homie-hand { z-index: 2; height: 12px; top: 0; right: -5px; transform: rotate(25deg); transform-origin: bottom center; animation: homie-post 6s ease-in-out infinite; }
 .homie-letter {
   position: absolute; display: grid; place-items: center; top: -6px; left: -6px;
   width: 17px; height: 12px; color: #754923; background: #ffedac; border-radius: 2px;
   font: 700 18px/12px system-ui;
 }
 .homie-yard[data-mail="true"] .homie-hand, .homie-yard[data-hello="true"] .homie-hand { animation: homie-post 1.4s ease-in-out infinite; }
-.homie-yard[data-mail="true"] .homie-cottage, .homie-yard[data-hello="true"] .homie-cottage { animation: homie-hop 1.4s ease-in-out infinite; }
+.homie-yard[data-mail="true"] .homie-gnome, .homie-yard[data-hello="true"] .homie-gnome { animation: homie-hop 1.4s ease-in-out infinite; }
 .homie-yard:is([data-mail="true"],[data-hello="true"]) .homie-leg { transform: rotate(28deg); }
 .homie-yard:is([data-mail="true"],[data-hello="true"]) .homie-leg--far { transform: rotate(-25deg); }
-.homie-star { position: absolute; left: -14px; top: -12px; font: bold 19px/1 system-ui; -webkit-text-stroke: 1px #423c46; animation: homie-catch 1s ease-out; }
+.homie-star { z-index: 3; position: absolute; left: -14px; top: -12px; font: bold 19px/1 system-ui; -webkit-text-stroke: 1px #423c46; animation: homie-catch 1s ease-out; }
 .homie-cheer { position: absolute; top: 0; left: 62px; right: 0; text-align: center; font: 700 15px/1.2 system-ui; color: #253e42; pointer-events: none; }
 .homie-yard[data-right="true"] .homie-cheer { left: 0; }
 @keyframes homie-post { 0%, 55%, 100% { transform: rotate(25deg); } 62% { transform: rotate(54deg); } 72%, 90% { transform: rotate(-12deg); } 81% { transform: rotate(18deg); } }
@@ -88,3 +80,19 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
   100% { opacity: 0; transform: translate(42vw,12vh) rotate(-8deg); }
 }
 @media (prefers-reduced-motion: reduce) { .homie-plane { display: none; } }
+
+/* The beetle keeps a head start whichever way Homie is crossing the header. */
+.homie-beetle { position: absolute; bottom: -8px; left: 100%; width: 17px; height: 13px; transform-origin: center; pointer-events: none; }
+.homie-yard[data-right="false"] .homie-beetle { left: auto; right: 100%; scale: -1 1; }
+.homie-yard[data-trick="chase"] .homie-friend { transition-timing-function: ease-in; }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-beetle { animation: homie-scurries 3.4s ease-in both; }
+  .homie-yard[data-trick="chase"] .homie-leg { animation: homie-pedal .18s ease-in-out infinite alternate; }
+  .homie-yard[data-trick="chase"] .homie-leg--far { animation-direction: alternate-reverse; }
+}
+@keyframes homie-scurries {
+  0% { opacity: 0; transform: translateX(1px); }
+  12%, 68% { opacity: 1; transform: translateX(5px) rotate(-8deg); }
+  77% { transform: translate(7px,-3px) rotate(8deg); }
+  100% { opacity: 0; transform: translateX(14px); }
+}
