@@ -96,3 +96,17 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
   77% { transform: translate(7px,-3px) rotate(8deg); }
   100% { opacity: 0; transform: translateX(14px); }
 }
+
+.homie-dock { height: 58px; }
+.homie-yard[data-away="true"] {
+  position: fixed; width: 58px; margin: 0; z-index: 8; pointer-events: none;
+  transition: left 1s ease-in-out, top 1s ease-in-out;
+  animation: homie-outing .8s ease-out both;
+}
+.homie-yard[data-away="true"] .homie-friend { left: 0; pointer-events: auto; animation: homie-land .8s step-end both; }
+.homie-yard[data-away="true"] .homie-cheer { top: 0; left: 0; right: auto; clip-path: inset(50%); }
+.homie-yard[data-retreat="true"] { animation: homie-home .28s ease-in both; }
+.homie-yard[data-retreat="true"] .homie-friend { animation: none; pointer-events: none; }
+@keyframes homie-outing { from { transform: translate(var(--dock-x),var(--dock-y)); opacity: .5; } to { transform: none; opacity: 1; } }
+@keyframes homie-home { from { transform: none; } to { transform: translate(var(--dock-x),var(--dock-y)); } }
+@keyframes homie-land { from { pointer-events: none; } to { pointer-events: auto; } }

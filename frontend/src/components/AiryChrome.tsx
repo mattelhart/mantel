@@ -54,7 +54,7 @@ export function AiryBar({
           {bookmarkText}
         </a>
       )}
-      <div className="airybar__spacer">{showHomie && <HomieDelivery />}</div>
+      <div className="airybar__spacer">{showHomie && <HomieDelivery day={now.toLocaleDateString('sv-SE', { timeZone: settings?.home_timezone })} />}</div>
       {showPeople && users.length > 0 && (
         <div className="airybar__people" role="group" aria-label="Family">
           {users.map((u) => {

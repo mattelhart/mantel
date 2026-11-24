@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { CSSProperties } from 'react'
+import { findHomieSpot } from './homieSpace'
 import './homie.css'
 
 // Capture the launch option before the router replaces the kiosk start URL.
@@ -13,24 +16,61 @@ const outings = ['bike', 'plane', 'garden', 'chase', 'rest'] as const
 type Props = {
   onDeliver?: () => void
   mailFrom?: string
+  holiday?: string
   star?: { name: string; color: string; earned: number }
 }
 
-export function Homie({ onDeliver, mailFrom, star }: Props) {
+export function Homie({ onDeliver, mailFrom, star, holiday }: Props) {
   const invitation = mailFrom ? "I've got mail from " + mailFrom + "!" : "Let's send a message, homie!"
   const congrats = star && "Nice work, " + star.name + "! +" + star.earned + " ★"
   const [right, setRight] = useState(false)
   const [trick, setTrick] = useState<typeof outings[number]>('rest')
   const [hello, setHello] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
+  const dock = useRef<HTMLDivElement>(null)
+  const [away, setAway] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null)
+  const [runningHome, setRunningHome] = useState(false)
   useEffect(() => {
+    let quietSince = 0
+    let returnTimer: number
+    let outingTimer: number
+    let awayNow = false
+    function goHome() {
+      if (!awayNow) return
+      awayNow = false
+      setRunningHome(true)
+      setTrick('rest')
+      returnTimer = window.setTimeout(() => { setAway(null); setRunningHome(false) }, 280)
+    }
+    function retreat(event: Event) {
+      if (event.target instanceof Element && event.target.closest('.homie-friend')) return
+      quietSince = Date.now()
+      goHome()
+    }
+    const activity = ['pointerdown', 'keyup', 'keydown', 'input', 'focusin', 'wheel', 'scroll', 'click']
+    for (const type of activity) document.addEventListener(type, retreat, { capture: true, passive: true })
+    window.addEventListener('resize', retreat)
+    document.addEventListener('visibilitychange', retreat)
+    const layout = new MutationObserver(goHome)
+    const main = document.querySelector('main')
+    if (main) layout.observe(main, {childList: true, characterData: true, subtree: true})
     let visit = 0
     let land: number
     const stroll = window.setInterval(() => {
-      if (document.hidden || document.querySelector('.saver, dialog[open], [role="dialog"]')
+      if (Date.now() - quietSince < 20000 || document.hidden
+          || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
       const move = outings[visit % outings.length]
       visit += 1
+      const home = dock.current?.getBoundingClientRect()
+      if (home?.width && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const spot = findHomieSpot()
+        if (spot) {
+          awayNow = true
+          setAway({ ...spot, dx: home.left - spot.x, dy: home.top - spot.y })
+          outingTimer = window.setTimeout(goHome, 18000)
+        }
+      }
       setTrick(move)
       if (move === 'bike' || move === 'chase' || move === 'rest') setRight(previous => !previous)
       land = window.setTimeout(() => setTrick('rest'), 3400)
@@ -44,14 +84,21 @@ export function Homie({ onDeliver, mailFrom, star }: Props) {
     }
     document.addEventListener('click', greet, true)
     return () => {
+      for (const type of activity) document.removeEventListener(type, retreat, true)
+      window.removeEventListener('resize', retreat)
+      document.removeEventListener('visibilitychange', retreat)
+      layout.disconnect()
+      clearTimeout(returnTimer)
+      clearTimeout(outingTimer)
       clearInterval(stroll)
       clearTimeout(land)
       clearTimeout(reset)
       document.removeEventListener('click', greet, true)
     }
   }, [])
-  return (
-    <div className="homie-yard" data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
+  const actor = (
+    <div className="homie-yard" data-away={Boolean(away)} data-retreat={runningHome}
+      style={away ? { left: away.x, top: away.y, '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
       <button className="homie-friend" ref={button} onClick={onDeliver} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
         <span className="homie-gnome" aria-hidden="true">
           {trick === 'bike' && <span className="homie-bike"><i /><b /><i /></span>}
@@ -62,6 +109,7 @@ export function Homie({ onDeliver, mailFrom, star }: Props) {
               <path fill="#fff1d4" d="M7 29 Q11 32 16 29 Q20 26 25 30 Q29 32 32 28 Q33 37 26 40 L27 37 Q24 44 17 46 L18 42 Q9 42 7 29Z" />
               <g className="homie-cap">
                 <path fill="#c95142" d="M4 24 Q9 18 12 10 Q15 1 26 2 Q33 2 36 8 Q29 6 26 10 Q24 16 34 22 Q22 27 4 24Z" />
+                {holiday && <path fill="#ffda6b" d="m18 11 1.3 3 3.4.3-2.5 2.1.8 3.2-3-1.8-2.9 1.8.8-3.2-2.5-2.1 3.4-.3Z" />}
                 <path fill="#a94035" d="M5 22 Q19 19 33 21 L34 25 Q22 23 5 27Z" />
               </g>
               <g fill="#313e37" stroke="none"><circle cx="13" cy="27" r="1.6" /><circle cx="26" cy="26" r="1.6" /></g>
@@ -88,7 +136,8 @@ export function Homie({ onDeliver, mailFrom, star }: Props) {
         </span>
       </button>
       {trick === 'plane' && <i className="homie-plane" aria-hidden="true" />}
-      <span role="status" className="homie-cheer">{congrats}</span>
+      <span role="status" className="homie-cheer">{congrats || (holiday && '✦ ' + holiday)}</span>
     </div>
   )
+  return <div ref={dock} className="homie-dock">{away ? createPortal(actor, document.body) : actor}</div>
 }

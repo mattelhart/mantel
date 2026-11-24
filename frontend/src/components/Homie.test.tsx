@@ -54,3 +54,28 @@ it('cycles through bike rides, plane throws, gardening and beetle chases', () =>
   act(() => vi.advanceTimersByTime(3400))
   expect(host.querySelector('.homie-beetle')).toBeNull()
 })
+
+it('visits an open patch and retreats on the first pointer press without consuming it', () => {
+  vi.useFakeTimers()
+  const select = vi.fn()
+  const host = mount(<><Homie /><main><button onPointerDown={select} /></main></>)
+  const rect = (width: number, height: number) => new DOMRect(0, 0, width, height)
+  const main = host.querySelector('main')!
+  vi.spyOn(main, 'getBoundingClientRect').mockReturnValue(rect(600, 400))
+  vi.spyOn(host.querySelector('.homie-dock')!, 'getBoundingClientRect').mockReturnValue(rect(120, 58))
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  Object.defineProperty(document, 'elementFromPoint', { value: () => main, configurable: true })
+  try {
+    act(() => vi.advanceTimersByTime(75000))
+    expect(document.querySelector('[data-away="true"]')).toBeTruthy()
+    act(() => main.querySelector('button')!.dispatchEvent(new Event('pointerdown', { bubbles: true })))
+    expect(select).toHaveBeenCalledOnce()
+    expect(document.querySelector('[data-retreat="true"]')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(280))
+    expect(host.querySelector('.homie-friend')).toBeTruthy()
+  } finally {
+    Reflect.deleteProperty(document, 'elementFromPoint')
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  }
+})

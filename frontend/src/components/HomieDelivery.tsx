@@ -4,11 +4,16 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { ChoreBoard } from '../api/types'
 import { doodleHref, useConversations } from '../views/messages/MessagesPage'
+import { useEvents } from '../api/hooks'
+import { holidaysOn } from './homieHolidays'
 import { Homie } from './Homie'
 
 type Star = { name: string; color: string; earned: number }
 
-export function HomieDelivery() {
+export function HomieDelivery({ day = new Date().toLocaleDateString('sv-SE') }: { day?: string }) {
+  const start = new Date(day + 'T00:00:00Z')
+  const events = useEvents(start, new Date(start.getTime() + 86400000))
+  const holidays = holidaysOn(day, events.data ?? [])
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { data } = useConversations()
@@ -63,5 +68,5 @@ export function HomieDelivery() {
       ? doodleHref(message.media_url, mail.user_id)
       : '/messages/' + mail.id)
   }
-  return <Homie onDeliver={deliver} mailFrom={mail?.name} star={star} />
+  return <Homie onDeliver={deliver} mailFrom={mail?.name} star={star} holiday={holidays.join(' · ')} />
 }
