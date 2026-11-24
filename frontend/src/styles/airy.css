@@ -834,19 +834,33 @@ html[data-theme='airy'] .shell__nav {
   }
 
   html[data-theme='airy'] .navbtn__label {
-    /* Large for across-the-room reading, but sized so 'Calendar' fits the
-       124px rail on one line; it shrinks on short screens with the icons. */
-    font-size: clamp(0.8rem, 1.75vh, 1.05rem);
-    font-weight: 800;
-    line-height: 1.15;
+    font-family: system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: normal;
+    line-height: 1.25;
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: center;
-    /* body uses antialiased (grayscale), which looks soft at this size on Linux. */
-    -webkit-font-smoothing: subpixel-antialiased;
-    -moz-osx-font-smoothing: auto;
-    text-rendering: optimizeLegibility;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 700px) and (max-height: 720px) {
+  html[data-theme='airy'] .navbtn__label { font-size: 14px; }
+}
+
+@media (orientation: landscape) and (min-width: 700px) and (min-height: 900px) {
+  html[data-theme='airy'] .navbtn__label { font-size: 18px; }
+}
+
+@media (orientation: landscape) and (min-width: 700px) {
+  html[data-theme='airy'] :is(.airy-avatar__name, .messages__status) {
+    color: var(--text);
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
   }
 }

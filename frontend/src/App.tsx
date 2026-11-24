@@ -82,7 +82,9 @@ export function App() {
     <div
       className="shell"
       data-airy={airy ? 'true' : undefined}
-      style={{ transform: `translate(${shift.x}px, ${shift.y}px)`, transition: 'transform 2s ease-in-out' }}
+      style={settings?.burn_in_shift
+        ? { transform: `translate(${shift.x}px, ${shift.y}px)`, transition: 'transform 2s ease-in-out' }
+        : undefined}
     >
       {airy ? (
         <AiryBar
