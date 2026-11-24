@@ -33,3 +33,16 @@ it('stays put during a dialog and strolls again after it closes', () => {
   act(() => vi.advanceTimersByTime(75000))
   expect(yard.getAttribute('data-right')).toBe('true')
 })
+
+it('rides, dismounts, then throws a plane on the next outing', () => {
+  vi.useFakeTimers()
+  const host = mount(<Homie />)
+  act(() => vi.advanceTimersByTime(75000))
+  expect(host.querySelector('.homie-bike')).toBeTruthy()
+  act(() => vi.advanceTimersByTime(3400))
+  expect(host.querySelector('.homie-bike')).toBeNull()
+  act(() => vi.advanceTimersByTime(71600))
+  expect(host.querySelector('.homie-plane')).toBeTruthy()
+  act(() => vi.advanceTimersByTime(3400))
+  expect(host.querySelector('.homie-plane')).toBeNull()
+})

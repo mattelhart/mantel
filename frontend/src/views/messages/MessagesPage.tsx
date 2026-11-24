@@ -67,7 +67,7 @@ export function friendlySendError(error: unknown, name?: string | null): string 
   return friendlyFailureText(raw, name) || "Couldn't send that. Try again in a moment."
 }
 
-function useConversations() {
+export function useConversations() {
   return useQuery({
     queryKey: KEY,
     queryFn: () => api.get<ConversationsResponse>('/messages/conversations'),
@@ -454,7 +454,7 @@ function DoodleComposer({
   )
 }
 
-function doodleHref(mediaUrl: string, userId: number | null): string {
+export function doodleHref(mediaUrl: string, userId: number | null): string {
   const params = new URLSearchParams({ media: mediaUrl })
   if (userId) params.set('replyTo', String(userId))
   return `/games/doodle?${params.toString()}`

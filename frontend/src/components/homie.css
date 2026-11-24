@@ -29,3 +29,62 @@
   .homie-yard[data-right] .homie-friend { left: 0; transition: none; }
   .homie-yard[data-hello] .homie-hand { animation: none; }
 }
+
+/* The silhouette carries focus on a remote. The whole hit area still accepts taps. */
+html .homie-yard .homie-friend:is(:focus, :focus-visible) {
+  outline: none !important; box-shadow: none; background: transparent;
+}
+.homie-friend:focus-visible .homie-cottage { filter: drop-shadow(0 0 2px #155bdd) drop-shadow(0 0 1px #155bdd); }
+.homie-cottage { box-shadow: none; margin-top: 5px; }
+.homie-leg, .homie-arm, .homie-hand {
+  position: absolute; width: 4px; border: 0; border-radius: 4px; background: currentColor;
+}
+.homie-leg { height: 7px; bottom: -7px; left: 5px; transform-origin: top; }
+.homie-leg::after { content: ''; position: absolute; bottom: -1px; left: -2px; width: 7px; height: 3px; border-radius: 3px; background: currentColor; }
+.homie-leg--far { left: 19px; }
+.homie-arm { height: 10px; left: -5px; top: 10px; transform: rotate(35deg); }
+.homie-cottage .homie-hand { height: 12px; top: 0; right: -5px; transform: rotate(25deg); transform-origin: bottom center; animation: homie-post 6s ease-in-out infinite; }
+.homie-letter {
+  position: absolute; display: grid; place-items: center; top: -6px; left: -6px;
+  width: 17px; height: 12px; color: #754923; background: #ffedac; border-radius: 2px;
+  font: 700 18px/12px system-ui;
+}
+.homie-yard[data-mail="true"] .homie-hand, .homie-yard[data-hello="true"] .homie-hand { animation: homie-post 1.4s ease-in-out infinite; }
+.homie-yard[data-mail="true"] .homie-cottage, .homie-yard[data-hello="true"] .homie-cottage { animation: homie-hop 1.4s ease-in-out infinite; }
+.homie-yard:is([data-mail="true"],[data-hello="true"]) .homie-leg { transform: rotate(28deg); }
+.homie-yard:is([data-mail="true"],[data-hello="true"]) .homie-leg--far { transform: rotate(-25deg); }
+.homie-star { position: absolute; left: -14px; top: -12px; font: bold 19px/1 system-ui; -webkit-text-stroke: 1px #423c46; animation: homie-catch 1s ease-out; }
+.homie-cheer { position: absolute; top: 0; left: 62px; right: 0; text-align: center; font: 700 15px/1.2 system-ui; color: #253e42; pointer-events: none; }
+.homie-yard[data-right="true"] .homie-cheer { left: 0; }
+@keyframes homie-post { 0%, 55%, 100% { transform: rotate(25deg); } 62% { transform: rotate(54deg); } 72%, 90% { transform: rotate(-12deg); } 81% { transform: rotate(18deg); } }
+@keyframes homie-hop { 0%, 60%, 100% { transform: translateY(0); } 16% { transform: translateY(1px) rotate(-4deg); } 30% { transform: translateY(-4px) rotate(4deg); } 45% { transform: translateY(-2px) rotate(-2deg); } }
+@keyframes homie-catch { from { transform: translate(16px,-12px) rotate(75deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@container (max-width: 220px) { .homie-cheer { clip-path: inset(50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .homie-yard .homie-friend * { animation: none !important; }
+}
+.homie-bike { position: absolute; left: -9px; bottom: -11px; width: 47px; height: 16px; }
+.homie-bike i { position: absolute; left: 0; bottom: 0; width: 15px; height: 15px; border: 2px solid #33494b; border-radius: 50%; background: linear-gradient(45deg,transparent 45%,#769998 46% 54%,transparent 55%); animation: homie-wheel .6s linear infinite; }
+.homie-bike i:last-child { left: auto; right: 0; }
+.homie-bike b { position: absolute; left: 10px; bottom: 6px; width: 21px; height: 10px; border: 3px solid #c96340; transform: skew(22deg); }
+.homie-yard[data-trick="bike"] .homie-leg { animation: homie-pedal .42s ease-in-out infinite alternate; }
+.homie-yard[data-trick="bike"] .homie-leg--far { animation-direction: alternate-reverse; }
+.homie-yard[data-trick="plane"] .homie-hand { animation: homie-throw .65s ease-out; }
+.homie-plane {
+  position: absolute; z-index: 2; top: 22px; left: 46px; width: 26px; height: 17px;
+  background: linear-gradient(155deg,#4b7999 0 48%,#b7dee7 49% 72%,#577e96 73%);
+  clip-path: polygon(0 0,100% 26%,18% 100%,30% 52%); pointer-events: none;
+  opacity: 0; animation: homie-flight 2.7s .35s ease-in-out forwards;
+}
+.homie-yard[data-right="true"] .homie-plane { left: calc(100% + 10px); scale: -1 1; }
+@keyframes homie-wheel { to { transform: rotate(360deg); } }
+@keyframes homie-pedal { from { transform: rotate(-35deg); } to { transform: rotate(35deg); } }
+@keyframes homie-throw { 35% { transform: rotate(-55deg); } 65% { transform: rotate(85deg); } }
+@keyframes homie-flight {
+  0% { opacity: 0; transform: translate(0,0) rotate(-18deg); }
+  8% { opacity: 1; }
+  30% { transform: translate(10vw,-18px) rotate(-8deg); }
+  75% { opacity: 1; transform: translate(32vw,9vh) rotate(18deg); }
+  100% { opacity: 0; transform: translate(42vw,12vh) rotate(-8deg); }
+}
+@media (prefers-reduced-motion: reduce) { .homie-plane { display: none; } }
