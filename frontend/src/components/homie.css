@@ -251,3 +251,31 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
   background: #394536; border-radius: 2px; box-shadow: 7px 0 #394536;
   animation: homie-pedal .18s ease-in-out infinite alternate;
 }
+
+/* One pair of boots grounds each stride, including the trip back to the dock. */
+.homie-yard[data-away="true"] { animation: none; transition: left var(--stride-ms) linear, top var(--stride-ms) linear; }
+.homie-yard[data-away="true"] .homie-friend { animation: none; }
+.homie-yard .homie-gnome .homie-arm { top: 8px; left: -2px; transform: rotate(9deg); }
+.homie-yard .homie-gnome .homie-hand { top: 8px; right: -2px; transform-origin: top center; transform: rotate(-9deg); animation: none; }
+.homie-yard[data-mail="true"] .homie-letter { top: 7px; }
+.homie-yard[data-mail="true"] .homie-gnome { animation: none; }
+.homie-carried { position: absolute; right: -11px; top: 9px; font: bold 17px/1 system-ui; color: #253e42; }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-yard[data-hello="true"] .homie-gnome .homie-hand { animation: homie-brief-wave .85s 1; }
+  .homie-yard[data-walking="true"] .homie-gnome { animation: homie-weight .36s linear infinite; }
+  .homie-yard[data-walking="true"] .homie-leg { height: 9px; animation: homie-foot .48s linear infinite; }
+  .homie-yard[data-walking="true"] .homie-leg--far { animation-delay: -.24s; }
+}
+@keyframes homie-brief-wave { 25%,65% { transform: rotate(-135deg); } 45% { transform: rotate(-105deg); } }
+@keyframes homie-weight { 50% { transform: translateY(-2px) rotate(2deg); } }
+@keyframes homie-foot { 0%,100% { transform: translate(-2px,0) rotate(27deg); } 50% { transform: translate(3px,0) rotate(-27deg); } 74% { transform: translateY(-3px) rotate(8deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-yard[data-walking="true"] .homie-leg { animation-duration: var(--step-time); }
+  .homie-yard[data-walking="true"] .homie-leg--far { animation-delay: calc(var(--step-time) * -.5); }
+  .homie-yard[data-walking="true"] .homie-gnome { rotate: var(--lean); animation-duration: calc(var(--step-time) * .5); }
+  .homie-yard[data-walking="true"] .homie-gnome .homie-arm { animation: homie-armswing var(--step-time) linear infinite; transform-origin: top center; }
+}
+@keyframes homie-armswing { 0%,100% { transform: rotate(-13deg); } 50% { transform: rotate(16deg); } }
+/* A walking gnome crosses controls; only his visible silhouette takes a tap. */
+.homie-yard[data-walking="true"] .homie-friend { pointer-events: none; }
+.homie-yard[data-walking="true"]:not([data-retreat="true"]) .homie-gnome { pointer-events: auto; }

@@ -35,29 +35,18 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const mischiefTurn = useRef(0)
   const visitCount = useRef(0)
   useEffect(() => {
-    if (trick === 'nudge') {
-      const target = document.querySelector('.shell__nav a[href="/chores"]')
-      const rect = target?.getBoundingClientRect()
-      if (!target || !rect?.width || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-      const animation = target.animate([
-        { translate: '0' }, { translate: '7px', offset: .28 },
-        { translate: '3px', offset: .44 }, { translate: '10px', offset: .58 }, { translate: '0' },
-      ], { duration: 1900, delay: 400, easing: 'ease-in-out' })
-      setPerch({ left: Math.max(2, rect.right - 22), top: Math.max(2, rect.top + rect.height / 2 - 10) })
-      return () => { animation.cancel(); setPerch(null) }
-    }
-    if (trick !== 'visitor' && trick !== 'swipe') return
+    if (trick !== 'visitor') return
     // Alternate ordinary visits with a pair of glyph routines.
-    const playful = trick === 'swipe' || Math.floor(mischiefTurn.current++ / 2) % 2 === 1
-    const carry = trick === 'swipe' || guest === 'robin'
+    const playful = Math.floor(mischiefTurn.current++ / 2) % 2 === 1
+    const carry = guest === 'robin'
     const glyph = document.querySelector<HTMLElement>(
-      trick === 'swipe' || !carry ? '[data-homie-glyph="letter"]' : '[data-homie-glyph="digit"]',
+      !carry ? '[data-homie-glyph="letter"]' : '[data-homie-glyph="digit"]',
     )
     if (playful && glyph && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       const r = glyph.getBoundingClientRect()
       if (r.width && r.height && r.left >= 2 && r.right < innerWidth - 4 && r.top >= 4 && r.bottom < innerHeight - 16) {
         const font = getComputedStyle(glyph)
-        const dx = r.right + 108 < innerWidth ? (trick === 'swipe' ? 96 : 42) : -42
+        const dx = r.right + 108 < innerWidth ? 42 : -42
         setBorrowed({ text: glyph.textContent ?? '', carry, style: {
           left: r.left, top: r.top, width: r.width, height: r.height, color: font.color,
           fontFamily: font.fontFamily, fontSize: font.fontSize, fontWeight: font.fontWeight,
@@ -67,7 +56,6 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
         return () => { glyph.classList.remove('homie-glyph-away'); setBorrowed(null) }
       }
     }
-    if (trick === 'swipe') return
     const selector = guest === 'robin' ? '.airy-avatar' : '.shell__nav a[href="/chores"]'
     const choices = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => {
       const r = el.getBoundingClientRect()
@@ -90,19 +78,49 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const button = useRef<HTMLButtonElement>(null)
   const dock = useRef<HTMLDivElement>(null)
   const [away, setAway] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null)
+  const [walking, setWalking] = useState(false)
+  const [pace, setPace] = useState(480)
+  const [heading, setHeading] = useState(1)
+  const [stride, setStride] = useState(0)
+  const [carried, setCarried] = useState('')
   const [push, setPush] = useState<Reaction | null>(null)
   const [runningHome, setRunningHome] = useState(false)
   useEffect(() => {
     let quietSince = 0
-    let returnTimer: number
     let outingTimer: number
     let awayNow = false
+    let timer: number
+    let startFrame: number
+    let stolen: HTMLElement | null = null
+    let nudge: Animation | undefined
+    function release() {
+      clearTimeout(timer)
+      cancelAnimationFrame(startFrame)
+      stolen?.classList.remove('homie-glyph-away')
+      stolen = null
+      setCarried('')
+      nudge?.cancel()
+      setWalking(false)
+    }
+    function walk(x: number, y: number, speed: number, arrived: () => void) {
+      const from = button.current!.getBoundingClientRect()
+      const ms = Math.max(180, Math.round(Math.hypot(x-from.left, y-from.top) / speed * 1000))
+      setHeading(x < from.left ? -1 : 1)
+      setPace(Math.round(105000 / speed))
+      setStride(ms)
+      setWalking(true)
+      setAway({ x, y, dx: 0, dy: 0 })
+      timer = window.setTimeout(() => { setWalking(false); arrived() }, ms)
+    }
     function goHome() {
       if (!awayNow || tumbling) return
       awayNow = false
+      release()
+      clearTimeout(outingTimer)
       setRunningHome(true)
       setTrick('rest')
-      returnTimer = window.setTimeout(() => { setAway(null); setRunningHome(false) }, 280)
+      const home = dock.current!.getBoundingClientRect()
+      walk(home.left, home.top, 420, () => { setAway(null); setRunningHome(false) })
     }
     let stopWatching: (() => void) | undefined
     let watchingUntil = 0
@@ -111,7 +129,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     function tumble(reaction: Reaction, origin: DOMRect) {
       const home = dock.current?.getBoundingClientRect()
       if (!home || document.hidden || document.querySelector('.saver, dialog[open], [role="dialog"]')) return
-      clearTimeout(returnTimer)
+      release()
       clearTimeout(outingTimer)
       awayNow = true
       tumbling = true
@@ -139,6 +157,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     }
     const activity = ['pointerdown', 'pointerup', 'dragover', 'keyup', 'keydown', 'input', 'focusin', 'wheel', 'scroll', 'click']
     for (const type of activity) document.addEventListener(type, retreat, { capture: true, passive: true })
+    window.addEventListener('homie-dodge', goHome)
     window.addEventListener('resize', retreat)
     document.addEventListener('visibilitychange', retreat)
     const layout = new MutationObserver(goHome)
@@ -147,19 +166,46 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     let visit = 0
     let land: number
     const stroll = window.setInterval(() => {
-      if (Date.now() - quietSince < 12000 || document.hidden
+      if (awayNow || Date.now() - quietSince < 12000 || document.hidden
           || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
       const move = outings[visit % outings.length]
       if (move === 'visitor') setGuest(Math.floor(visit / outings.length) % 2 === 0 ? 'robin' : 'neighbour')
       visit += 1
-      const home = dock.current?.getBoundingClientRect()
-      if (home?.width && move !== 'swipe' && move !== 'nudge' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        const spot = findHomieSpot()
-        if (spot) {
+      const home = button.current?.getBoundingClientRect()
+      if (home?.width && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const target = move === 'swipe' ? document.querySelector<HTMLElement>('[data-homie-glyph="letter"]')
+          : move === 'nudge' ? document.querySelector<HTMLElement>('.shell__nav a[href="/chores"]') : null
+        const r = target?.getBoundingClientRect()
+        const stop = r?.width ? { x: Math.max(0, r.right - 8), y: Math.max(0,r.top + r.height/2 - 31) } : findHomieSpot()
+        if (stop && !awayNow) {
           awayNow = true
-          setAway({ ...spot, dx: home.left - spot.x, dy: home.top - spot.y })
-          outingTimer = window.setTimeout(goHome, 18000)
+          setStride(0)
+          setRight(false)
+          setAway({x: home.left, y: home.top, dx: 0, dy: 0})
+          startFrame = requestAnimationFrame(() => {
+            if (!button.current) return
+            startFrame = requestAnimationFrame(() => walk(stop.x, stop.y, 225, () => {
+              setTrick(move)
+              if (target && move === 'swipe') {
+                stolen = target
+                target.classList.add('homie-glyph-away')
+                setCarried(target.textContent ?? '')
+                const hideout = findHomieSpot() ?? { x: Math.min(innerWidth-60, stop.x+130), y: stop.y }
+                timer = window.setTimeout(() => walk(hideout.x, hideout.y, 350, () => {
+                  timer = window.setTimeout(() => walk(stop.x, stop.y, 300, () => {
+                    timer = window.setTimeout(goHome, 380)
+                  }), 600)
+                }), 300)
+              } else {
+                if (target && move === 'nudge') nudge = target.animate(
+                  [{translate:'0'}, {translate:'-7px'}, {translate:'-3px'}, {translate:'-10px'}, {translate:'0'}],
+                  {duration: 1900, easing:'ease-in-out'})
+                outingTimer = window.setTimeout(goHome, move === 'visitor' ? 5600 : 3400)
+              }
+            }))
+          })
+          return
         }
       }
       setTrick(move)
@@ -176,12 +222,13 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     document.addEventListener('click', greet, true)
     return () => {
       for (const type of activity) document.removeEventListener(type, retreat, true)
+      window.removeEventListener('homie-dodge', goHome)
       window.removeEventListener('resize', retreat)
       document.removeEventListener('visibilitychange', retreat)
       stopWatching?.()
       clearTimeout(tumbleTimer)
       layout.disconnect()
-      clearTimeout(returnTimer)
+      release()
       clearTimeout(outingTimer)
       clearInterval(stroll)
       clearTimeout(land)
@@ -227,9 +274,9 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     if (mailFrom) onDeliver?.()
   }
   const actor = (
-    <div className="homie-yard" data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
-      style={away ? { left: away.x, top: away.y, '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick} data-performing={Boolean(trick === 'swipe' && borrowed || trick === 'nudge' && perch)}>
-      <button className="homie-friend" ref={button} type="button" onClick={tapHomie} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
+    <div className="homie-yard" data-walking={walking} data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
+      style={away ? { left: away.x, top: away.y, '--stride-ms': stride + 'ms', '--step-time': pace + 'ms', '--lean': heading * 4 + 'deg', '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
+      <button className="homie-friend" ref={button} type="button" onClick={() => { if (away) window.dispatchEvent(new Event('homie-dodge')); tapHomie() }} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
         <span className="homie-jump" key={jump} data-jump={jump > 0}>
         <span className="homie-gnome" aria-hidden="true">
           {trick === 'sweep' && <i className="homie-broom" />}
@@ -249,6 +296,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
             <g fill="#efae49"><circle cx="8" cy="4" r="3" /><circle cx="5" cy="7" r="3" /><circle cx="11" cy="7" r="3" /></g>
             <circle cx="8" cy="7" r="2" fill="#8e5034" />
           </svg>}
+          {carried && <b className="homie-carried" aria-hidden="true">{carried}</b>}
           <i className="homie-arm" /><i className="homie-hand">{mailFrom && <b className="homie-letter">✉</b>}</i>
           <i className="homie-leg" /><i className="homie-leg homie-leg--far" />
           {star && <i className="homie-star" style={{ color: star.color }}>★</i>}
@@ -261,11 +309,10 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     </div>
   )
   return <div ref={dock} className="homie-dock">{away ? createPortal(actor, document.body) : actor}
-    {borrowed && (visitor || trick === 'swipe') && createPortal(<span className="homie-glyph-scene" data-carry={borrowed.carry} data-gnome={trick === 'swipe'}
+    {borrowed && visitor && createPortal(<span className="homie-glyph-scene" data-carry={borrowed.carry}
       aria-hidden="true" style={borrowed.style}>
-      <span className="homie-loose-glyph">{borrowed.text}</span><span className="homie-glyph-guest">{trick === 'swipe' ? portrait : visitor}</span>
+      <span className="homie-loose-glyph">{borrowed.text}</span><span className="homie-glyph-guest">{visitor}</span>
     </span>, document.body)}
-    {trick === 'nudge' && perch && createPortal(<span className="homie-perch homie-shove" style={perch} aria-hidden="true">{portrait}</span>, document.body)}
     {visitor && perch && createPortal(<span className="homie-perch" style={perch}>{visitor}</span>, document.body)}
     {job && <button type="button" className="homie-chore-note" onClick={onChores}
       aria-label={`Open chores: ${job.name}, ${job.title}`}>

@@ -65,7 +65,7 @@ it('visits an open patch and retreats on the first pointer press without consumi
   const rect = (width: number, height: number) => new DOMRect(0, 0, width, height)
   const main = host.querySelector('main')!
   vi.spyOn(main, 'getBoundingClientRect').mockReturnValue(rect(600, 400))
-  vi.spyOn(host.querySelector('.homie-dock')!, 'getBoundingClientRect').mockReturnValue(rect(120, 58))
+  vi.spyOn(host.querySelector('.homie-friend')!, 'getBoundingClientRect').mockReturnValue(rect(120, 58))
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
   Object.defineProperty(document, 'elementFromPoint', { value: () => main, configurable: true })
   try {
@@ -156,16 +156,23 @@ it('returns the borrowed digit on touch and straightens the letter when the visi
   } finally { vi.unstubAllGlobals(); vi.restoreAllMocks() }
 })
 
-it('lets Homie himself steal a letter and restores it on the next tap', () => {
+it.each([true, false])('carries one letter on the actual gnome and restores it (interrupted: %s)', interrupted => {
   vi.useFakeTimers()
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
   try {
     const host = mount(<><Homie /><span data-homie-glyph="letter">s</span></>)
     const letter = host.querySelector('[data-homie-glyph]')!
     vi.spyOn(letter, 'getBoundingClientRect').mockReturnValue(new DOMRect(55, 45, 12, 20))
-    for (let i = 0; i < 6; i++) act(() => vi.advanceTimersByTime(outingInterval))
-    expect(document.querySelector('.homie-glyph-scene[data-gnome="true"] .homie-loose-glyph')?.textContent).toBe('s')
-    click(letter)
+    for (let i = 0; i < 5; i++) act(() => vi.advanceTimersByTime(outingInterval))
+    vi.spyOn(host.querySelector('.homie-friend')!, 'getBoundingClientRect').mockReturnValue(new DOMRect(100,20,58,58))
+    act(() => vi.advanceTimersByTime(outingInterval))
+    expect(letter.classList.contains('homie-glyph-away')).toBe(false)
+    act(() => vi.advanceTimersByTime(1700))
+    expect(document.querySelector('.homie-gnome .homie-carried')?.textContent).toBe('s')
+    expect(document.querySelectorAll('.homie-gnome')).toHaveLength(1)
+    if (interrupted) click(letter)
+    else act(() => vi.advanceTimersByTime(10000))
+    expect(document.querySelector('.homie-carried')).toBeNull()
     expect(letter.classList.contains('homie-glyph-away')).toBe(false)
     expect(document.querySelector('.homie-glyph-scene')).toBeNull()
   } finally {
