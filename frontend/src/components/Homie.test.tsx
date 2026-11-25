@@ -71,8 +71,10 @@ it('visits an open patch and retreats on the first pointer press without consumi
   try {
     act(() => vi.advanceTimersByTime(outingInterval))
     expect(document.querySelector('[data-away="true"]')).toBeTruthy()
-    act(() => main.querySelector('button')!.dispatchEvent(new Event('pointerdown', { bubbles: true })))
-    expect(select).toHaveBeenCalledOnce()
+    act(() => main.querySelector('button')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 500, clientY: 350 })))
+    expect(document.querySelector('[data-retreat="true"]')).toBeNull()
+    act(() => main.querySelector('button')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 5, clientY: 5 })))
+    expect(select).toHaveBeenCalledTimes(2)
     expect(document.querySelector('[data-retreat="true"]')).toBeTruthy()
     act(() => vi.advanceTimersByTime(280))
     expect(host.querySelector('.homie-friend')).toBeTruthy()
@@ -203,4 +205,17 @@ it('seals and collects each envelope with one gnome, alternating truck and plane
     advanceTo('.homie-dock .homie-yard')
   }
   expect(document.querySelector('.homie-letter')).toBeNull()
+})
+
+it('takes up lantern patrol, knitting and watering while an editor keeps focus', () => {
+  vi.useFakeTimers()
+  const host = mount(<><Homie /><textarea defaultValue="Family note" /></>)
+  const editor = host.querySelector('textarea')!
+  act(() => editor.focus())
+  for (const activity of ['lantern', 'knit', 'water']) {
+    act(() => vi.advanceTimersByTime(outingInterval))
+    expect(host.querySelector('.homie-yard')?.getAttribute('data-trick')).toBe(activity)
+    expect(document.activeElement).toBe(editor)
+    expect(editor.value).toBe('Family note')
+  }
 })

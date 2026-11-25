@@ -13,8 +13,10 @@ export const showHomie = choice === null
   : choice === '1'
 if (choice !== null) sessionStorage.setItem('homie.companion', showHomie ? '1' : '0')
 
-export const outingInterval = 28000
+export const outingInterval = 14000
 const outings = ['bike', 'plane', 'garden', 'chase', 'visitor', 'swipe', 'nudge', 'sweep'] as const
+
+const pastimes = ['lantern', 'knit', 'water'] as const
 
 type Props = {
   job?: { name: string; title: string }
@@ -29,7 +31,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const invitation = mailFrom ? "I've got mail from " + mailFrom + "!" : "Say hello to Homie"
   const congrats = star && "Nice work, " + star.name + "! +" + star.earned + " ★"
   const [right, setRight] = useState(false)
-  const [trick, setTrick] = useState<typeof outings[number] | 'rest' | 'fish'>('rest')
+  const [trick, setTrick] = useState<typeof outings[number] | typeof pastimes[number] | 'rest' | 'fish'>('rest')
   const [guest, setGuest] = useState<'robin' | 'neighbour'>('robin')
   const [perch, setPerch] = useState<{ left: number; top: number } | null>(null)
   const [borrowed, setBorrowed] = useState<{ text: string; style: CSSProperties; carry: boolean } | null>(null)
@@ -81,6 +83,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const [away, setAway] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null)
   type Route = { vehicle: 'truck' | 'airplane'; pickupX: number; pickupY: number; parkingX: number; phase: 'seal' | 'carry' | 'board' | 'depart' }
   const [route, setRoute] = useState<Route | null>(null)
+  const [quietOuting, setQuietOuting] = useState(false)
   const [walking, setWalking] = useState(false)
   const [pace, setPace] = useState(480)
   const [heading, setHeading] = useState(1)
@@ -92,7 +95,9 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     let posting = false
     let waiting = 0
     let byAir = false
-    let quietSince = 0
+    let lastInteraction = -Infinity
+    let pastimeTurn = 0
+    let returning = false
     let outingTimer: number
     let awayNow = false
     let timer: number
@@ -106,6 +111,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       stolen = null
       setCarried('')
       nudge?.cancel()
+      nudge = undefined
       setWalking(false)
     }
     function walk(x: number, y: number, speed: number, arrived: () => void) {
@@ -123,10 +129,11 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       awayNow = false
       release()
       clearTimeout(outingTimer)
+      returning = true
       setRunningHome(true)
       setTrick('rest')
       const home = dock.current!.getBoundingClientRect()
-      walk(home.left, home.top, 420, () => { setAway(null); setRunningHome(false) })
+      walk(home.left, home.top, 420, () => { setAway(null); returning = false; setRunningHome(false) })
     }
     let stopWatching: (() => void) | undefined
     let watchingUntil = 0
@@ -152,34 +159,52 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     function retreat(event: Event) {
       if (posting) return
       if (event.target instanceof Element && event.target.closest('.homie-friend')) return
-      setTrick(current => ['visitor', 'swipe', 'nudge', 'sweep'].includes(current) ? 'rest' : current)
-      quietSince = Date.now()
+      // Put borrowed UI back as soon as someone starts using the app.
+      setTrick(current => ['visitor', 'swipe', 'nudge'].includes(current) ? 'rest' : current)
+      lastInteraction = Date.now()
       if (tumbling) return
       if (button.current && event.type !== 'visibilitychange' && Date.now() >= watchingUntil) {
         stopWatching?.()
         stopWatching = watchForPush(button.current, tumble)
         if (stopWatching) watchingUntil = Date.now() + 500
       }
-      goHome()
+      const bounds = button.current?.getBoundingClientRect()
+      const pointer = event as Partial<MouseEvent>
+      const target = event.target instanceof Element ? event.target : null
+      const point = typeof pointer.clientX === 'number' && typeof pointer.clientY === 'number'
+        ? { x: pointer.clientX, y: pointer.clientY } : null
+      const control = target?.closest('button,a,input,select,textarea,[tabindex],[contenteditable="true"]')?.getBoundingClientRect()
+      const nearby = bounds && (point
+        ? point.x >= bounds.left - 55 && point.x <= bounds.right + 55 && point.y >= bounds.top - 55 && point.y <= bounds.bottom + 55
+        : control && control.left < bounds.right + 25 && control.right > bounds.left - 25 && control.top < bounds.bottom + 25 && control.bottom > bounds.top - 25)
+      if (nearby || stolen || nudge || event.type === 'resize' || document.hidden) goHome()
     }
     const activity = ['pointerdown', 'pointerup', 'dragover', 'keyup', 'keydown', 'input', 'focusin', 'wheel', 'scroll', 'click']
     for (const type of activity) document.addEventListener(type, retreat, { capture: true, passive: true })
     window.addEventListener('homie-dodge', goHome)
     window.addEventListener('resize', retreat)
     document.addEventListener('visibilitychange', retreat)
-    const layout = new MutationObserver(goHome)
+    const layout = new MutationObserver(() => {
+      if (!awayNow || posting) return
+      const box = button.current?.getBoundingClientRect()
+      const under = box && document.elementFromPoint?.(box.left + box.width / 2, box.top + box.height / 2)
+      if (document.querySelector('.saver, dialog[open], [role="dialog"]') ||
+          (under && !under.closest('.homie-yard') && under.closest('button,a,input,select,textarea,[contenteditable="true"]'))) goHome()
+    })
     const main = document.querySelector('main')
     if (main) layout.observe(main, {childList: true, characterData: true, subtree: true})
     let visit = 0
     let land: number
     const stroll = window.setInterval(() => {
-      if (posting || awayNow || Date.now() - quietSince < 12000 || document.hidden
-          || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
+      if (posting || awayNow || returning || document.hidden
+          || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
-      const scheduled = outings[visit % outings.length]
+      const inUse = Date.now() - lastInteraction < outingInterval || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]')
+      setQuietOuting(Boolean(inUse))
+      const scheduled = inUse ? pastimes[pastimeTurn++ % pastimes.length] : outings[visit % outings.length]
       const move = scheduled === 'sweep' && Math.floor(visit / outings.length) % 2 === 0 ? 'fish' : scheduled
       if (move === 'visitor') setGuest(Math.floor(visit / outings.length) % 2 === 0 ? 'robin' : 'neighbour')
-      visit += 1
+      if (!inUse) visit += 1
       const home = button.current?.getBoundingClientRect()
       if (home?.width && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const target = move === 'swipe' ? document.querySelector<HTMLElement>('[data-homie-glyph="letter"]')
@@ -224,6 +249,8 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       const origin = button.current?.getBoundingClientRect()
       if (!origin || document.hidden || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
       if (posting) { waiting++; return }
+      setQuietOuting(false)
+      returning = false
       posting = true
       release()
       stopWatching?.()
@@ -260,7 +287,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
               setAway(null)
               posting = false
               awayNow = false
-              quietSince = Date.now()
+              returning = false
               if (waiting) { waiting--; timer = window.setTimeout(collectPost, 250) }
             }, 1400)
           }, 420)
@@ -336,11 +363,25 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     if (mailFrom) onDeliver?.()
   }
   const actor = (
-    <div className="homie-yard" data-post={route?.phase} data-walking={walking} data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
+    <div className="homie-yard" data-quiet-outing={quietOuting} data-post={route?.phase} data-walking={walking} data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
       style={away ? { left: away.x, top: away.y, '--stride-ms': stride + 'ms', '--step-time': pace + 'ms', '--lean': heading * 4 + 'deg', '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
       <button className="homie-friend" ref={button} type="button" onClick={() => { if (away) window.dispatchEvent(new Event('homie-dodge')); tapHomie() }} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
         <span className="homie-jump" key={jump} data-jump={jump > 0}>
         <span className="homie-gnome" aria-hidden="true">
+          {trick === 'lantern' && <svg className="homie-lantern" viewBox="0 0 20 30" focusable="false">
+            <path fill="none" stroke="#574636" strokeWidth="2" d="M5 12V8a5 5 0 0 1 10 0v4"/>
+            <path fill="#ffe295" stroke="#715534" strokeWidth="2" d="m3 12 2 13h10l2-13Z"/>
+            <path fill="#52716b" d="M2 10h16v4H2zm2 15h12v3H4z"/>
+          </svg>}
+          {trick === 'knit' && <svg className="homie-knit" viewBox="0 0 32 32" focusable="false">
+            <path fill="#c17664" d="M8 13h14v13l-4 3-3-3-3 2-4-3Z"/>
+            <path fill="none" stroke="#ffe4b2" strokeWidth="2" d="m9 16 4 3 4-3 4 3m-12 2 4 3 4-3 4 3"/>
+            <g stroke="#795434" strokeWidth="2" strokeLinecap="round"><path d="m5 4 16 13"/><path className="homie-needle" d="M26 3 10 17"/></g>
+          </svg>}
+          {trick === 'water' && <svg className="homie-can" viewBox="0 0 32 27" focusable="false">
+            <g stroke="#3b635f" fill="#8cc0b5" strokeWidth="2"><circle cx="7" cy="9" r="5" fill="none"/><path d="M8 7h12v6l7-6 2 3-10 11H8Z"/></g>
+            <path className="homie-water" d="m28 13 1 3m0 2 1 3" stroke="#5391ae" fill="none" strokeLinecap="round"/>
+          </svg>}
           {trick === 'garden' && <svg className="homie-spade" viewBox="0 0 12 34" focusable="false">
             <path fill="none" stroke="#71492b" strokeWidth="2.6" d="M6 25V8C0 7 1 2 2 2h8c1 0 1 5-4 6" />
             <path fill="#83999a" stroke="#334845" d="M1 22h10v5q-1 4-5 6-4-2-5-6Z" />
@@ -362,7 +403,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
               <path fill="none" d="m4 6 11 1" /><circle fill="#48382d" cx="17" cy="7" r="2.3" />
             </g>
           </svg>}
-          {(trick === 'garden' || star) && <svg className="homie-sprout" viewBox="0 0 20 24" focusable="false">
+          {(trick === 'garden' || trick === 'water' || star) && <svg className="homie-sprout" viewBox="0 0 20 24" focusable="false">
             <path fill="none" stroke="#476842" strokeWidth="2" d="M10 23 Q12 12 8 6" />
             <path fill="#61945c" d="M10 17 Q0 18 1 10 Q8 9 10 17 M11 13 Q11 5 19 6 Q18 13 11 13" />
             <g fill="#efae49"><circle cx="8" cy="4" r="3" /><circle cx="5" cy="7" r="3" /><circle cx="11" cy="7" r="3" /></g>

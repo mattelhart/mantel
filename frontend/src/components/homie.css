@@ -311,3 +311,21 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
 .homie-yard[data-post] .homie-friend, .homie-yard[data-post] .homie-gnome { pointer-events: none !important; }
 .homie-yard:is([data-post="board"],[data-post="depart"]) .homie-leg { visibility: hidden; }
 .homie-yard[data-post="depart"] { transition-timing-function: ease-in; }
+
+.homie-lantern, .homie-knit, .homie-can { position: absolute; z-index: 3; pointer-events: none; }
+.homie-lantern { width: 16px; height: 24px; top: 6px; right: -14px; transform-origin: 50% 12%; }
+.homie-knit { width: 26px; height: 26px; top: 5px; right: -11px; }
+.homie-needle { transform-origin: 12px 16px; }
+.homie-can { width: 28px; height: 24px; top: 5px; right: -22px; transform-origin: 20% 40%; }
+.homie-yard[data-trick="water"] .homie-sprout { left: 52px; }
+.homie-yard[data-quiet-outing="true"][data-away="true"] :is(.homie-friend, .homie-gnome) { pointer-events: none !important; }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-lantern { animation: homie-lamp-swing .95s ease-in-out infinite alternate; }
+  .homie-needle { animation: homie-stitch .45s ease-in-out infinite alternate; }
+  .homie-can { animation: homie-pour 1.6s ease-in-out infinite; }
+  .homie-water { animation: homie-drip 1.6s linear infinite; }
+}
+@keyframes homie-lamp-swing { from { rotate: -18deg; } to { rotate: 17deg; } }
+@keyframes homie-stitch { to { transform: translate(-2px,2px) rotate(-24deg); } }
+@keyframes homie-pour { 35%,70% { rotate: 28deg; } }
+@keyframes homie-drip { 0%,28%,85%,100% { opacity: 0; } 38%,70% { opacity: 1; transform: translateY(2px); } }
