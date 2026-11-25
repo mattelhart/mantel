@@ -13,7 +13,7 @@ function Where() {
 
 afterEach(() => { unmount(); localStorage.clear() })
 
-it('delivers a picture once, offers Messages between deliveries, and celebrates new stars', async () => {
+it('delivers a picture once, dodges between deliveries, and celebrates new stars', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
   client.setQueryData(['messages'], { conversations: [{ id: 'user-1', user_id: 1, name: 'Sam',
     last_message: { id: 8, direction: 'in', media_url: '/picture', media_content_type: 'image/png' } }] })
@@ -27,8 +27,10 @@ it('delivers a picture once, offers Messages between deliveries, and celebrates 
   expect(button.getAttribute('aria-label')).toContain('mail from Sam')
   click(button)
   expect(host.querySelector('output')?.textContent).toBe('/games/doodle?media=%2Fpicture&replyTo=1')
+  expect(button.querySelector('.homie-letter')).toBeNull()
   click(button)
-  expect(host.querySelector('output')?.textContent).toBe('/messages')
+  expect(button.querySelector('.homie-jump[data-jump="true"]')).toBeTruthy()
+  expect(host.querySelector('output')?.textContent).toBe('/games/doodle?media=%2Fpicture&replyTo=1')
   expect(host.querySelector('.homie-star')).toBeNull()
   await act(async () => {
     client.setQueryData(board, { people: [{ ...person, stars: 5 }] })

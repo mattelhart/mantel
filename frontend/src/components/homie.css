@@ -214,3 +214,40 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
   .homie-glyph-away { opacity: 1; }
   .homie-glyph-scene { display: none; }
 }
+
+.homie-jump { display: block; }
+.homie-broom { position: absolute; left: -11px; top: 0; width: 3px; height: 29px; border-radius: 2px; background: #845b32; transform: rotate(27deg); }
+.homie-broom::after { content: ''; position: absolute; left: -4px; bottom: -4px; width: 11px; height: 9px; border-radius: 3px 3px 1px 1px; background: repeating-linear-gradient(90deg,#c28c42 0 2px,#f0c572 2px 3px); }
+.homie-shove .homie-portrait { width: 23px; height: 29px; left: 0; bottom: 0; }
+.homie-glyph-scene[data-gnome="true"] .homie-portrait { width: 25px; height: 32px; left: -2px; bottom: -8px; }
+.homie-glyph-scene[data-gnome="true"] { animation-name: homie-make-off; }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-jump[data-jump="true"] { animation: homie-dodge .65s ease-out; }
+  .homie-broom { animation: homie-sweep .55s ease-in-out 6 alternate; }
+  .homie-shove { animation: homie-shoulder 2.3s ease-in-out both; }
+}
+@keyframes homie-dodge {
+  12% { transform: scale(1.12,.78); }
+  40% { transform: translate(-17px,-15px) rotate(-14deg); }
+  68% { transform: translate(-25px,3px) rotate(7deg); }
+  86% { transform: translate(-9px,-5px); }
+}
+@keyframes homie-sweep { to { transform: rotate(-27deg); } }
+@keyframes homie-shoulder {
+  0%,100% { opacity: 0; transform: translateX(12px); }
+  18%,74% { opacity: 1; }
+  29%,60% { transform: translateX(-5px) rotate(-14deg); }
+  44% { transform: translateX(2px); }
+}
+@keyframes homie-make-off {
+  0%,18%,92%,100% { transform: none; }
+  40% { transform: translate(calc(var(--flight-x) * .6), 8px) rotate(8deg); }
+  58%,69% { transform: translate(var(--flight-x), 13px) rotate(-6deg); }
+  83% { transform: translate(calc(var(--flight-x) * .34), 4px); }
+}
+.homie-yard[data-performing="true"] .homie-gnome { opacity: .26; }
+.homie-glyph-scene[data-gnome="true"] .homie-glyph-guest::after {
+  content: ''; position: absolute; left: 6px; bottom: -9px; width: 4px; height: 6px;
+  background: #394536; border-radius: 2px; box-shadow: 7px 0 #394536;
+  animation: homie-pedal .18s ease-in-out infinite alternate;
+}

@@ -12,7 +12,8 @@ export const showHomie = choice === null
   : choice === '1'
 if (choice !== null) sessionStorage.setItem('homie.companion', showHomie ? '1' : '0')
 
-const outings = ['bike', 'plane', 'garden', 'chase', 'visitor', 'rest'] as const
+export const outingInterval = 28000
+const outings = ['bike', 'plane', 'garden', 'chase', 'visitor', 'swipe', 'nudge', 'sweep'] as const
 
 type Props = {
   job?: { name: string; title: string }
@@ -24,26 +25,39 @@ type Props = {
 }
 
 export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Props) {
-  const invitation = mailFrom ? "I've got mail from " + mailFrom + "!" : "Let's send a message, homie!"
+  const invitation = mailFrom ? "I've got mail from " + mailFrom + "!" : "Say hello to Homie"
   const congrats = star && "Nice work, " + star.name + "! +" + star.earned + " ★"
   const [right, setRight] = useState(false)
-  const [trick, setTrick] = useState<typeof outings[number]>('rest')
+  const [trick, setTrick] = useState<typeof outings[number] | 'rest'>('rest')
   const [guest, setGuest] = useState<'robin' | 'neighbour'>('robin')
   const [perch, setPerch] = useState<{ left: number; top: number } | null>(null)
   const [borrowed, setBorrowed] = useState<{ text: string; style: CSSProperties; carry: boolean } | null>(null)
   const mischiefTurn = useRef(0)
   const visitCount = useRef(0)
   useEffect(() => {
-    if (trick !== 'visitor') return
+    if (trick === 'nudge') {
+      const target = document.querySelector('.shell__nav a[href="/chores"]')
+      const rect = target?.getBoundingClientRect()
+      if (!target || !rect?.width || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+      const animation = target.animate([
+        { translate: '0' }, { translate: '7px', offset: .28 },
+        { translate: '3px', offset: .44 }, { translate: '10px', offset: .58 }, { translate: '0' },
+      ], { duration: 1900, delay: 400, easing: 'ease-in-out' })
+      setPerch({ left: Math.max(2, rect.right - 22), top: Math.max(2, rect.top + rect.height / 2 - 10) })
+      return () => { animation.cancel(); setPerch(null) }
+    }
+    if (trick !== 'visitor' && trick !== 'swipe') return
     // Alternate ordinary visits with a pair of glyph routines.
-    const playful = Math.floor(mischiefTurn.current++ / 2) % 2 === 1
-    const carry = guest === 'robin'
-    const glyph = document.querySelector<HTMLElement>(carry ? '[data-homie-glyph="digit"]' : '[data-homie-glyph="letter"]')
+    const playful = trick === 'swipe' || Math.floor(mischiefTurn.current++ / 2) % 2 === 1
+    const carry = trick === 'swipe' || guest === 'robin'
+    const glyph = document.querySelector<HTMLElement>(
+      trick === 'swipe' || !carry ? '[data-homie-glyph="letter"]' : '[data-homie-glyph="digit"]',
+    )
     if (playful && glyph && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       const r = glyph.getBoundingClientRect()
       if (r.width && r.height && r.left >= 2 && r.right < innerWidth - 4 && r.top >= 4 && r.bottom < innerHeight - 16) {
         const font = getComputedStyle(glyph)
-        const dx = r.right + 54 < innerWidth ? 42 : -42
+        const dx = r.right + 108 < innerWidth ? (trick === 'swipe' ? 96 : 42) : -42
         setBorrowed({ text: glyph.textContent ?? '', carry, style: {
           left: r.left, top: r.top, width: r.width, height: r.height, color: font.color,
           fontFamily: font.fontFamily, fontSize: font.fontSize, fontWeight: font.fontWeight,
@@ -53,6 +67,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
         return () => { glyph.classList.remove('homie-glyph-away'); setBorrowed(null) }
       }
     }
+    if (trick === 'swipe') return
     const selector = guest === 'robin' ? '.airy-avatar' : '.shell__nav a[href="/chores"]'
     const choices = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => {
       const r = el.getBoundingClientRect()
@@ -70,6 +85,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       {duration: 320, delay: 1100, iterations: guest === 'robin' ? 1 : 2})
     return () => { animation?.cancel(); setPerch(null) }
   }, [trick, guest])
+  const [jump, setJump] = useState(0)
   const [hello, setHello] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
   const dock = useRef<HTMLDivElement>(null)
@@ -111,7 +127,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     }
     function retreat(event: Event) {
       if (event.target instanceof Element && event.target.closest('.homie-friend')) return
-      setTrick(current => current === 'visitor' ? 'rest' : current)
+      setTrick(current => ['visitor', 'swipe', 'nudge', 'sweep'].includes(current) ? 'rest' : current)
       quietSince = Date.now()
       if (tumbling) return
       if (button.current && event.type !== 'visibilitychange' && Date.now() >= watchingUntil) {
@@ -131,14 +147,14 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     let visit = 0
     let land: number
     const stroll = window.setInterval(() => {
-      if (Date.now() - quietSince < 20000 || document.hidden
+      if (Date.now() - quietSince < 12000 || document.hidden
           || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
       const move = outings[visit % outings.length]
       if (move === 'visitor') setGuest(Math.floor(visit / outings.length) % 2 === 0 ? 'robin' : 'neighbour')
       visit += 1
       const home = dock.current?.getBoundingClientRect()
-      if (home?.width && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (home?.width && move !== 'swipe' && move !== 'nudge' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const spot = findHomieSpot()
         if (spot) {
           awayNow = true
@@ -147,9 +163,9 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
         }
       }
       setTrick(move)
-      if (move === 'bike' || move === 'chase' || move === 'rest') setRight(previous => !previous)
-      land = window.setTimeout(() => setTrick('rest'), move === 'visitor' ? 5600 : 3400)
-    }, 75000)
+      if (move === 'bike' || move === 'chase' || move === 'sweep') setRight(previous => !previous)
+      land = window.setTimeout(() => setTrick('rest'), move === 'visitor' || move === 'swipe' ? 5600 : 3400)
+    }, outingInterval)
     let reset: number
     function greet(event: Event) {
       if (!(event.target instanceof Element) || event.target.closest('.saver, dialog, [role="dialog"]')) return
@@ -188,13 +204,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
               <path fill="none" strokeLinecap="round" d="m20 21 4-4" />
             </g>}
           </svg>
-  const actor = (
-    <div className="homie-yard" data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
-      style={away ? { left: away.x, top: away.y, '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
-      <button className="homie-friend" ref={button} onClick={onDeliver} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
-        <span className="homie-gnome" aria-hidden="true">
-          {trick === 'bike' && <span className="homie-bike"><i /><b /><i /></span>}
-          <svg className="homie-portrait" viewBox="0 0 40 51" focusable="false">
+  const portrait = <svg className="homie-portrait" viewBox="0 0 40 51" focusable="false">
             <g stroke="#394536" strokeWidth="1.5" strokeLinejoin="round">
               <path fill="#59998a" d="M12 29 Q20 25 28 29 L34 46 Q21 51 6 46Z" />
               <path fill="#f3bc99" d="M7 22 Q19 14 32 22 L30 34 Q19 41 9 32Z" />
@@ -210,6 +220,21 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
               <path fill="none" strokeLinecap="round" d="M17 35 Q20 38 23 34" />
             </g>
           </svg>
+
+  function tapHomie() {
+    setJump(n => n + 1)
+    setTrick('rest')
+    if (mailFrom) onDeliver?.()
+  }
+  const actor = (
+    <div className="homie-yard" data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
+      style={away ? { left: away.x, top: away.y, '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick} data-performing={Boolean(trick === 'swipe' && borrowed || trick === 'nudge' && perch)}>
+      <button className="homie-friend" ref={button} type="button" onClick={tapHomie} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
+        <span className="homie-jump" key={jump} data-jump={jump > 0}>
+        <span className="homie-gnome" aria-hidden="true">
+          {trick === 'sweep' && <i className="homie-broom" />}
+          {trick === 'bike' && <span className="homie-bike"><i /><b /><i /></span>}
+          {portrait}
           {!perch && !borrowed && visitor}
           {trick === 'chase' && <svg className="homie-beetle" viewBox="0 0 22 15" focusable="false">
             <g stroke="#48382d" strokeWidth="1.5" strokeLinecap="round">
@@ -224,21 +249,23 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
             <g fill="#efae49"><circle cx="8" cy="4" r="3" /><circle cx="5" cy="7" r="3" /><circle cx="11" cy="7" r="3" /></g>
             <circle cx="8" cy="7" r="2" fill="#8e5034" />
           </svg>}
-          <i className="homie-arm" /><i className="homie-hand"><b className="homie-letter">✉</b></i>
+          <i className="homie-arm" /><i className="homie-hand">{mailFrom && <b className="homie-letter">✉</b>}</i>
           <i className="homie-leg" /><i className="homie-leg homie-leg--far" />
           {star && <i className="homie-star" style={{ color: star.color }}>★</i>}
         </span>
-        {push?.kind === 'roll' && <b className="homie-dropped-letter" aria-hidden="true">✉</b>}
+        </span>
+        {mailFrom && push?.kind === 'roll' && <b className="homie-dropped-letter" aria-hidden="true">✉</b>}
       </button>
       {trick === 'plane' && <i className="homie-plane" aria-hidden="true" />}
       <span role="status" className="homie-cheer">{congrats || (holiday && '✦ ' + holiday)}</span>
     </div>
   )
   return <div ref={dock} className="homie-dock">{away ? createPortal(actor, document.body) : actor}
-    {visitor && borrowed && createPortal(<span className="homie-glyph-scene" data-carry={borrowed.carry}
+    {borrowed && (visitor || trick === 'swipe') && createPortal(<span className="homie-glyph-scene" data-carry={borrowed.carry} data-gnome={trick === 'swipe'}
       aria-hidden="true" style={borrowed.style}>
-      <span className="homie-loose-glyph">{borrowed.text}</span><span className="homie-glyph-guest">{visitor}</span>
+      <span className="homie-loose-glyph">{borrowed.text}</span><span className="homie-glyph-guest">{trick === 'swipe' ? portrait : visitor}</span>
     </span>, document.body)}
+    {trick === 'nudge' && perch && createPortal(<span className="homie-perch homie-shove" style={perch} aria-hidden="true">{portrait}</span>, document.body)}
     {visitor && perch && createPortal(<span className="homie-perch" style={perch}>{visitor}</span>, document.body)}
     {job && <button type="button" className="homie-chore-note" onClick={onChores}
       aria-label={`Open chores: ${job.name}, ${job.title}`}>
