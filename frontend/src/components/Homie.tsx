@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { watchForPush, type Reaction } from './homiePush'
 import { findHomieSpot } from './homieSpace'
+import { PostalVehicle } from './PostalVehicle'
 import './homie.css'
 
 // Capture the launch option before the router replaces the kiosk start URL.
@@ -78,6 +79,8 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const button = useRef<HTMLButtonElement>(null)
   const dock = useRef<HTMLDivElement>(null)
   const [away, setAway] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null)
+  type Route = { vehicle: 'truck' | 'airplane'; pickupX: number; pickupY: number; parkingX: number; phase: 'seal' | 'carry' | 'board' | 'depart' }
+  const [route, setRoute] = useState<Route | null>(null)
   const [walking, setWalking] = useState(false)
   const [pace, setPace] = useState(480)
   const [heading, setHeading] = useState(1)
@@ -86,6 +89,9 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const [push, setPush] = useState<Reaction | null>(null)
   const [runningHome, setRunningHome] = useState(false)
   useEffect(() => {
+    let posting = false
+    let waiting = 0
+    let byAir = false
     let quietSince = 0
     let outingTimer: number
     let awayNow = false
@@ -113,7 +119,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       timer = window.setTimeout(() => { setWalking(false); arrived() }, ms)
     }
     function goHome() {
-      if (!awayNow || tumbling) return
+      if (posting || !awayNow || tumbling) return
       awayNow = false
       release()
       clearTimeout(outingTimer)
@@ -128,7 +134,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     let tumbling = false
     function tumble(reaction: Reaction, origin: DOMRect) {
       const home = dock.current?.getBoundingClientRect()
-      if (!home || document.hidden || document.querySelector('.saver, dialog[open], [role="dialog"]')) return
+      if (posting || !home || document.hidden || document.querySelector('.saver, dialog[open], [role="dialog"]')) return
       release()
       clearTimeout(outingTimer)
       awayNow = true
@@ -144,6 +150,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       }, reaction.kind === 'roll' ? 1700 : 640)
     }
     function retreat(event: Event) {
+      if (posting) return
       if (event.target instanceof Element && event.target.closest('.homie-friend')) return
       setTrick(current => ['visitor', 'swipe', 'nudge', 'sweep'].includes(current) ? 'rest' : current)
       quietSince = Date.now()
@@ -166,7 +173,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     let visit = 0
     let land: number
     const stroll = window.setInterval(() => {
-      if (awayNow || Date.now() - quietSince < 12000 || document.hidden
+      if (posting || awayNow || Date.now() - quietSince < 12000 || document.hidden
           || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
       const scheduled = outings[visit % outings.length]
@@ -213,6 +220,54 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       if (move === 'bike' || move === 'chase' || move === 'sweep') setRight(previous => !previous)
       land = window.setTimeout(() => setTrick('rest'), move === 'visitor' || move === 'swipe' ? 5600 : 3400)
     }, outingInterval)
+    function collectPost() {
+      const origin = button.current?.getBoundingClientRect()
+      if (!origin || document.hidden || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+      if (posting) { waiting++; return }
+      posting = true
+      release()
+      stopWatching?.()
+      clearTimeout(land)
+      clearTimeout(outingTimer)
+      clearTimeout(tumbleTimer)
+      tumbling = false
+      awayNow = true
+      setPush(null)
+      setRunningHome(false)
+      setTrick('rest')
+      setRight(false)
+      setStride(0)
+      setAway({ x: origin.left, y: origin.top, dx: 0, dy: 0 })
+      const composer = document.querySelector('.messages__composer textarea, .messages--thread textarea')?.getBoundingClientRect()
+      const pickupX = Math.max(12, Math.min(innerWidth - 150, composer ? composer.left + composer.width * .55 : innerWidth * .55))
+      const pickupY = Math.max(60, Math.min(innerHeight - 85, composer ? composer.top - 54 : innerHeight * .72))
+      const parkingX = Math.min(innerWidth - 75, pickupX + 124)
+      const vehicle = byAir ? 'airplane' : 'truck'
+      byAir = !byAir
+      const itinerary: Route = { vehicle, pickupX, pickupY, parkingX, phase: 'seal' }
+      setRoute(itinerary)
+      timer = window.setTimeout(() => walk(pickupX, pickupY, 540, () => {
+        setRoute({ ...itinerary, phase: 'carry' })
+        timer = window.setTimeout(() => walk(parkingX, pickupY, 235, () => {
+          setRoute({ ...itinerary, phase: 'board' })
+          timer = window.setTimeout(() => {
+            setRoute({ ...itinerary, phase: 'depart' })
+            setStride(1350)
+            setAway({ x: innerWidth + 90, y: vehicle === 'airplane' ? Math.max(-60, pickupY - innerHeight * .38) : pickupY, dx: 0, dy: 0 })
+            timer = window.setTimeout(() => {
+              setRoute(null)
+              setWalking(false)
+              setAway(null)
+              posting = false
+              awayNow = false
+              quietSince = Date.now()
+              if (waiting) { waiting--; timer = window.setTimeout(collectPost, 250) }
+            }, 1400)
+          }, 420)
+        }), 250)
+      }), 700)
+    }
+    window.addEventListener('homie-post', collectPost)
     let reset: number
     function greet(event: Event) {
       if (!(event.target instanceof Element) || event.target.closest('.saver, dialog, [role="dialog"]')) return
@@ -228,6 +283,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       document.removeEventListener('visibilitychange', retreat)
       stopWatching?.()
       clearTimeout(tumbleTimer)
+      window.removeEventListener('homie-post', collectPost)
       layout.disconnect()
       release()
       clearTimeout(outingTimer)
@@ -280,7 +336,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
     if (mailFrom) onDeliver?.()
   }
   const actor = (
-    <div className="homie-yard" data-walking={walking} data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
+    <div className="homie-yard" data-post={route?.phase} data-walking={walking} data-push={push?.direction} data-reaction={push?.kind} data-away={Boolean(away)} data-retreat={runningHome}
       style={away ? { left: away.x, top: away.y, '--stride-ms': stride + 'ms', '--step-time': pace + 'ms', '--lean': heading * 4 + 'deg', '--dock-x': away.dx + 'px', '--dock-y': away.dy + 'px' } as CSSProperties : undefined} data-right={right} data-hello={hello} data-mail={Boolean(mailFrom)} data-star={Boolean(star)} data-trick={trick}>
       <button className="homie-friend" ref={button} type="button" onClick={() => { if (away) window.dispatchEvent(new Event('homie-dodge')); tapHomie() }} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
         <span className="homie-jump" key={jump} data-jump={jump > 0}>
@@ -313,18 +369,23 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
             <circle cx="8" cy="7" r="2" fill="#8e5034" />
           </svg>}
           {carried && <b className="homie-carried" aria-hidden="true">{carried}</b>}
-          <i className="homie-arm" /><i className="homie-hand">{mailFrom && <b className="homie-letter">✉</b>}</i>
+          <i className="homie-arm" /><i className="homie-hand">{(route ? route.phase === 'carry' : mailFrom) && <b className="homie-letter">✉</b>}</i>
           <i className="homie-leg" /><i className="homie-leg homie-leg--far" />
           {star && <i className="homie-star" style={{ color: star.color }}>★</i>}
         </span>
         </span>
         {mailFrom && push?.kind === 'roll' && <b className="homie-dropped-letter" aria-hidden="true">✉</b>}
       </button>
+      {route && (route.phase === 'board' || route.phase === 'depart') && <span className="homie-ride"><PostalVehicle kind={route.vehicle} /></span>}
       {trick === 'plane' && <i className="homie-plane" aria-hidden="true" />}
       <span role="status" className="homie-cheer">{congrats || (holiday && '✦ ' + holiday)}</span>
     </div>
   )
   return <div ref={dock} className="homie-dock">{away ? createPortal(actor, document.body) : actor}
+    {route && (route.phase === 'seal' || route.phase === 'carry') && createPortal(<>
+      {route.phase === 'seal' && <span aria-hidden="true" className="homie-post-envelope" style={{left: route.pickupX + 35, top: route.pickupY + 30}}><i /></span>}
+      <span aria-hidden="true" className="homie-parked" style={{left: route.parkingX, top: route.pickupY}}><PostalVehicle kind={route.vehicle} /></span>
+    </>, document.body)}
     {borrowed && visitor && createPortal(<span className="homie-glyph-scene" data-carry={borrowed.carry}
       aria-hidden="true" style={borrowed.style}>
       <span className="homie-loose-glyph">{borrowed.text}</span><span className="homie-glyph-guest">{visitor}</span>

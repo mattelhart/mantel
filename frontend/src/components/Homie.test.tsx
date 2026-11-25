@@ -180,3 +180,27 @@ it.each([true, false])('carries one letter on the actual gnome and restores it (
     vi.restoreAllMocks()
   }
 })
+
+it('seals and collects each envelope with one gnome, alternating truck and plane', () => {
+  vi.useFakeTimers()
+  mount(<Homie />)
+  const post = () => act(() => { window.dispatchEvent(new Event('homie-post')) })
+  const advanceTo = (selector: string) => {
+    for (let tick = 0; tick < 160 && !document.querySelector(selector); tick++) {
+      act(() => vi.advanceTimersByTime(50))
+    }
+    expect(document.querySelector(selector)).toBeTruthy()
+  }
+  post()
+  post()
+  for (const vehicle of ['truck', 'airplane']) {
+    advanceTo('.homie-post-envelope')
+    expect(document.querySelector('.homie-parked svg')?.getAttribute('data-vehicle')).toBe(vehicle)
+    advanceTo('[data-post="carry"] .homie-letter')
+    expect(document.querySelector('.homie-post-envelope')).toBeNull()
+    advanceTo('[data-post="depart"] .homie-ride')
+    expect(document.querySelectorAll('.homie-portrait')).toHaveLength(1)
+    advanceTo('.homie-dock .homie-yard')
+  }
+  expect(document.querySelector('.homie-letter')).toBeNull()
+})

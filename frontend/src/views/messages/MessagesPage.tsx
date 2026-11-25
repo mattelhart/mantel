@@ -159,6 +159,7 @@ export function MessageThreadPage() {
   const quick = listing.data?.quick_replies ?? ["Dinner's ready", 'Call me', "On my way?"]
 
   const celebrateSent = useCallback(() => {
+    window.dispatchEvent(new Event('homie-post'))
     setJustSent(true)
     if (sentTimer.current) window.clearTimeout(sentTimer.current)
     sentTimer.current = window.setTimeout(() => setJustSent(false), SENT_MS)

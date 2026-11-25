@@ -298,3 +298,16 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
   28%,64% { transform: rotate(4deg); }
   74% { transform: rotate(-18deg); }
 }
+
+.homie-parked, .homie-post-envelope { position: fixed; z-index: 9; pointer-events: none; }
+.homie-post-vehicle { display: block; width: 94px; height: 51px; }
+.homie-parked, .homie-ride { margin-left: -26px; margin-top: 23px; }
+.homie-ride { position: absolute; left: 0; top: 0; pointer-events: none; }
+.homie-post-envelope { width: 25px; height: 16px; border: 2px solid #455863; border-radius: 3px; background: #fff1c9; }
+.homie-post-envelope i { position: absolute; inset: -9px 3px 2px; background: repeating-linear-gradient(#fff 0 4px,#b7c9cc 4px 5px); border: 1px solid #718a91; animation: homie-insert .6s ease-out both; }
+.homie-post-envelope::after { content: ''; position: absolute; inset: 0; background: #e6bb78; clip-path: polygon(0 0,100% 0,50% 72%); transform-origin: center top; animation: homie-seal .65s both; }
+@keyframes homie-insert { from { transform: translateY(-10px) rotate(-9deg); } to { transform: translateY(8px) scale(.8,.3); } }
+@keyframes homie-seal { 0%,55% { transform: scaleY(-1); } }
+.homie-yard[data-post] .homie-friend, .homie-yard[data-post] .homie-gnome { pointer-events: none !important; }
+.homie-yard:is([data-post="board"],[data-post="depart"]) .homie-leg { visibility: hidden; }
+.homie-yard[data-post="depart"] { transition-timing-function: ease-in; }
