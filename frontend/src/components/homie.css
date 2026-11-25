@@ -7,7 +7,7 @@
   display: grid; place-items: center; transition: left 3s ease-in-out;
 }
 .homie-yard[data-right="true"] .homie-friend { left: 100%; }
-.homie-gnome { position: relative; display: block; width: 31px; height: 25px; margin-top: 9px; }
+.homie-gnome { scale: 1.16; transform-origin: center 80%; position: relative; display: block; width: 31px; height: 25px; margin-top: 9px; }
 .homie-portrait { position: absolute; width: 37px; height: 47px; left: -3px; bottom: -1px; z-index: 1; overflow: visible; }
 .homie-cap { transform-origin: 10px 24px; }
 .homie-yard[data-hello="true"] .homie-cap { animation: homie-tip 1s ease-in-out; }
@@ -279,3 +279,22 @@ html .homie-yard .homie-friend:is(:focus, :focus-visible) {
 /* A walking gnome crosses controls; only his visible silhouette takes a tap. */
 .homie-yard[data-walking="true"] .homie-friend { pointer-events: none; }
 .homie-yard[data-walking="true"]:not([data-retreat="true"]) .homie-gnome { pointer-events: auto; }
+
+.homie-leg::after { background: #573c2c; border-bottom: 1px solid #312e29; }
+.homie-spade, .homie-rod { position: absolute; pointer-events: none; z-index: 2; }
+.homie-spade { width: 10px; height: 27px; left: -8px; bottom: -5px; transform-origin: center 42%; }
+.homie-rod { width: 31px; height: 28px; left: 100%; top: -8px; transform-origin: left 60%; }
+@media (prefers-reduced-motion: no-preference) {
+  .homie-spade { animation: homie-dig 1.45s ease-in-out 2; }
+  .homie-rod { animation: homie-nibble 3.3s ease-in-out; }
+}
+@keyframes homie-dig {
+  0%,100% { transform: rotate(-13deg); }
+  38% { transform: translateY(4px) rotate(6deg); }
+  68% { transform: translate(-2px,-2px) rotate(-28deg); }
+}
+@keyframes homie-nibble {
+  0%,100% { transform: rotate(-8deg); }
+  28%,64% { transform: rotate(4deg); }
+  74% { transform: rotate(-18deg); }
+}

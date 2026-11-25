@@ -28,7 +28,7 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const invitation = mailFrom ? "I've got mail from " + mailFrom + "!" : "Say hello to Homie"
   const congrats = star && "Nice work, " + star.name + "! +" + star.earned + " ★"
   const [right, setRight] = useState(false)
-  const [trick, setTrick] = useState<typeof outings[number] | 'rest'>('rest')
+  const [trick, setTrick] = useState<typeof outings[number] | 'rest' | 'fish'>('rest')
   const [guest, setGuest] = useState<'robin' | 'neighbour'>('robin')
   const [perch, setPerch] = useState<{ left: number; top: number } | null>(null)
   const [borrowed, setBorrowed] = useState<{ text: string; style: CSSProperties; carry: boolean } | null>(null)
@@ -169,7 +169,8 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       if (awayNow || Date.now() - quietSince < 12000 || document.hidden
           || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]') || document.querySelector('.saver, dialog[open], [role="dialog"]')
           || button.current?.matches(':focus-visible') || location.pathname.startsWith('/games')) return
-      const move = outings[visit % outings.length]
+      const scheduled = outings[visit % outings.length]
+      const move = scheduled === 'sweep' && Math.floor(visit / outings.length) % 2 === 0 ? 'fish' : scheduled
       if (move === 'visitor') setGuest(Math.floor(visit / outings.length) % 2 === 0 ? 'robin' : 'neighbour')
       visit += 1
       const home = button.current?.getBoundingClientRect()
@@ -254,16 +255,21 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
   const portrait = <svg className="homie-portrait" viewBox="0 0 40 51" focusable="false">
             <g stroke="#394536" strokeWidth="1.5" strokeLinejoin="round">
               <path fill="#59998a" d="M12 29 Q20 25 28 29 L34 46 Q21 51 6 46Z" />
+              <path fill="#76553b" d="m10 38 19-1 1 4-21 2Z" />
+              <path fill="#cbab69" d="m24 38 4-.3.4 3-4 .3Z" />
               <path fill="#f3bc99" d="M7 22 Q19 14 32 22 L30 34 Q19 41 9 32Z" />
               <path fill="#fff1d4" d="M7 29 Q11 32 16 29 Q20 26 25 30 Q29 32 32 28 Q33 37 26 40 L27 37 Q24 44 17 46 L18 42 Q9 42 7 29Z" />
+              <path fill="#dccaa9" stroke="none" d="M9 32q2 7 8 8l-1-4 4 4q5-1 10-8-1 7-6 9l2-4q-3 5-8 8l1-4q-6 0-10-9Z" />
               <g className="homie-cap">
                 <path fill="#c95142" d="M4 24 Q9 18 12 10 Q15 1 26 2 Q33 2 36 8 Q29 6 26 10 Q24 16 34 22 Q22 27 4 24Z" />
+                <path fill="#e07960" stroke="none" d="M9 20Q15 5 24 4q-7 4-10 13Z" />
                 {holiday && <path fill="#ffda6b" d="m18 11 1.3 3 3.4.3-2.5 2.1.8 3.2-3-1.8-2.9 1.8.8-3.2-2.5-2.1 3.4-.3Z" />}
                 <path fill="#a94035" d="M5 22 Q19 19 33 21 L34 25 Q22 23 5 27Z" />
               </g>
               <g fill="#313e37" stroke="none"><circle cx="13" cy="27" r="1.6" /><circle cx="26" cy="26" r="1.6" /></g>
               {push?.kind === 'roll' && <path className="homie-grumble" fill="none" strokeLinecap="round" d="m11 24 4 2m9-1 4-2" />}
               <ellipse fill="#e99879" cx="20" cy="29" rx="5.4" ry="3.8" />
+              <ellipse fill="#ffd0aa" stroke="none" cx="18.5" cy="28" rx="2.6" ry="1" />
               <path fill="none" strokeLinecap="round" d="M17 35 Q20 38 23 34" />
             </g>
           </svg>
@@ -279,6 +285,16 @@ export function Homie({ onDeliver, mailFrom, star, holiday, job, onChores }: Pro
       <button className="homie-friend" ref={button} type="button" onClick={() => { if (away) window.dispatchEvent(new Event('homie-dodge')); tapHomie() }} aria-label={`Homie the Gnome: ${invitation}`} title={invitation}>
         <span className="homie-jump" key={jump} data-jump={jump > 0}>
         <span className="homie-gnome" aria-hidden="true">
+          {trick === 'garden' && <svg className="homie-spade" viewBox="0 0 12 34" focusable="false">
+            <path fill="none" stroke="#71492b" strokeWidth="2.6" d="M6 25V8C0 7 1 2 2 2h8c1 0 1 5-4 6" />
+            <path fill="#83999a" stroke="#334845" d="M1 22h10v5q-1 4-5 6-4-2-5-6Z" />
+          </svg>}
+          {trick === 'fish' && <svg className="homie-rod" viewBox="0 0 38 34" focusable="false">
+            <path fill="none" stroke="#765539" strokeWidth="2" d="M1 20Q19-1 32 4" />
+            <path fill="none" stroke="#687f82" d="M32 4q-2 8 1 20" />
+            <ellipse fill="#d95141" stroke="#60443e" cx="33" cy="25" rx="2" ry="3" />
+            <path fill="none" stroke="#91bac0" d="M25 29q7 3 13 0" />
+          </svg>}
           {trick === 'sweep' && <i className="homie-broom" />}
           {trick === 'bike' && <span className="homie-bike"><i /><b /><i /></span>}
           {portrait}
